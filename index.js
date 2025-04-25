@@ -14,10 +14,23 @@ const supabase = createClient(
 );
 
 // Auth preHandler
+// Auth preHandler
 fastify.addHook('preHandler', async (req, reply) => {
-  if (req.routerPath.startsWith('/auth')) return;
-  const auth = req.headers.authorization;
-  if (!auth) return reply.status(401).send({ error: 'Unauthorized' });
+  // Skip auth checks for auth routes
+  if (req.routerPath && req.routerPath.startsWith('/auth')) {
+    return;
+  }
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return reply.status(401).send({ error: 'Unauthorized' });
+  }
+  const token = authHeader.split(' ')[1];
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    return reply.status(401).send({ error: 'Invalid token' });
+  }
+  req.user = user;
+});
   const token = auth.split(' ')[1];
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return reply.status(401).send({ error: 'Invalid token' });
