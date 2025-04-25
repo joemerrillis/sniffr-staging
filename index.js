@@ -196,5 +196,147 @@ fastify.post('/daycare/sessions', async (req, reply) => {
   if (error) return reply.status(400).send({ error }); reply.send(data);
 });
 
+// AI Scheduling Assistant (RPC)
+fastify.post('/ai/schedule-suggestions', async (req, reply) => {
+  const { tenantId } = req.user.user_metadata;
+  const { data, error } = await supabase.rpc('get_schedule_suggestions', { tenant_id: tenantId });
+  if (error) return reply.status(500).send({ error });
+  reply.send({ suggestions: data });
+});
+// Client Intake & Waitlist
+fastify.post('/intake', async (req, reply) => {
+  const payload = { ...req.body, tenant_id: req.user.user_metadata.tenant_id, status: 'prospect' };
+  const { data, error } = await supabase.from('intake').insert(payload).single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+fastify.get('/intake/waitlist', async (req, reply) => {
+  const { data, error } = await supabase.from('intake')
+    .select('*')
+    .eq('tenant_id', req.user.user_metadata.tenant_id)
+    .eq('status', 'prospect');
+  if (error) return reply.status(500).send({ error });
+  reply.send(data);
+});
+fastify.patch('/intake/:id/convert', async (req, reply) => {
+  const { data, error } = await supabase.from('intake')
+    .update({ status: 'active' })
+    .eq('id', req.params.id)
+    .single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+// Meet-and-Greet Scheduler
+fastify.post('/meet-greets', async (req, reply) => {
+  const payload = { ...req.body, tenant_id: req.user.user_metadata.tenant_id };
+  const { data, error } = await supabase.from('meet_greets').insert(payload).single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+fastify.get('/meet-greets', async (req, reply) => {
+  const { data, error } = await supabase.from('meet_greets')
+    .select('*')
+    .eq('tenant_id', req.user.user_metadata.tenant_id);
+  if (error) return reply.status(500).send({ error });
+  reply.send(data);
+});
+fastify.patch('/meet-greets/:id', async (req, reply) => {
+  const { data, error } = await supabase.from('meet_greets')
+    .update(req.body)
+    .eq('id', req.params.id)
+    .single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+// B2B Referrals & Collaboration
+fastify.get('/tenants/nearby', async (req, reply) => {
+  const { data, error } = await supabase.from('tenants')
+    .select('id,name,slug')
+    .neq('id', req.user.user_metadata.tenant_id);
+  if (error) return reply.status(500).send({ error });
+  reply.send(data);
+});
+fastify.post('/referrals', async (req, reply) => {
+  const payload = { ...req.body, from_tenant: req.user.user_metadata.tenant_id };
+  const { data, error } = await supabase.from('referrals').insert(payload).single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+fastify.get('/referrals', async (req, reply) => {
+  const tenantId = req.user.user_metadata.tenant_id;
+  const { data, error } = await supabase.from('referrals')
+    .select('*')
+    .or(`from_tenant.eq.${tenantId},to_tenant.eq.${tenantId}`);
+  if (error) return reply.status(500).send({ error });
+  reply.send(data);
+});
+// In-App Messaging & Emergency Alerts
+fastify.get('/messages/:conversationId', async (req, reply) => {
+  const { data, error } = await supabase.from('messages')
+    .select('*')
+    .eq('conversation_id', req.params.conversationId)
+    .order('created_at', { ascending: true });
+  if (error) return reply.status(500).send({ error });
+  reply.send(data);
+});
+fastify.post('/messages', async (req, reply) => {
+  const payload = { ...req.body, sender_id: req.user.id };
+  const { data, error } = await supabase.from('messages').insert(payload).single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+fastify.post('/alerts/emergency', async (req, reply) => {
+  const payload = { ...req.body, tenant_id: req.user.user_metadata.tenant_id };
+  const { data, error } = await supabase.from('alerts').insert(payload).single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+// Global AI Feature Tuner
+fastify.patch('/platform/feature-flags', async (req, reply) => {
+  const { features } = req.body;
+  const { data, error } = await supabase.from('tenants')
+    .update({ features })
+    .eq('id', req.user.user_metadata.tenant_id)
+    .single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+// Service Cart & Checkout
+fastify.post('/cart', async (req, reply) => {
+  const payload = { ...req.body, user_id: req.user.id };
+  const { data, error } = await supabase.from('cart').insert(payload).single();
+  if (error) return reply.status(400).send({ error });
+  reply.send(data);
+});
+fastify.get('/cart', async (req, reply) => {
+  const { data, error } = await supabase.from('cart').select('*').eq('user_id', req.user.id);
+  if (error) return reply.status(500).send({ error });
+  reply.send(data);
+});
+fastify.post('/checkout', async (req, reply) => {
+  const { data: items, error: cartErr } = await supabase.from('cart').select('*').eq('user_id', req.user.id);
+  if (cartErr) return reply.status(500).send({ error: cartErr });
+  const purchases = items.map(item => ({ user_id: req.user.id, type: item.type, amount: item.price }));
+  const { data: purchaseData, error: purErr } = await supabase.from('purchases').insert(purchases);
+  if (purErr) return reply.status(500).send({ error: purErr });
+  await supabase.from('cart').delete().eq('user_id', req.user.id);
+  reply.send({ purchases: purchaseData });
+});
+// Intelligent Booking Suggestions (Client)
+fastify.get('/ai/booking-suggestions', async (req, reply) => {
+  const { data, error } = await supabase.rpc('get_booking_suggestions', { user_id: req.user.id });
+  if (error) return reply.status(500).send({ error });
+  reply.send({ suggestions: data });
+});
+// Social Community Hub
+fastify.get('/social/feed', async (req, reply) => {
+  const { data, error } = await supabase.from('social_feed')
+    .select('*')
+    .eq('tenant_id', req.user.user_metadata.tenant_id)
+    .order('timestamp', { ascending: false });
+  if (error) return reply.status(500).send({ error });
+  reply.send(data);
+});
 // Start server listening on all interfaces
 fastify.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' });
+
