@@ -196,5 +196,5 @@ fastify.post('/daycare/sessions', async (req, reply) => {
   if (error) return reply.status(400).send({ error }); reply.send(data);
 });
 
-// Start server
-fastify.listen({ port: process.env.PORT || 3000 });
+// Start server listening on all interfaces
+fastify.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' });
