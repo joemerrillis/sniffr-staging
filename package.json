@@ -4,6 +4,7 @@
   "description": "Fastify backend for Sniffr SaaS, integrating with Supabase",
   "main": "index.js",
   "scripts": {
+    "build": "echo \"Build complete!\"",
     "start": "node index.js"
   },
   "engines": {
