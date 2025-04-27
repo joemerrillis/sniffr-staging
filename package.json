@@ -1,0 +1,21 @@
+{
+  "name": "api-sniffrpack",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.17.0",
+    "fastify-plugin": "^4.5.0",
+    "@supabase/supabase-js": "^2.13.0",
+    "dotenv": "^16.0.0",
+    "fastify-jwt": "^5.0.0",
+    "bcrypt": "^5.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
