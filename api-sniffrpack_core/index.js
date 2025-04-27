@@ -8,6 +8,11 @@ const fastify = Fastify({ logger: true });
 
 fastify.register(corePlugin);
 
+fastify.get('/', async () => {
+  return { status: 'ok' };
+});
+
+
 const start = async () => {
   try {
     await fastify.listen({ port: process.env.PORT || 3000 });
