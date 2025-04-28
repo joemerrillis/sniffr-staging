@@ -12,13 +12,16 @@ fastify.register(corePlugin);
 // Unprotected health check
 fastify.get('/', async () => ({ status: 'ok' }));
 
-// TODO: later register auth, users, tenants, etc:
-// fastify.register(import('./src/auth/index.js'));
-// fastify.register(import('./src/users/index.js'), { prefix: '/users' });
+// Register auth routes under /auth
+fastify.register(import('./src/auth/index.js'), { prefix: '/auth' });
+
+// TODO: later register users, tenants, etc.:
+// fastify.register(import('./src/users/index.js'),   { prefix: '/users' });
+// fastify.register(import('./src/tenants/index.js'), { prefix: '/tenants' });
 
 const start = async () => {
   try {
-    // Use the PORT supplied by Render (or default to 3000) and bind to all interfaces
+    // Use Render’s injected PORT (or fallback to 3000) and bind to all interfaces
     const port = Number(process.env.PORT) || 3000;
     await fastify.listen({ port, host: '0.0.0.0' });
     const address = fastify.server.address();
