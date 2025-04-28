@@ -1,5 +1,5 @@
 import fp from 'fastify-plugin';
-import fastifyJwt from 'fastify/jwt';
+import fastifyJwt from '@fastify/jwt';
 
 export default fp(async function (fastify, opts) {
   const secret = process.env.JWT_SECRET;
