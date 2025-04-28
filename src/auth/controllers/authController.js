@@ -7,32 +7,54 @@ export async function register(request, reply) {
   if (existing) {
     return reply.code(400).send({ error: 'User already exists' });
   }
+
   const passwordHash = await hashPassword(password);
-  const user = await createUser(request.server, { email, name, role: 'client', passwordHash });
-  reply.code(201).send({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+  const user = await createUser(request.server, {
+    email,
+    name,
+    role: 'client',
+    passwordHash
+  });
+
+  reply.code(201).send({
+    user: {
+      id:    user.id,
+      email: user.email,
+      name:  user.name,
+      role:  user.role
+    }
+  });
 }
 
-// after
 export async function login(request, reply) {
   const { email, password } = request.body;
   const user = await findUserByEmail(request.server, email).catch(() => null);
-  if (!user) return reply.code(400).send({ error: 'Invalid credentials' });
-  const valid = await comparePassword(password, user.password_hash);
-  if (!valid) return reply.code(400).send({ error: 'Invalid credentials' });
+  if (!user) {
+    return reply.code(400).send({ error: 'Invalid credentials' });
+  }
 
-  // SIGN the JWT off the Fastify instance, not the request
-  const token = await request.server.jwtSign({
-    userId: user.id,
-    role:   user.role,
+  const valid = await comparePassword(password, user.password_hash);
+  if (!valid) {
+    return reply.code(400).send({ error: 'Invalid credentials' });
+  }
+
+  // Sign the JWT via reply.jwtSign()
+  const token = await reply.jwtSign({
+    userId:   user.id,
+    role:     user.role,
     tenantId: user.tenant_id
   });
 
   reply.send({
     token,
-    user: { id: user.id, email: user.email, name: user.name, role: user.role }
+    user: {
+      id:    user.id,
+      email: user.email,
+      name:  user.name,
+      role:  user.role
+    }
   });
 }
-
 
 export async function getProfile(request, reply) {
   const { userId } = request.user;
@@ -41,12 +63,16 @@ export async function getProfile(request, reply) {
     .select('id, email, name, role, tenant_id')
     .eq('id', userId)
     .single();
-  if (error) return reply.code(404).send({ error: 'User not found' });
+
+  if (error) {
+    return reply.code(404).send({ error: 'User not found' });
+  }
+
   reply.send({ user: data });
 }
 
 export async function logout(request, reply) {
-  // With JWTs, clients can simply discard token;
-  // implement blacklist here if needed.
+  // With JWTs, clients can simply discard the token.
+  // If you want server-side invalidation you can add a blacklist here.
   reply.send({ message: 'Logged out' });
 }
