@@ -12,7 +12,7 @@
     "fastify-plugin": "^4.5.0",
     "@supabase/supabase-js": "^2.13.0",
     "dotenv": "^16.0.0",
-    "fastify-jwt": "^4.0.0",
+    "@fastify/jwt": "^9.1.0",
     "bcrypt": "^5.0.1"
   },
   "devDependencies": {
