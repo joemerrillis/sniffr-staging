@@ -12,6 +12,7 @@ export async function register(request, reply) {
   reply.code(201).send({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 }
 
+// after
 export async function login(request, reply) {
   const { email, password } = request.body;
   const user = await findUserByEmail(request.server, email).catch(() => null);
@@ -19,9 +20,19 @@ export async function login(request, reply) {
   const valid = await comparePassword(password, user.password_hash);
   if (!valid) return reply.code(400).send({ error: 'Invalid credentials' });
 
-  const token = await request.jwtSign({ userId: user.id, role: user.role, tenantId: user.tenant_id });
-  reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+  // SIGN the JWT off the Fastify instance, not the request
+  const token = await request.server.jwtSign({
+    userId: user.id,
+    role:   user.role,
+    tenantId: user.tenant_id
+  });
+
+  reply.send({
+    token,
+    user: { id: user.id, email: user.email, name: user.name, role: user.role }
+  });
 }
+
 
 export async function getProfile(request, reply) {
   const { userId } = request.user;
