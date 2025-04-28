@@ -18,8 +18,11 @@ fastify.get('/', async () => ({ status: 'ok' }));
 
 const start = async () => {
   try {
-    await fastify.listen({ port: process.env.PORT || 3000 });
-    fastify.log.info(`🚀 Server listening on port ${fastify.server.address().port}`);
+    // Use the PORT supplied by Render (or default to 3000) and bind to all interfaces
+    const port = Number(process.env.PORT) || 3000;
+    await fastify.listen({ port, host: '0.0.0.0' });
+    const address = fastify.server.address();
+    fastify.log.info(`🚀 Server listening on ${address.address}:${address.port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
