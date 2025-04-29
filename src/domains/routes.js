@@ -10,18 +10,23 @@ import {
 } from './controllers/domainsController.js';
 
 export default async function domainsRoutes(fastify, opts) {
-  // List domains (optionally filtered by tenant_id)
+  // 1) LIST
   fastify.get('/', {
     schema: {
       querystring: {
         type: 'object',
-        properties: { tenant_id: { type: 'string', format: 'uuid' } }
+        properties: {
+          tenant_id: { type: 'string', format: 'uuid' }
+        }
       },
       response: {
         200: {
           type: 'object',
           properties: {
-            domains: { type: 'array', items: domainSchemas.Domain }
+            domains: {
+              type: 'array',
+              items: domainSchemas.Domain
+            }
           },
           required: ['domains']
         }
@@ -29,7 +34,7 @@ export default async function domainsRoutes(fastify, opts) {
     }
   }, list);
 
-  // Retrieve one domain
+  // 2) RETRIEVE SINGLE
   fastify.get('/:id', {
     schema: {
       params: {
@@ -49,7 +54,7 @@ export default async function domainsRoutes(fastify, opts) {
     }
   }, retrieve);
 
-  // Create a new domain
+  // 3) CREATE
   fastify.post('/', {
     schema: {
       body: domainSchemas.CreateDomain,
@@ -65,7 +70,7 @@ export default async function domainsRoutes(fastify, opts) {
     }
   }, create);
 
-  // Update an existing domain
+  // 4) UPDATE
   fastify.patch('/:id', {
     schema: {
       params: {
@@ -86,7 +91,7 @@ export default async function domainsRoutes(fastify, opts) {
     }
   }, modify);
 
-  // Delete a domain
+  // 5) DELETE
   fastify.delete('/:id', {
     schema: {
       params: {
@@ -97,7 +102,7 @@ export default async function domainsRoutes(fastify, opts) {
     }
   }, remove);
 
-  // Perform CNAME verification
+  // 6) VERIFY CNAME
   fastify.post('/:id/verify', {
     schema: {
       params: {
@@ -116,4 +121,4 @@ export default async function domainsRoutes(fastify, opts) {
       }
     }
   }, verify);
-};
+}
