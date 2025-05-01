@@ -1,3 +1,4 @@
+// src/users/routes.js
 import { userSchemas } from './schemas/users.js';
 import { list, retrieve, modify, remove } from './controllers/usersController.js';
 
@@ -39,7 +40,7 @@ export default async function usersRoutes(fastify, opts) {
     }
   }, retrieve);
 
-  // Update user: return { user: {} }
+  // Update user: accept new profile fields, return { user: {} }
   fastify.patch('/:id', {
     schema: {
       params: {
@@ -62,7 +63,7 @@ export default async function usersRoutes(fastify, opts) {
     }
   }, modify);
 
-  // Delete user: no response schema (204 No Content)
+  // Delete user: no response body (204 No Content)
   fastify.delete('/:id', {
     schema: {
       params: {
