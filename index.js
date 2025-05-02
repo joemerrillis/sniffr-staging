@@ -24,6 +24,8 @@ fastify.register(import('./src/domains/index.js'), { prefix: '/domains' });
 // **Tenants**
 fastify.register(import('./src/tenants/index.js'), { prefix: '/tenants' });
 
+// **Dogs**
+fastify.register(import('./src/dogs/index.js'), { prefix: '/dogs' });
 
 // TODO: later register users, tenants, etc.:
 // fastify.register(import('./src/users/index.js'),   { prefix: '/users' });
