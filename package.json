@@ -14,7 +14,8 @@
     "dotenv": "^16.0.0",
     "@fastify/jwt": "^9.1.0",
     "bcrypt": "^5.0.1",
-    "archiver": "^5.3.1"
+    "archiver": "^5.3.1",
+    "uuid": "^9.x"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
