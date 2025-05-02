@@ -4,9 +4,10 @@ import {
   updateVisibility
 } from './controllers/dogVisibilityController.js';
 
-export default async function visibilityRoutes(fastify, opts) {
+
+ export default async function visibilityRoutes(fastify, opts) {
   // Get current visibility
-  fastify.get('/', {
+  fastify.get('/:id/visibility', {
     schema: {
       params: {
         type: 'object',
@@ -26,7 +27,7 @@ export default async function visibilityRoutes(fastify, opts) {
   }, getVisibility);
 
   // Toggle visibility
-  fastify.patch('/', {
+  fastify.patch('/:id/visibility', {
     schema: {
       params: {
         type: 'object',
