@@ -6,8 +6,8 @@ import authPlugin    from './src/auth/index.js';
 import usersPlugin   from './src/users/index.js';
 import tenantsPlugin from './src/tenants/index.js';
 import domainsPlugin from './src/domains/index.js';
-import dogsPlugin    from './src/dogs/index.js';
-import dogVisibilityPlugin from './src/dogVisibility/index.js';
+import dogsPlugin         from './src/dogs/index.js';
+import visibilityRoutes   from './src/dogVisibility/routes.js';
 
 dotenv.config();
 
@@ -35,7 +35,7 @@ fastify.register(domainsPlugin, { prefix: '/domains' });
 fastify.register(dogsPlugin, { prefix: '/dogs' });
 
 //dog visibility
-fastify.register(dogVisibilityPlugin, { prefix: '/dogs' });
+.register(visibilityRoutes,  { prefix: '/dogs/:id/visibility' })
 
 const start = async () => {
   try {
