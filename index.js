@@ -8,6 +8,7 @@ import tenantsPlugin         from './src/tenants/index.js';
 import domainsPlugin         from './src/domains/index.js';
 import dogsPlugin            from './src/dogs/index.js';
 import visibilityRoutes      from './src/dogVisibility/routes.js';
+import dogFriendsPlugin from './src/dogFriends/index.js';
 
 dotenv.config();
 
@@ -36,6 +37,10 @@ fastify.register(dogsPlugin,    { prefix: '/dogs' });
 
 // Dog visibility (mounted under /dogs/:id/visibility)
 fastify.register(visibilityRoutes, { prefix: '/dogs' });
+
+// Dog-to-dog friendships
+fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
+
 
 const start = async () => {
   try {
