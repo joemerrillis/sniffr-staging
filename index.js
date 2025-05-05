@@ -1,53 +1,45 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
-import corePlugin            from './src/core/index.js';
-import authPlugin            from './src/auth/index.js';
-import usersPlugin           from './src/users/index.js';
-import tenantsPlugin         from './src/tenants/index.js';
-import domainsPlugin         from './src/domains/index.js';
-import dogsPlugin            from './src/dogs/index.js';
-import visibilityRoutes      from './src/dogVisibility/routes.js';
-import dogFriendsPlugin from './src/dogFriends/index.js';
+import corePlugin        from './src/core/index.js';
+import authPlugin        from './src/auth/index.js';
+import usersPlugin       from './src/users/index.js';
+import tenantsPlugin     from './src/tenants/index.js';
+import domainsPlugin     from './src/domains/index.js';
+import dogsPlugin        from './src/dogs/index.js';
+import visibilityPlugin  from './src/dogVisibility/index.js';
+import dogFriendsPlugin  from './src/dogFriends/index.js';
 
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
-// Core (Supabase client, error handler, logging, etc.)
+// Core (Supabase, error hooks, logging)
 fastify.register(corePlugin);
 
-// Public health check
+// Health check
 fastify.get('/', async () => ({ status: 'ok' }));
 
-// Auth (register, login, profile)
-fastify.register(authPlugin,    { prefix: '/auth' });
+// Auth
+fastify.register(authPlugin,      { prefix: '/auth' });
 
-// User management
-fastify.register(usersPlugin,   { prefix: '/users' });
+// User, Tenant, Domain
+fastify.register(usersPlugin,     { prefix: '/users' });
+fastify.register(tenantsPlugin,   { prefix: '/tenants' });
+fastify.register(domainsPlugin,   { prefix: '/domains' });
 
-// Tenant management
-fastify.register(tenantsPlugin, { prefix: '/tenants' });
+// Dogs & Visibility
+fastify.register(dogsPlugin,      { prefix: '/dogs' });
+fastify.register(visibilityPlugin,{ prefix: '/dogs/:id/visibility' });
 
-// Custom domains
-fastify.register(domainsPlugin, { prefix: '/domains' });
-
-// Dog profiles & media
-fastify.register(dogsPlugin,    { prefix: '/dogs' });
-
-// Dog visibility (mounted under /dogs/:id/visibility)
-fastify.register(visibilityRoutes, { prefix: '/dogs' });
-
-// Dog-to-dog friendships
-fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
-
+// Dog-to-Dog Friendships
+fastify.register(dogFriendsPlugin,{ prefix: '/dog-friends' });
 
 const start = async () => {
   try {
     const port = Number(process.env.PORT) || 3000;
     await fastify.listen({ port, host: '0.0.0.0' });
-    const address = fastify.server.address();
-    fastify.log.info(`🚀 Server listening on ${address.address}:${address.port}`);
+    fastify.log.info(`🚀 Server listening on 0.0.0.0:${port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
