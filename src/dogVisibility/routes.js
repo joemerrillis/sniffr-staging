@@ -1,3 +1,5 @@
+// src/dogVisibility/routes.js
+
 import { dogVisibilitySchemas } from './schemas/dogVisibility.js';
 import {
   getVisibility,
@@ -15,12 +17,12 @@ export default async function visibilityRoutes(fastify, opts) {
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-      body: dogVisibilitySchemas.CreateVisibility,     // { is_visible: boolean }
+      body: dogVisibilitySchemas.UpdateVisibility,     // { is_visible: boolean }
       response: {
         201: {
           type: 'object',
           properties: {
-            visibility: dogVisibilitySchemas.Visibility  // { dog_id, is_visible }
+            visibility: dogVisibilitySchemas.Visibility
           },
           required: ['visibility']
         }
@@ -56,7 +58,7 @@ export default async function visibilityRoutes(fastify, opts) {
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-      body: dogVisibilitySchemas.UpdateVisibility,     // { is_visible: boolean }
+      body: dogVisibilitySchemas.UpdateVisibility,
       response: {
         200: {
           type: 'object',
