@@ -1,6 +1,11 @@
 // src/dogVisibility/services/dogVisibilityService.js
 
+/**
+ * Fetch the visibility row for this dog.
+ * Throws if none exists.
+ */
 export async function getVisibilityByDogId(fastify, dogId) {
+  // Select the row; .single() will error if no match
   const { data, error } = await fastify.supabase
     .from('dog_visibility')
     .select('dog_id, is_visible')
@@ -10,20 +15,6 @@ export async function getVisibilityByDogId(fastify, dogId) {
   if (error) {
     throw new Error(`Visibility not set for dog ${dogId}`);
   }
-  return data;
-}
-
-
-  // Now select the (new-or-existing) row
-  const { data, error } = await fastify.supabase
-    .from('dog_visibility')
-    .select('dog_id, is_visible')
-    .eq('dog_id', dogId)
-    .single();
-
-  if (error) {
-    throw new Error(`Could not fetch visibility: ${error.message}`);
-  }
 
   return data;
 }
@@ -32,7 +23,7 @@ export async function getVisibilityByDogId(fastify, dogId) {
  * Set (or insert) the visibility value for this dog.
  */
 export async function setVisibilityByDogId(fastify, dogId, isVisible) {
-  // Upsert will insert or update
+  // Upsert will insert or update based on dog_id conflict
   const { data, error } = await fastify.supabase
     .from('dog_visibility')
     .upsert(
@@ -61,6 +52,4 @@ export async function deleteVisibilityByDogId(fastify, dogId) {
   if (error) {
     throw new Error(`Could not delete visibility: ${error.message}`);
   }
-  
-  // Return nothing; controller will send 204 No Content
 }
