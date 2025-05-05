@@ -9,6 +9,7 @@ import domainsPlugin     from './src/domains/index.js';
 import dogsPlugin        from './src/dogs/index.js';
 import visibilityPlugin  from './src/dogVisibility/index.js';
 import dogFriendsPlugin  from './src/dogFriends/index.js';
+import dogAssignementsPlugin from './src/dogAssignments/inded.js'; 
 
 dotenv.config();
 
@@ -34,6 +35,10 @@ fastify.register(visibilityPlugin,{ prefix: '/dogs/:id/visibility' });
 
 // Dog-to-Dog Friendships
 fastify.register(dogFriendsPlugin,{ prefix: '/dog-friends' });
+
+// Dog Assignments
+fastify.register(import('./src/dogAssignments/index.js'), { prefix: '/dog-assignments' });
+
 
 const start = async () => {
   try {
