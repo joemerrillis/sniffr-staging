@@ -1,8 +1,10 @@
+// index.js
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
+// Core & route plugins
 import corePlugin           from './src/core/index.js';
-import authPlugin           from './src/auth/index.js';
+import authRoutes           from './src/auth/index.js';            // routes-only
 import usersPlugin          from './src/users/index.js';
 import tenantsPlugin        from './src/tenants/index.js';
 import domainsPlugin        from './src/domains/index.js';
@@ -11,23 +13,40 @@ import visibilityPlugin     from './src/dogVisibility/index.js';
 import dogFriendsPlugin     from './src/dogFriends/index.js';
 import dogAssignmentsPlugin from './src/dogAssignments/index.js';
 
+// Add JWT plugin
+import fastifyJwt from '@fastify/jwt';
+
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
-// Core (Supabase client, error hooks, logging)
+// 1) Core wiring
 fastify.register(corePlugin);
 
-// Auth routes (register, login, profile) — this plugin also sets up JWT and decorate('authenticate')
-fastify.register(authPlugin, { prefix: '/auth' });
+// 2) JWT setup
+fastify.register(fastifyJwt, {
+  secret: process.env.JWT_SECRET
+});
 
-// Unprotected health check
+// 3) Authentication decorator
+fastify.decorate('authenticate', async (request, reply) => {
+  try {
+    await request.jwtVerify();
+  } catch (err) {
+    reply.send(err);
+  }
+});
+
+// 4) Auth *routes* (signup / login / profile) — public
+fastify.register(authRoutes, { prefix: '/auth' });
+
+// 5) Health check — public
 fastify.get('/', async () => ({ status: 'ok' }));
 
-// Protect everything else
+// 6) Protect everything else with our new decorator
 fastify.addHook('onRequest', fastify.authenticate);
 
-// Application modules
+// 7) Mount the rest of your modules
 fastify.register(usersPlugin,          { prefix: '/users' });
 fastify.register(tenantsPlugin,        { prefix: '/tenants' });
 fastify.register(domainsPlugin,        { prefix: '/domains' });
