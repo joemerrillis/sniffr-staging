@@ -1,15 +1,15 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
-import corePlugin        from './src/core/index.js';
-import authPlugin        from './src/auth/index.js';
-import usersPlugin       from './src/users/index.js';
-import tenantsPlugin     from './src/tenants/index.js';
-import domainsPlugin     from './src/domains/index.js';
-import dogsPlugin        from './src/dogs/index.js';
-import visibilityPlugin  from './src/dogVisibility/index.js';
-import dogFriendsPlugin  from './src/dogFriends/index.js';
-import dogAssignementsPlugin from './src/dogAssignments/inded.js'; 
+import corePlugin           from './src/core/index.js';
+import authPlugin           from './src/auth/index.js';
+import usersPlugin          from './src/users/index.js';
+import tenantsPlugin        from './src/tenants/index.js';
+import domainsPlugin        from './src/domains/index.js';
+import dogsPlugin           from './src/dogs/index.js';
+import visibilityPlugin     from './src/dogVisibility/index.js';
+import dogFriendsPlugin     from './src/dogFriends/index.js';
+import dogAssignmentsPlugin from './src/dogAssignments/index.js';  // fixed path
 
 dotenv.config();
 
@@ -22,23 +22,22 @@ fastify.register(corePlugin);
 fastify.get('/', async () => ({ status: 'ok' }));
 
 // Auth
-fastify.register(authPlugin,      { prefix: '/auth' });
+fastify.register(authPlugin,          { prefix: '/auth' });
 
 // User, Tenant, Domain
-fastify.register(usersPlugin,     { prefix: '/users' });
-fastify.register(tenantsPlugin,   { prefix: '/tenants' });
-fastify.register(domainsPlugin,   { prefix: '/domains' });
+fastify.register(usersPlugin,         { prefix: '/users' });
+fastify.register(tenantsPlugin,       { prefix: '/tenants' });
+fastify.register(domainsPlugin,       { prefix: '/domains' });
 
 // Dogs & Visibility
-fastify.register(dogsPlugin,      { prefix: '/dogs' });
-fastify.register(visibilityPlugin,{ prefix: '/dogs/:id/visibility' });
+fastify.register(dogsPlugin,          { prefix: '/dogs' });
+fastify.register(visibilityPlugin,    { prefix: '/dogs/:id/visibility' });
 
 // Dog-to-Dog Friendships
-fastify.register(dogFriendsPlugin,{ prefix: '/dog-friends' });
+fastify.register(dogFriendsPlugin,    { prefix: '/dog-friends' });
 
 // Dog Assignments
-fastify.register(import('./src/dogAssignments/index.js'), { prefix: '/dog-assignments' });
-
+fastify.register(dogAssignmentsPlugin,{ prefix: '/dog-assignments' });
 
 const start = async () => {
   try {
