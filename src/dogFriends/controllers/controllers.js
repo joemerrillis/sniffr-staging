@@ -4,7 +4,7 @@ import {
   createFriendship,
   updateFriendship,
   deleteFriendship
-} from './services/services.js';
+} from './services.js';
 
 export async function list(request, reply) {
   const dogId = request.query.dog_id;
