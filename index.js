@@ -1,6 +1,9 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
+// register the Fastify JWT plugin directly
+import fastifyJwt from '@fastify/jwt';
+
 import corePlugin           from './src/core/index.js';
 import authPlugin           from './src/auth/index.js';
 import usersPlugin          from './src/users/index.js';
@@ -15,26 +18,40 @@ dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
-// Core (Supabase client, error handling, logging, etc.)
+// Core (Supabase client, error hooks, logging)
 fastify.register(corePlugin);
 
-// Auth routes (register, login, profile) + JWT setup
+// JWT setup
+fastify.register(fastifyJwt, {
+  secret: process.env.JWT_SECRET
+});
+
+// decorate an `authenticate` method for protecting routes
+fastify.decorate('authenticate', async function(request, reply) {
+  try {
+    await request.jwtVerify();
+  } catch (err) {
+    reply.send(err);
+  }
+});
+
+// Auth routes (register, login, profile) — unprotected
 fastify.register(authPlugin, { prefix: '/auth' });
 
-// Unprotected health check
+// Health check — unprotected
 fastify.get('/', async () => ({ status: 'ok' }));
 
-// Protect all routes below with JWT
+// Protect everything else
 fastify.addHook('onRequest', fastify.authenticate);
 
 // Application modules
-fastify.register(usersPlugin,           { prefix: '/users' });
-fastify.register(tenantsPlugin,         { prefix: '/tenants' });
-fastify.register(domainsPlugin,         { prefix: '/domains' });
-fastify.register(dogsPlugin,            { prefix: '/dogs' });
-fastify.register(visibilityPlugin,      { prefix: '/dogs/:id/visibility' });
-fastify.register(dogFriendsPlugin,      { prefix: '/dog-friends' });
-fastify.register(dogAssignmentsPlugin,  { prefix: '/dog-assignments' });
+fastify.register(usersPlugin,          { prefix: '/users' });
+fastify.register(tenantsPlugin,        { prefix: '/tenants' });
+fastify.register(domainsPlugin,        { prefix: '/domains' });
+fastify.register(dogsPlugin,           { prefix: '/dogs' });
+fastify.register(visibilityPlugin,     { prefix: '/dogs/:id/visibility' });
+fastify.register(dogFriendsPlugin,     { prefix: '/dog-friends' });
+fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
 
 const start = async () => {
   try {
