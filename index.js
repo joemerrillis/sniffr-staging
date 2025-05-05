@@ -9,35 +9,32 @@ import domainsPlugin        from './src/domains/index.js';
 import dogsPlugin           from './src/dogs/index.js';
 import visibilityPlugin     from './src/dogVisibility/index.js';
 import dogFriendsPlugin     from './src/dogFriends/index.js';
-import dogAssignmentsPlugin from './src/dogAssignments/index.js';  // fixed path
+import dogAssignmentsPlugin from './src/dogAssignments/index.js';
 
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
-// Core (Supabase, error hooks, logging)
+// Core (Supabase client, error handling, logging, etc.)
 fastify.register(corePlugin);
 
-// Health check
+// Auth routes (register, login, profile) + JWT setup
+fastify.register(authPlugin, { prefix: '/auth' });
+
+// Unprotected health check
 fastify.get('/', async () => ({ status: 'ok' }));
 
-// Auth
-fastify.register(authPlugin,          { prefix: '/auth' });
+// Protect all routes below with JWT
+fastify.addHook('onRequest', fastify.authenticate);
 
-// User, Tenant, Domain
-fastify.register(usersPlugin,         { prefix: '/users' });
-fastify.register(tenantsPlugin,       { prefix: '/tenants' });
-fastify.register(domainsPlugin,       { prefix: '/domains' });
-
-// Dogs & Visibility
-fastify.register(dogsPlugin,          { prefix: '/dogs' });
-fastify.register(visibilityPlugin,    { prefix: '/dogs/:id/visibility' });
-
-// Dog-to-Dog Friendships
-fastify.register(dogFriendsPlugin,    { prefix: '/dog-friends' });
-
-// Dog Assignments
-fastify.register(dogAssignmentsPlugin,{ prefix: '/dog-assignments' });
+// Application modules
+fastify.register(usersPlugin,           { prefix: '/users' });
+fastify.register(tenantsPlugin,         { prefix: '/tenants' });
+fastify.register(domainsPlugin,         { prefix: '/domains' });
+fastify.register(dogsPlugin,            { prefix: '/dogs' });
+fastify.register(visibilityPlugin,      { prefix: '/dogs/:id/visibility' });
+fastify.register(dogFriendsPlugin,      { prefix: '/dog-friends' });
+fastify.register(dogAssignmentsPlugin,  { prefix: '/dog-assignments' });
 
 const start = async () => {
   try {
