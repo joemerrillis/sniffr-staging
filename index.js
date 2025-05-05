@@ -1,13 +1,13 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
-import corePlugin          from './src/core/index.js';
-import authPlugin          from './src/auth/index.js';
-import usersPlugin         from './src/users/index.js';
-import tenantsPlugin       from './src/tenants/index.js';
-import domainsPlugin       from './src/domains/index.js';
-import dogsPlugin          from './src/dogs/index.js';
-import visibilityRoutes    from './src/dogVisibility/routes.js';
+import corePlugin            from './src/core/index.js';
+import authPlugin            from './src/auth/index.js';
+import usersPlugin           from './src/users/index.js';
+import tenantsPlugin         from './src/tenants/index.js';
+import domainsPlugin         from './src/domains/index.js';
+import dogsPlugin            from './src/dogs/index.js';
+import visibilityRoutes      from './src/dogVisibility/routes.js';
 
 dotenv.config();
 
@@ -20,10 +20,10 @@ fastify.register(corePlugin);
 fastify.get('/', async () => ({ status: 'ok' }));
 
 // Auth (register, login, profile)
-fastify.register(authPlugin,   { prefix: '/auth' });
+fastify.register(authPlugin,    { prefix: '/auth' });
 
 // User management
-fastify.register(usersPlugin,  { prefix: '/users' });
+fastify.register(usersPlugin,   { prefix: '/users' });
 
 // Tenant management
 fastify.register(tenantsPlugin, { prefix: '/tenants' });
@@ -32,10 +32,10 @@ fastify.register(tenantsPlugin, { prefix: '/tenants' });
 fastify.register(domainsPlugin, { prefix: '/domains' });
 
 // Dog profiles & media
-fastify.register(dogsPlugin,     { prefix: '/dogs' });
+fastify.register(dogsPlugin,    { prefix: '/dogs' });
 
 // Dog visibility (mounted under /dogs/:id/visibility)
-fastify.register(visibilityRoutes, { prefix: '/dogs/:id/visibility' });
+fastify.register(visibilityRoutes, { prefix: '/dogs' });
 
 const start = async () => {
   try {
