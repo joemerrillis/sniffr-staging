@@ -1,9 +1,6 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
-// register the Fastify JWT plugin directly
-import fastifyJwt from '@fastify/jwt';
-
 import corePlugin           from './src/core/index.js';
 import authPlugin           from './src/auth/index.js';
 import usersPlugin          from './src/users/index.js';
@@ -21,24 +18,10 @@ const fastify = Fastify({ logger: true });
 // Core (Supabase client, error hooks, logging)
 fastify.register(corePlugin);
 
-// JWT setup
-fastify.register(fastifyJwt, {
-  secret: process.env.JWT_SECRET
-});
-
-// decorate an `authenticate` method for protecting routes
-fastify.decorate('authenticate', async function(request, reply) {
-  try {
-    await request.jwtVerify();
-  } catch (err) {
-    reply.send(err);
-  }
-});
-
-// Auth routes (register, login, profile) — unprotected
+// Auth routes (register, login, profile) — this plugin also sets up JWT and decorate('authenticate')
 fastify.register(authPlugin, { prefix: '/auth' });
 
-// Health check — unprotected
+// Unprotected health check
 fastify.get('/', async () => ({ status: 'ok' }));
 
 // Protect everything else
