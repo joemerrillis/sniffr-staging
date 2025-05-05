@@ -1,5 +1,5 @@
-import { friendSchemas } from './schemas.js';
-import { list, retrieve, create, modify, remove } from './controllers.js';
+import { friendSchemas } from './schemas/schemas.js';
+import { list, retrieve, create, modify, remove } from './controllers/controllers.js';
 
 export default async function routes(fastify, opts) {
   fastify.get('/', {
