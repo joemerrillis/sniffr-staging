@@ -1,7 +1,7 @@
+// src/auth/plugins/jwt.js
 import fp from 'fastify-plugin';
 import fastifyJwt from '@fastify/jwt';
 
-// JWT plugin: registers @fastify/jwt, decorates authenticate, and adds global hook
 export default fp(async function jwtPlugin(fastify, opts) {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
@@ -9,10 +9,10 @@ export default fp(async function jwtPlugin(fastify, opts) {
     throw new Error('JWT_SECRET is required');
   }
 
-  // 1) Register the JWT library
+  // 1) Register JWT library
   fastify.register(fastifyJwt, { secret });
 
-  // 2) Decorate Fastify with `authenticate()` to verify JWT on protected routes
+  // 2) Decorator to verify JWT
   fastify.decorate('authenticate', async function(request, reply) {
     try {
       await request.jwtVerify();
@@ -21,6 +21,21 @@ export default fp(async function jwtPlugin(fastify, opts) {
     }
   });
 
-  // 3) Apply the authenticate hook globally on every request after decoration
-  fastify.addHook('onRequest', fastify.authenticate);
+  // 3) Global onRequest hook that *skips* public paths
+  fastify.addHook('onRequest', async (request, reply) => {
+    const { method, url } = request.raw;
+
+    // Allow unauthenticated access to:
+    //  - Health check: GET or HEAD on '/'
+    //  - All /auth routes (login, register, etc.)
+    if (
+      (url === '/' && (method === 'GET' || method === 'HEAD')) ||
+      url.startsWith('/auth')
+    ) {
+      return;
+    }
+
+    // Everything else requires a valid JWT
+    await fastify.authenticate(request, reply);
+  });
 });
