@@ -27,11 +27,23 @@ export async function create(request, reply) {
   // 1) Create the tenant record
   const tenant = await createTenant(request.server, request.body);
 
-  // 2) Auto-add the creator as the primary “walker” (employee)
+  // 2) Ensure the creator exists in `users`
+  try {
+    const { userId, email, name, role } = request.user;
+    await request.server.supabase
+      .from('users')
+      .upsert(
+        [{ id: userId, email, name, role }],
+        { onConflict: 'id', returning: 'minimal' }
+      );
+  } catch (upsertErr) {
+    request.server.log.error({ upsertErr }, 'Failed to upsert user before employee seed');
+  }
+
+  // 3) Auto-add the creator as the primary “walker” (employee)
   let seededEmployee = null;
   try {
     const userId = request.user.userId;
-
     const { data: employee, error: empErr } = await request.server.supabase
       .from('employees')
       .insert(
@@ -46,27 +58,22 @@ export async function create(request, reply) {
       .single();
 
     if (empErr) {
-      // log detailed Supabase error
       request.server.log.error({ empErr }, 'Error inserting employee for tenant');
     } else {
       seededEmployee = employee;
       request.server.log.info({ employee }, 'Seeded initial employee');
     }
   } catch (err) {
-    // log thrown exceptions
     request.server.log.error({ err }, 'Failed to auto-assign initial employee for tenant');
   }
 
-  // 3) Return the created tenant AND the new employee record
-  reply.code(201).send({
-    tenant,
-    employee: seededEmployee
-  });
+  // 4) Return the created tenant and seeded employee
+  reply.code(201).send({ tenant, employee: seededEmployee });
 }
 
 export async function modify(request, reply) {
   const { id } = request.params;
-  const payload = request.body;
+  const payload  = request.body;
   try {
     const tenant = await updateTenant(request.server, id, payload);
     return { tenant };
