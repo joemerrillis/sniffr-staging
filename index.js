@@ -2,9 +2,8 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
-// Core & route plugins
 import corePlugin           from './src/core/index.js';
-import authRoutes           from './src/auth/index.js';            // routes-only
+import authPlugin           from './src/auth/index.js';            // plugin does JWT + decorate
 import usersPlugin          from './src/users/index.js';
 import tenantsPlugin        from './src/tenants/index.js';
 import domainsPlugin        from './src/domains/index.js';
@@ -13,40 +12,26 @@ import visibilityPlugin     from './src/dogVisibility/index.js';
 import dogFriendsPlugin     from './src/dogFriends/index.js';
 import dogAssignmentsPlugin from './src/dogAssignments/index.js';
 
-// Add JWT plugin
-import fastifyJwt from '@fastify/jwt';
-
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
-// 1) Core wiring
+// 1) Core (Supabase client, error hooks, logging)
 fastify.register(corePlugin);
 
-// 2) JWT setup
-fastify.register(fastifyJwt, {
-  secret: process.env.JWT_SECRET
-});
+// 2) Auth‐plugin: 
+//    - Registers @fastify/jwt 
+//    - Decorates fastify.authenticate 
+//    - Registers /auth routes
+fastify.register(authPlugin);
 
-// 3) Authentication decorator
-fastify.decorate('authenticate', async (request, reply) => {
-  try {
-    await request.jwtVerify();
-  } catch (err) {
-    reply.send(err);
-  }
-});
-
-// 4) Auth *routes* (signup / login / profile) — public
-fastify.register(authRoutes, { prefix: '/auth' });
-
-// 5) Health check — public
+// 3) Public health check
 fastify.get('/', async () => ({ status: 'ok' }));
 
-// 6) Protect everything else with our new decorator
+// 4) Protect all subsequent routes with the authenticate decorator from authPlugin
 fastify.addHook('onRequest', fastify.authenticate);
 
-// 7) Mount the rest of your modules
+// 5) Mount your application modules
 fastify.register(usersPlugin,          { prefix: '/users' });
 fastify.register(tenantsPlugin,        { prefix: '/tenants' });
 fastify.register(domainsPlugin,        { prefix: '/domains' });
