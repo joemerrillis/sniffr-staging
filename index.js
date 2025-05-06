@@ -11,7 +11,7 @@ import dogsPlugin           from './src/dogs/index.js';
 import visibilityPlugin     from './src/dogVisibility/index.js';
 import dogFriendsPlugin     from './src/dogFriends/index.js';
 import dogAssignmentsPlugin from './src/dogAssignments/index.js';
-import employeesPlugin from '.src/employees/inded.js';
+import employeesPlugin from '.src/employees/index.js';
 
 dotenv.config();
 
