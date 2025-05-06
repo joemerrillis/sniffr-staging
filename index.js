@@ -29,7 +29,7 @@ fastify.register(authPlugin);
 fastify.get('/', async () => ({ status: 'ok' }));
 
 // 4) Protect all subsequent routes with the authenticate decorator from authPlugin
-fastify.addHook('onRequest', fastify.authenticate);
+// fastify.addHook('onRequest', fastify.authenticate);
 
 // 5) Mount your application modules
 fastify.register(usersPlugin,          { prefix: '/users' });
