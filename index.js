@@ -11,7 +11,7 @@ import dogsPlugin           from './src/dogs/index.js';
 import visibilityPlugin     from './src/dogVisibility/index.js';
 import dogFriendsPlugin     from './src/dogFriends/index.js';
 import dogAssignmentsPlugin from './src/dogAssignments/index.js';
-import employeesPlugin from '.src/employees/index.js';
+import employeesPlugin from './src/employees/index.js';
 
 dotenv.config();
 
@@ -40,7 +40,7 @@ fastify.register(dogsPlugin,           { prefix: '/dogs' });
 fastify.register(visibilityPlugin,     { prefix: '/dogs/:id/visibility' });
 fastify.register(dogFriendsPlugin,     { prefix: '/dog-friends' });
 fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
-fastify.register(employeesModule, { prefix: '/employees' });
+fastify.register(employeesPlugin, { prefix: '/employees' });
 
 
 const start = async () => {
