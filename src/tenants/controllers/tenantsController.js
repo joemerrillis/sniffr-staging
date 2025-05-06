@@ -24,25 +24,44 @@ export async function retrieve(request, reply) {
 }
 
 export async function create(request, reply) {
-  const payload = request.body;
-  // 1) create the tenant record
-  const tenant = await createTenant(request.server, payload);
+  // 1) Create the tenant record
+  const tenant = await createTenant(request.server, request.body);
 
-  // 2) auto‐add the creator as the primary “walker” (employee)
+  // 2) Auto-add the creator as the primary “walker” (employee)
+  let seededEmployee = null;
   try {
-    const userId = request.user.userId; // injected by your auth plugin
-    await request.server.supabase
+    const userId = request.user.userId; // from your auth plugin
+    const { data: employee, error: empErr } = await request.server.supabase
       .from('employees')
-      .insert([{ tenant_id: tenant.id, user_id: userId, is_primary: true }]);
+      .insert(
+        [{
+          tenant_id:  tenant.id,
+          user_id:    userId,
+          is_primary: true
+        }],
+        { returning: 'representation' }
+      )
+      .select('*')
+      .single();
+
+    if (empErr) {
+      throw empErr;
+    }
+
+    seededEmployee = employee;
+    request.server.log.info({ employee }, 'Seeded initial employee');
   } catch (err) {
-    // log, but don’t block tenant creation
     request.server.log.error(
-      'Failed to auto-assign initial employee for tenant',
+      'Failed to auto-assign initial employee for tenant:',
       err
     );
   }
 
-  reply.code(201).send({ tenant });
+  // 3) Return the created tenant (and employee if you want to surface it)
+  reply.code(201).send({
+    tenant,
+    employee: seededEmployee
+  });
 }
 
 export async function modify(request, reply) {
