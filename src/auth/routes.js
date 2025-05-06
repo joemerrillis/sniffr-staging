@@ -2,6 +2,17 @@
 
 import { register, login, me, logout } from './controllers/authController.js';
 
+const UserResponse = {
+  type: 'object',
+  properties: {
+    id:           { type: 'string', format: 'uuid' },
+    email:        { type: 'string', format: 'email' },
+    name:         { type: 'string' },
+    role:         { type: 'string', enum: ['tenant_admin','client'] },
+    created_at:   { type: 'string', format: 'date-time' }
+  }
+};
+
 export default async function authRoutes(fastify, opts) {
   // 1) Register a new user (tenant-admin or client)
   fastify.post(
@@ -22,7 +33,7 @@ export default async function authRoutes(fastify, opts) {
           201: {
             type: 'object',
             properties: {
-              user:  { $ref: 'auth#/definitions/User' },
+              user:  UserResponse,
               token: { type: 'string' }
             }
           }
@@ -44,6 +55,14 @@ export default async function authRoutes(fastify, opts) {
             email:    { type: 'string', format: 'email' },
             password: { type: 'string' }
           }
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              token: { type: 'string' }
+            }
+          }
         }
       }
     },
@@ -57,7 +76,12 @@ export default async function authRoutes(fastify, opts) {
       preHandler: [ fastify.authenticate ],
       schema: {
         response: {
-          200: { type: 'object', properties: { user: { $ref: 'auth#/definitions/User' } } }
+          200: {
+            type: 'object',
+            properties: {
+              user: UserResponse
+            }
+          }
         }
       }
     },
@@ -68,7 +92,17 @@ export default async function authRoutes(fastify, opts) {
   fastify.post(
     '/logout',
     {
-      preHandler: [ fastify.authenticate ]
+      preHandler: [ fastify.authenticate ],
+      schema: {
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' }
+            }
+          }
+        }
+      }
     },
     logout
   );
