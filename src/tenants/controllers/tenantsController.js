@@ -30,7 +30,8 @@ export async function create(request, reply) {
   // 2) Auto-add the creator as the primary “walker” (employee)
   let seededEmployee = null;
   try {
-    const userId = request.user.userId; // from your auth plugin
+    const userId = request.user.userId;
+
     const { data: employee, error: empErr } = await request.server.supabase
       .from('employees')
       .insert(
@@ -45,19 +46,18 @@ export async function create(request, reply) {
       .single();
 
     if (empErr) {
-      throw empErr;
+      // log detailed Supabase error
+      request.server.log.error({ empErr }, 'Error inserting employee for tenant');
+    } else {
+      seededEmployee = employee;
+      request.server.log.info({ employee }, 'Seeded initial employee');
     }
-
-    seededEmployee = employee;
-    request.server.log.info({ employee }, 'Seeded initial employee');
   } catch (err) {
-    request.server.log.error(
-      'Failed to auto-assign initial employee for tenant:',
-      err
-    );
+    // log thrown exceptions
+    request.server.log.error({ err }, 'Failed to auto-assign initial employee for tenant');
   }
 
-  // 3) Return the created tenant (and employee if you want to surface it)
+  // 3) Return the created tenant AND the new employee record
   reply.code(201).send({
     tenant,
     employee: seededEmployee
