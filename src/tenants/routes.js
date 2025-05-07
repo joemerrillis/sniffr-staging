@@ -8,11 +8,9 @@ import {
   modify,
   remove
 } from './controllers/tenantsController.js';
-import { authenticate } from '../auth/plugins/jwt.js';          // for TS/IDE hints
-import { Employee } from '../employees/schemas/employeesSchemas.js';
 
 export default async function tenantsRoutes(fastify, opts) {
-  // List tenants (public or could be protected as you prefer)
+  // List all tenants
   fastify.get(
     '/',
     {
@@ -34,7 +32,7 @@ export default async function tenantsRoutes(fastify, opts) {
     list
   );
 
-  // Get a single tenant
+  // Retrieve a single tenant
   fastify.get(
     '/:id',
     {
@@ -58,21 +56,31 @@ export default async function tenantsRoutes(fastify, opts) {
     retrieve
   );
 
-  // **Create tenant** (must be logged in as a tenant_admin)
+  // Create a new tenant (protected)
   fastify.post(
     '/',
     {
-      preHandler: [ fastify.authenticate ],
+      preHandler: [fastify.authenticate],
       schema: {
         body: tenantSchemas.CreateTenant,
         response: {
           201: {
             type: 'object',
             properties: {
-              tenant:   tenantSchemas.Tenant,
-              employee: Employee            // allow the seeded employee
+              tenant: tenantSchemas.Tenant,
+              employee: {
+                type: 'object',
+                properties: {
+                  id:         { type: 'string', format: 'uuid' },
+                  tenant_id:  { type: 'string', format: 'uuid' },
+                  user_id:    { type: 'string', format: 'uuid' },
+                  is_primary: { type: 'boolean' },
+                  created_at: { type: 'string', format: 'date-time' }
+                },
+                required: ['id','tenant_id','user_id','is_primary','created_at']
+              }
             },
-            required: ['tenant', 'employee']
+            required: ['tenant','employee']
           }
         }
       }
@@ -80,11 +88,11 @@ export default async function tenantsRoutes(fastify, opts) {
     create
   );
 
-  // **Modify tenant** (protected)
+  // Update a tenant (protected)
   fastify.patch(
     '/:id',
     {
-      preHandler: [ fastify.authenticate ],
+      preHandler: [fastify.authenticate],
       schema: {
         params: {
           type: 'object',
@@ -106,11 +114,11 @@ export default async function tenantsRoutes(fastify, opts) {
     modify
   );
 
-  // **Delete tenant** (protected)
+  // Delete a tenant (protected)
   fastify.delete(
     '/:id',
     {
-      preHandler: [ fastify.authenticate ],
+      preHandler: [fastify.authenticate],
       schema: {
         params: {
           type: 'object',
