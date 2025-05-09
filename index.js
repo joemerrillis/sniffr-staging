@@ -11,7 +11,7 @@ import visibilityPlugin     from './src/dogVisibility/index.js';
 import dogFriendsPlugin     from './src/dogFriends/index.js';
 import dogAssignmentsPlugin from './src/dogAssignments/index.js';
 import employeesPlugin      from './src/employees/index.js';
-import clientWalkersPlugin from './src/clientWalkers/index.js';
+import clientWalkersPlugin  from './src/clientWalkers/index.js';
 
 dotenv.config();
 
@@ -23,7 +23,7 @@ fastify.register(corePlugin);
 // 2) Public health check (no auth required)
 fastify.get('/', async () => ({ status: 'ok' }));
 
-// 3) Auth‐plugin: 
+// 3) Auth‐plugin:
 //    - Registers @fastify/jwt
 //    - Decorates fastify.authenticate
 //    - Adds global onRequest hook to protect subsequent routes
@@ -39,8 +39,7 @@ fastify.register(visibilityPlugin,     { prefix: '/dogs/:id/visibility' });
 fastify.register(dogFriendsPlugin,     { prefix: '/dog-friends' });
 fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
 fastify.register(employeesPlugin,      { prefix: '/employees' });
-fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
-
+fastify.register(clientWalkersPlugin,  { prefix: '/client-walkers' });
 
 const start = async () => {
   try {
