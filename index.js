@@ -12,6 +12,7 @@ import dogFriendsPlugin     from './src/dogFriends/index.js';
 import dogAssignmentsPlugin from './src/dogAssignments/index.js';
 import employeesPlugin      from './src/employees/index.js';
 import clientWalkersPlugin from './src/clientWalkers/index.js';
+import tenantClientsPlugin from './src/tenantClients/index.js';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ fastify.register(dogFriendsPlugin,     { prefix: '/dog-friends' });
 fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
 fastify.register(employeesPlugin,      { prefix: '/employees' });
 fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
+fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
 
 const start = async () => {
   try {
