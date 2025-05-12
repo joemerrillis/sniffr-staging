@@ -28,7 +28,11 @@ export async function listWalksByDay(request, reply) {
 }
 
 export async function createWalk(request, reply) {
-  const payload = request.body;
+  // Allow client_id to come from authenticated user if not in body
+  const payload = { ...request.body };
+  if (!payload.client_id && request.user && request.user.userId) {
+    payload.client_id = request.user.userId;
+  }
   const rec = await createService(request.server, payload);
   reply.code(201).send(rec);
 }
