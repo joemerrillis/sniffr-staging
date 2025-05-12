@@ -1,54 +1,50 @@
-// src/clientWalkWindows/services/clientWalkWindowsService.js
+// src/dogs/services/dogsService.js
 
-const TABLE = 'client_walk_windows';
+const TABLE = 'dogs';
 
-export async function listWindows(server, userId) {
+export async function listDogs(server) {
   const { data, error } = await server.supabase
     .from(TABLE)
-    .select('*')
-    .eq('user_id', userId);
+    .select('*');
   if (error) throw error;
   return data;
 }
 
-export async function getWindow(server, userId, id) {
+export async function getDog(server, id) {
   const { data, error } = await server.supabase
     .from(TABLE)
     .select('*')
-    .eq('user_id', userId)
     .eq('id', id)
     .single();
-  if (error) return null;
+  if (error) throw error;
   return data;
 }
 
-export async function createWindow(server, payload) {
+export async function createDog(server, payload) {
   const { data, error } = await server.supabase
     .from(TABLE)
     .insert([payload])
-    .select('*')
+    .select('*')             // ensure full row returned
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function updateWindow(server, userId, id, payload) {
+export async function updateDog(server, id, payload) {
   const { data, error } = await server.supabase
     .from(TABLE)
     .update(payload)
     .select('*')
-    .eq('user_id', userId)
     .eq('id', id)
     .single();
-  if (error) return null;
+  if (error) throw error;
   return data;
 }
 
-export async function deleteWindow(server, userId, id) {
+export async function deleteDog(server, id) {
   const { error } = await server.supabase
     .from(TABLE)
     .delete()
-    .eq('user_id', userId)
     .eq('id', id);
   if (error) throw error;
 }
