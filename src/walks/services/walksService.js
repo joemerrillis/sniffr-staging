@@ -56,7 +56,7 @@ export async function listWalksByDay(server, date, fallback_last_week) {
 }
 
 export async function createWalk(server, payload) {
-  // 1) Ensure we have client_id
+  // 1) Ensure we have client_id (from payload or dog.owner_id)
   if (!payload.client_id) {
     const { data: dog, error: dogErr } = await server.supabase
       .from(DOGS_TABLE)
@@ -67,7 +67,7 @@ export async function createWalk(server, payload) {
     payload.client_id = dog.owner_id;
   }
 
-  // 2) Auto-fill requested_start/end from client if missing
+  // 2) Auto-fill requested_start/end from client profile if missing
   if (!payload.requested_start || !payload.requested_end) {
     const { data: client, error: clientErr } = await server.supabase
       .from(USERS_TABLE)
@@ -82,7 +82,7 @@ export async function createWalk(server, payload) {
     }
   }
 
-  // 3) Insert draft walk: no scheduled_at, is_confirmed=false
+  // 3) Insert draft walk: scheduled_at=NULL, is_confirmed=false
   const insertPayload = {
     ...payload,
     scheduled_at:   null,
@@ -128,7 +128,7 @@ export async function confirmWalksByDay(server, date) {
 }
 
 export async function cloneWeekWalks(server, fromWeekStart, toWeekStart) {
-  // Fetch last week’s confirmed walks
+  // Fetch last week's confirmed walks
   const { data: originals, error: e1 } = await server.supabase
     .from(TABLE)
     .select('*')
@@ -137,7 +137,7 @@ export async function cloneWeekWalks(server, fromWeekStart, toWeekStart) {
 
   if (e1) throw e1;
 
-  // Map into new-week drafts (clearing IDs & scheduled_at)
+  // Map into new-week drafts
   const clones = originals.map(w => ({
     ...w,
     requested_date: toWeekStart,
