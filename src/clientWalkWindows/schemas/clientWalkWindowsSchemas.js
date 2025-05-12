@@ -5,7 +5,10 @@ export const ClientWalkWindow = {
   properties: {
     id:             { type: 'string', format: 'uuid' },
     user_id:        { type: 'string', format: 'uuid' },
-    day_of_week:    { type: 'string', format: 'weekday' },
+    day_of_week: {
+      type: 'string',
+      enum: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    },
     window_start:   { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
     window_end:     { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
     effective_start:{ type: ['string','null'], format: 'date' },
@@ -18,7 +21,10 @@ export const ClientWalkWindow = {
 export const CreateClientWalkWindow = {
   type: 'object',
   properties: {
-    day_of_week:    { type: 'string', format: 'weekday' },
+    day_of_week: {
+      type: 'string',
+      enum: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    },
     window_start:   { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
     window_end:     { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
     effective_start:{ type: 'string', format: 'date' },
@@ -30,7 +36,10 @@ export const CreateClientWalkWindow = {
 export const UpdateClientWalkWindow = {
   type: 'object',
   properties: {
-    day_of_week:    { type: 'string', format: 'weekday' },
+    day_of_week: {
+      type: 'string',
+      enum: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    },
     window_start:   { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
     window_end:     { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
     effective_start:{ type: 'string', format: 'date' },
