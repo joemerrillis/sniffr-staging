@@ -8,11 +8,6 @@ import {
   deleteClientWalkWindow
 } from '../services/clientWalkWindowsService.js';
 
-// helper to go from 0–6 → lowercase weekday
-const DAY_MAP = [
-  'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
-];
-
 /**
  * List all walk windows for this user
  */
@@ -52,12 +47,14 @@ export async function createWindow(request, reply) {
       .code(400)
       .send({ error: 'day_of_week must be an integer 0 (Sunday) through 6 (Saturday)' });
   }
-  const dowString = DAY_MAP[day_of_week];
+
+  // Convert the integer into the string enum label: "0" - "6"
+  const dowLabel = String(day_of_week);
 
   const payload = {
     ...rest,
     user_id:     userId,
-    day_of_week: dowString
+    day_of_week: dowLabel
   };
 
   const window = await createClientWalkWindow(request.server, payload);
@@ -72,7 +69,7 @@ export async function updateWindow(request, reply) {
   const { id } = request.params;
   const { day_of_week, ...rest } = request.body;
 
-  let payload = { ...rest };
+  const payload = { ...rest };
 
   if (day_of_week !== undefined) {
     if (
@@ -85,7 +82,7 @@ export async function updateWindow(request, reply) {
         .code(400)
         .send({ error: 'day_of_week must be an integer 0 (Sunday) through 6 (Saturday)' });
     }
-    payload.day_of_week = DAY_MAP[day_of_week];
+    payload.day_of_week = String(day_of_week);
   }
 
   const window = await updateClientWalkWindow(request.server, userId, id, payload);
