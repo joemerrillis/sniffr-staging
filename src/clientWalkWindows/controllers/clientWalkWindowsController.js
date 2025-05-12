@@ -10,7 +10,7 @@ import {
 
 // helper to go from 0–6 → lowercase weekday
 const DAY_MAP = [
-  'sunday','monday','tuesday','wednesday','thursday','friday','saturday'
+  'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
 ];
 
 /**
