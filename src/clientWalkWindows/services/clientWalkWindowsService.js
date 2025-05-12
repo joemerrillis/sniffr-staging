@@ -1,3 +1,5 @@
+// src/clientWalkWindows/services/clientWalkWindowsService.js
+
 const TABLE = 'client_walk_windows';
 
 export async function listWindows(server, userId) {
@@ -25,7 +27,7 @@ export async function getWindow(server, userId, id) {
 export async function createWindow(server, payload) {
   const { data, error } = await server.supabase
     .from(TABLE)
-    .insert([payload])
+    .insert([payload], { returning: 'representation' })
     .single();
   if (error) throw error;
   return data;
@@ -34,7 +36,7 @@ export async function createWindow(server, payload) {
 export async function updateWindow(server, userId, id, payload) {
   const { data, error } = await server.supabase
     .from(TABLE)
-    .update(payload)
+    .update(payload, { returning: 'representation' })
     .eq('user_id', userId)
     .eq('id', id)
     .single();
