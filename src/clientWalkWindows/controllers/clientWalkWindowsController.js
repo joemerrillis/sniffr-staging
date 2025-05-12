@@ -12,7 +12,7 @@ import {
  * List all walk windows for this user
  */
 export async function listWindows(request, reply) {
-  const userId = request.user.id;
+  const userId = request.user.sub;
   const windows = await listClientWalkWindows(request.server, userId);
   reply.send({ windows });
 }
@@ -21,7 +21,7 @@ export async function listWindows(request, reply) {
  * Retrieve a single walk window by ID
  */
 export async function getWindow(request, reply) {
-  const userId = request.user.id;
+  const userId = request.user.sub;
   const { id } = request.params;
   const window = await getClientWalkWindow(request.server, userId, id);
   if (!window) {
@@ -34,7 +34,7 @@ export async function getWindow(request, reply) {
  * Create a new walk window (day_of_week comes in as 0–6)
  */
 export async function createWindow(request, reply) {
-  const userId = request.user.id;
+  const userId = request.user.sub;
   const { day_of_week, ...rest } = request.body;
 
   if (
@@ -48,7 +48,7 @@ export async function createWindow(request, reply) {
       .send({ error: 'day_of_week must be an integer 0 (Sunday) through 6 (Saturday)' });
   }
 
-  // Convert the integer into the string enum label: "0" - "6"
+  // Convert to the string enum label "0"–"6"
   const dowLabel = String(day_of_week);
 
   const payload = {
@@ -65,7 +65,7 @@ export async function createWindow(request, reply) {
  * Update an existing walk window by ID
  */
 export async function updateWindow(request, reply) {
-  const userId = request.user.id;
+  const userId = request.user.sub;
   const { id } = request.params;
   const { day_of_week, ...rest } = request.body;
 
@@ -96,7 +96,7 @@ export async function updateWindow(request, reply) {
  * Delete a walk window by ID
  */
 export async function deleteWindow(request, reply) {
-  const userId = request.user.id;
+  const userId = request.user.sub;
   const { id } = request.params;
   await deleteClientWalkWindow(request.server, userId, id);
   reply.code(204).send();
