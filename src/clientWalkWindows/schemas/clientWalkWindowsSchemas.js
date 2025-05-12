@@ -5,12 +5,13 @@ export const ClientWalkWindow = {
   properties: {
     id:              { type: 'string', format: 'uuid' },
     user_id:         { type: 'string', format: 'uuid' },
-    day_of_week:     { type: 'string', enum: [
-                        'sunday','monday','tuesday','wednesday','thursday','friday','saturday'
-                      ] },
+    day_of_week:     {
+      type: 'string',
+      enum: ['0','1','2','3','4','5','6']
+    },
     window_start:    { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
     window_end:      { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
-    effective_start: { type: ['string','null'], format: 'date' },
+    effective_start: { type: 'string', format: 'date' },
     effective_end:   { type: ['string','null'], format: 'date' },
     created_at:      { type: 'string', format: 'date-time' }
   },
