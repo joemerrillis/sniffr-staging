@@ -8,10 +8,32 @@ import {
   deleteClientWalkWindow
 } from '../services/clientWalkWindowsService.js';
 
-// helper to go from 0-6 → lowercase weekday
+// helper to go from 0–6 → lowercase weekday
 const DAY_MAP = [
   'sunday','monday','tuesday','wednesday','thursday','friday','saturday'
 ];
+
+/**
+ * List all walk windows for this user
+ */
+export async function listWindows(request, reply) {
+  const userId = request.user.id;
+  const windows = await listClientWalkWindows(request.server, userId);
+  reply.send({ windows });
+}
+
+/**
+ * Retrieve a single walk window by ID
+ */
+export async function getWindow(request, reply) {
+  const userId = request.user.id;
+  const { id } = request.params;
+  const window = await getClientWalkWindow(request.server, userId, id);
+  if (!window) {
+    return reply.code(404).send({ error: 'Window not found' });
+  }
+  reply.send({ window });
+}
 
 /**
  * Create a new walk window (day_of_week comes in as 0–6)
@@ -20,10 +42,10 @@ export async function createWindow(request, reply) {
   const userId = request.user.id;
   const { day_of_week, ...rest } = request.body;
 
-  // validate & convert
   if (
     typeof day_of_week !== 'number' ||
-    day_of_week < 0 || day_of_week > 6 ||
+    day_of_week < 0 ||
+    day_of_week > 6 ||
     !Number.isInteger(day_of_week)
   ) {
     return reply
@@ -34,8 +56,8 @@ export async function createWindow(request, reply) {
 
   const payload = {
     ...rest,
-    user_id:      userId,
-    day_of_week:  dowString
+    user_id:     userId,
+    day_of_week: dowString
   };
 
   const window = await createClientWalkWindow(request.server, payload);
@@ -55,7 +77,8 @@ export async function updateWindow(request, reply) {
   if (day_of_week !== undefined) {
     if (
       typeof day_of_week !== 'number' ||
-      day_of_week < 0 || day_of_week > 6 ||
+      day_of_week < 0 ||
+      day_of_week > 6 ||
       !Number.isInteger(day_of_week)
     ) {
       return reply
@@ -72,4 +95,12 @@ export async function updateWindow(request, reply) {
   reply.send({ window });
 }
 
-// listWindows, getWindow, deleteWindow remain unchanged
+/**
+ * Delete a walk window by ID
+ */
+export async function deleteWindow(request, reply) {
+  const userId = request.user.id;
+  const { id } = request.params;
+  await deleteClientWalkWindow(request.server, userId, id);
+  reply.code(204).send();
+}
