@@ -1,74 +1,54 @@
-import { v4 as uuidv4 } from 'uuid';
+// src/clientWalkWindows/services/clientWalkWindowsService.js
 
-export async function listDogs(fastify, tenantId, ownerId) {
-  let query = fastify.supabase
-    .from('dogs')
-    .select('id, tenant_id, owner_id, name, photo_url, birthdate, universal_profile_id, created_at');
-  if (tenantId) query = query.eq('tenant_id', tenantId);
-  if (ownerId) query = query.eq('owner_id', ownerId);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+const TABLE = 'client_walk_windows';
+
+export async function listWindows(server, userId) {
+  const { data, error } = await server.supabase
+    .from(TABLE)
+    .select('*')
+    .eq('user_id', userId);
+  if (error) throw error;
   return data;
 }
 
-export async function getDogById(fastify, id) {
-  const { data, error } = await fastify.supabase
-    .from('dogs')
-    .select('id, tenant_id, owner_id, name, photo_url, birthdate, universal_profile_id, created_at')
+export async function getWindow(server, userId, id) {
+  const { data, error } = await server.supabase
+    .from(TABLE)
+    .select('*')
+    .eq('user_id', userId)
     .eq('id', id)
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return null;
   return data;
 }
 
-export async function createDog(fastify, payload) {
-  const { data, error } = await fastify.supabase
-    .from('dogs')
-    .insert(payload)
-    .select()
+export async function createWindow(server, payload) {
+  const { data, error } = await server.supabase
+    .from(TABLE)
+    .insert([payload])
+    .select('*')
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throw error;
   return data;
 }
 
-export async function updateDog(fastify, id, updates) {
-  const { data, error } = await fastify.supabase
-    .from('dogs')
-    .update(updates)
+export async function updateWindow(server, userId, id, payload) {
+  const { data, error } = await server.supabase
+    .from(TABLE)
+    .update(payload)
+    .select('*')
+    .eq('user_id', userId)
     .eq('id', id)
-    .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return null;
   return data;
 }
 
-export async function deleteDog(fastify, id) {
-  const { error } = await fastify.supabase
-    .from('dogs')
+export async function deleteWindow(server, userId, id) {
+  const { error } = await server.supabase
+    .from(TABLE)
     .delete()
+    .eq('user_id', userId)
     .eq('id', id);
-  if (error) throw new Error(error.message);
-  return;
-}
-
-// Generate a signed upload URL for a photo in R2
-export async function generatePhotoUploadUrl(fastify, tenantId, dogId) {
-  const key = `${tenantId}/${dogId}/${uuidv4()}.jpg`;
-  const { url, method, headers } = await fastify.r2.getSignedUrl(key, {
-    method: 'PUT',
-    expiresIn: 300
-  });
-  const publicUrl = `${fastify.r2.publicEndpoint}/${key}`;
-  return { uploadUrl: url, uploadMethod: method, uploadHeaders: headers, publicUrl };
-}
-
-// Stub for export media; actual streaming implemented in controller
-export async function getOwnerMedia(fastify, ownerId) {
-  const dogs = await listDogs(fastify, null, ownerId);
-  return dogs.map(d => ({
-    id: d.id,
-    name: d.name,
-    photo_url: d.photo_url,
-    birthdate: d.birthdate
-  }));
+  if (error) throw error;
 }
