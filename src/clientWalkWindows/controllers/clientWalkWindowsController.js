@@ -110,3 +110,14 @@ export async function deleteWindow(request, reply) {
   await deleteClientWalkWindow(request.server, userId, id);
   reply.code(204).send();
 }
+import {
+
+  // … existing imports …
+  listWindowsForWeek as listWeekService
+} from '../services/clientWalkWindowsService.js';
+
+export async function listWindowsForWeek(request, reply) {
+  const { week_start } = request.query;
+  const data = await listWeekService(request.server, request.user.userId, week_start);
+  reply.send(data);
+}
