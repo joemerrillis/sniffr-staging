@@ -31,6 +31,27 @@ export const ClientWalkWindow = {
   ]
 };
 
+// Envelope for an array of windows
+export const WindowsEnvelope = {
+  $id: 'WindowsEnvelope',
+  type: 'object',
+  properties: {
+    windows: {
+      type: 'array',
+      items: { $ref: 'ClientWalkWindow#' }
+    }
+  }
+};
+
+// Envelope for a single window
+export const WindowEnvelope = {
+  $id: 'WindowEnvelope',
+  type: 'object',
+  properties: {
+    window: { $ref: 'ClientWalkWindow#' }
+  }
+};
+
 export const CreateClientWalkWindow = {
   type: 'object',
   properties: {
