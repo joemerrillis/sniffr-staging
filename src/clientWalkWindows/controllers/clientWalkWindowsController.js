@@ -1,5 +1,4 @@
 // src/clientWalkWindows/controllers/clientWalkWindowsController.js
-
 import {
   listClientWalkWindows,
   getClientWalkWindow,
@@ -8,16 +7,13 @@ import {
   deleteClientWalkWindow
 } from '../services/clientWalkWindowsService.js';
 
-/**
- * Helper: grab the user ID from the decoded JWT.
- * We check both .id and .sub to cover whichever claim you signed.
- */
+/** Helper to pull the logged-in user’s ID from JWT */
 function getUserId(request) {
   return request.user.id ?? request.user.sub;
 }
 
 /**
- * List all walk windows for the current user
+ * GET /client-windows
  */
 export async function listWindows(request, reply) {
   const userId = getUserId(request);
@@ -26,7 +22,7 @@ export async function listWindows(request, reply) {
 }
 
 /**
- * Retrieve a single walk window by ID
+ * GET /client-windows/:id
  */
 export async function getWindow(request, reply) {
   const userId = getUserId(request);
@@ -36,18 +32,17 @@ export async function getWindow(request, reply) {
   if (!window) {
     return reply.code(404).send({ error: 'Window not found' });
   }
-
   reply.send({ window });
 }
 
 /**
- * Create a new walk window (day_of_week must be 0–6)
+ * POST /client-windows
  */
 export async function createWindow(request, reply) {
   const userId = getUserId(request);
   const { day_of_week, window_start, window_end, effective_start, effective_end } = request.body;
 
-  // Validate day_of_week
+  // Validate day_of_week is integer 0–6
   if (
     typeof day_of_week !== 'number' ||
     !Number.isInteger(day_of_week) ||
@@ -60,8 +55,8 @@ export async function createWindow(request, reply) {
   }
 
   const payload = {
-    user_id:         userId,
-    day_of_week,     // keep as integer
+    user_id:        userId,
+    day_of_week,
     window_start,
     window_end,
     effective_start,
@@ -73,14 +68,13 @@ export async function createWindow(request, reply) {
 }
 
 /**
- * Update an existing walk window by ID
+ * PATCH /client-windows/:id
  */
 export async function updateWindow(request, reply) {
   const userId = getUserId(request);
   const { id } = request.params;
   const { day_of_week, window_start, window_end, effective_start, effective_end } = request.body;
 
-  // Build update payload
   const payload = {};
   if (day_of_week !== undefined) {
     if (
@@ -95,21 +89,20 @@ export async function updateWindow(request, reply) {
     }
     payload.day_of_week = day_of_week;
   }
-  if (window_start     !== undefined) payload.window_start     = window_start;
-  if (window_end       !== undefined) payload.window_end       = window_end;
-  if (effective_start  !== undefined) payload.effective_start  = effective_start;
-  if (effective_end    !== undefined) payload.effective_end    = effective_end;
+  if (window_start    !== undefined) payload.window_start    = window_start;
+  if (window_end      !== undefined) payload.window_end      = window_end;
+  if (effective_start !== undefined) payload.effective_start = effective_start;
+  if (effective_end   !== undefined) payload.effective_end   = effective_end;
 
   const window = await updateClientWalkWindow(request.server, userId, id, payload);
   if (!window) {
     return reply.code(404).send({ error: 'Window not found' });
   }
-
   reply.send({ window });
 }
 
 /**
- * Delete a walk window by ID
+ * DELETE /client-windows/:id
  */
 export async function deleteWindow(request, reply) {
   const userId = getUserId(request);
