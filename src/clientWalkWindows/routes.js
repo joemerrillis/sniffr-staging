@@ -1,111 +1,78 @@
 // src/clientWalkWindows/routes.js
+
 import {
   listWindows,
   getWindow,
   createWindow,
   updateWindow,
-  deleteWindow
+  deleteWindow,
+  listWindowsForWeek
 } from './controllers/clientWalkWindowsController.js';
+
 import {
-  CreateClientWalkWindow,
-  UpdateClientWalkWindow
+  Window,
+  CreateWindow,
+  UpdateWindow,
+  WeekQuery
 } from './schemas/clientWalkWindowsSchemas.js';
 
 export default async function routes(fastify, opts) {
   // 1) List all windows for current user
-  fastify.get(
-    '/',
-    {
-      schema: {
-        response: {
-          200: { $ref: 'WindowsEnvelope#' }
-        }
-      }
-    },
-    listWindows
-  );
+  fastify.get('/', {
+    schema: {
+      response: { 200: { type: 'array', items: Window } }
+    }
+  }, listWindows);
 
   // 2) Retrieve a single window by ID
-  fastify.get(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' }
-          },
-          required: ['id']
-        },
-        response: {
-          200: { $ref: 'WindowEnvelope#' }
-        }
-      }
-    },
-    getWindow
-  );
+  fastify.get('/:id', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      response: { 200: Window }
+    }
+  }, getWindow);
 
-  // 3) Create a new window
-  fastify.post(
-    '/',
-    {
-      schema: {
-        body: CreateClientWalkWindow,
-        response: {
-          201: { $ref: 'WindowEnvelope#' }
-        }
-      }
-    },
-    createWindow
-  );
+  // 3) List windows active during a given week
+  fastify.get('/week', {
+    schema: {
+      querystring: WeekQuery,
+      response: { 200: { type: 'array', items: Window } }
+    }
+  }, listWindowsForWeek);
 
-  // 4) Update an existing window
-  fastify.patch(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' }
-          },
-          required: ['id']
-        },
-        body: UpdateClientWalkWindow,
-        response: {
-          200: { $ref: 'WindowEnvelope#' }
-        }
-      }
-    },
-    updateWindow
-  );
+  // 4) Create a new window
+  fastify.post('/', {
+    schema: {
+      body: CreateWindow,
+      response: { 201: Window }
+    }
+  }, createWindow);
 
-  // 5) Delete a window
-  fastify.delete(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' }
-          },
-          required: ['id']
-        },
-        response: {
-          204: { type: 'null' }
-        }
+  // 5) Update an existing window
+  fastify.patch('/:id', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      body: UpdateWindow,
+      response: { 200: Window }
+    }
+  }, updateWindow);
+
+  // 6) Delete a window
+  fastify.delete('/:id', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
       }
-    },
-    deleteWindow
-  );
+    }
+  }, deleteWindow);
 }
-import { WeekQuery } from './schemas/clientWalkWindowsSchemas.js';
-import { listWindowsForWeek } from './controllers/clientWalkWindowsController.js';
-
-fastify.get('/week', {
-  schema: {
-    querystring: WeekQuery,
-    response: { 200: { type: 'array', items: Window } }
-  }
-}, listWindowsForWeek);
