@@ -1,25 +1,34 @@
 // src/clientWalkWindows/services/clientWalkWindowsService.js
 
-export async function listClientWalkWindows(server, clientId) {
+/**
+ * List all windows for a given user
+ */
+export async function listClientWalkWindows(server, userId) {
   const { data, error } = await server.supabase
     .from('client_walk_windows')
     .select('*')
-    .eq('client_id', clientId);
+    .eq('user_id', userId);
   if (error) throw error;
   return data;
 }
 
-export async function getClientWalkWindow(server, clientId, id) {
+/**
+ * Get a single window by user + ID
+ */
+export async function getClientWalkWindow(server, userId, id) {
   const { data, error } = await server.supabase
     .from('client_walk_windows')
     .select('*')
-    .eq('client_id', clientId)
+    .eq('user_id', userId)
     .eq('id', id)
     .single();
   if (error) throw error;
   return data;
 }
 
+/**
+ * Create a new window
+ */
 export async function createClientWalkWindow(server, payload) {
   const { data, error } = await server.supabase
     .from('client_walk_windows')
@@ -29,22 +38,28 @@ export async function createClientWalkWindow(server, payload) {
   return data;
 }
 
-export async function updateClientWalkWindow(server, clientId, id, payload) {
+/**
+ * Update a window for a given user
+ */
+export async function updateClientWalkWindow(server, userId, id, payload) {
   const { data, error } = await server.supabase
     .from('client_walk_windows')
     .update(payload)
-    .eq('client_id', clientId)
+    .eq('user_id', userId)
     .eq('id', id)
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function deleteClientWalkWindow(server, clientId, id) {
+/**
+ * Delete a window for a given user
+ */
+export async function deleteClientWalkWindow(server, userId, id) {
   const { error } = await server.supabase
     .from('client_walk_windows')
     .delete()
-    .eq('client_id', clientId)
+    .eq('user_id', userId)
     .eq('id', id);
   if (error) throw error;
 }
