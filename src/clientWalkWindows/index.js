@@ -4,19 +4,15 @@ import routes from './routes.js';
 import {
   ClientWalkWindow,
   WindowsEnvelope,
-  WindowEnvelope,
-  CreateClientWalkWindow,
-  UpdateClientWalkWindow
+  WindowEnvelope
 } from './schemas/clientWalkWindowsSchemas.js';
 
 export default fp(async function clientWalkWindowsModule(fastify, opts) {
-  // 1) Make Fastify aware of all our JSON schemas
+  // register only schemas that have an $id
   fastify.addSchema(ClientWalkWindow);
   fastify.addSchema(WindowsEnvelope);
   fastify.addSchema(WindowEnvelope);
-  fastify.addSchema(CreateClientWalkWindow);
-  fastify.addSchema(UpdateClientWalkWindow);
 
-  // 2) Register our routes (the “prefix” comes from how you mount this plugin in index.js)
+  // now mount our routes under whatever prefix was passed in
   fastify.register(routes, opts);
 });
