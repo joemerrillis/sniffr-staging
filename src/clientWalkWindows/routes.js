@@ -1,5 +1,4 @@
 // src/clientWalkWindows/routes.js
-
 import {
   listWindows,
   getWindow,
@@ -7,17 +6,13 @@ import {
   updateWindow,
   deleteWindow
 } from './controllers/clientWalkWindowsController.js';
-
 import {
-  ClientWalkWindow,
-  WindowsEnvelope,
-  WindowEnvelope,
   CreateClientWalkWindow,
   UpdateClientWalkWindow
 } from './schemas/clientWalkWindowsSchemas.js';
 
 export default async function routes(fastify, opts) {
-  // 1) List
+  // 1) List all windows for current user
   fastify.get(
     '/',
     {
@@ -30,14 +25,16 @@ export default async function routes(fastify, opts) {
     listWindows
   );
 
-  // 2) Retrieve one
+  // 2) Retrieve a single window by ID
   fastify.get(
     '/:id',
     {
       schema: {
         params: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
+          properties: {
+            id: { type: 'string', format: 'uuid' }
+          },
           required: ['id']
         },
         response: {
@@ -48,7 +45,7 @@ export default async function routes(fastify, opts) {
     getWindow
   );
 
-  // 3) Create
+  // 3) Create a new window
   fastify.post(
     '/',
     {
@@ -62,14 +59,16 @@ export default async function routes(fastify, opts) {
     createWindow
   );
 
-  // 4) Update
+  // 4) Update an existing window
   fastify.patch(
     '/:id',
     {
       schema: {
         params: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
+          properties: {
+            id: { type: 'string', format: 'uuid' }
+          },
           required: ['id']
         },
         body: UpdateClientWalkWindow,
@@ -81,14 +80,16 @@ export default async function routes(fastify, opts) {
     updateWindow
   );
 
-  // 5) Delete
+  // 5) Delete a window
   fastify.delete(
     '/:id',
     {
       schema: {
         params: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
+          properties: {
+            id: { type: 'string', format: 'uuid' }
+          },
           required: ['id']
         },
         response: {
