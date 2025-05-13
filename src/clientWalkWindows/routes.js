@@ -100,3 +100,12 @@ export default async function routes(fastify, opts) {
     deleteWindow
   );
 }
+import { WeekQuery } from './schemas/clientWalkWindowsSchemas.js';
+import { listWindowsForWeek } from './controllers/clientWalkWindowsController.js';
+
+fastify.get('/week', {
+  schema: {
+    querystring: WeekQuery,
+    response: { 200: { type: 'array', items: Window } }
+  }
+}, listWindowsForWeek);
