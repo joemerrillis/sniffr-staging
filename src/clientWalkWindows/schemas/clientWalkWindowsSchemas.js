@@ -90,3 +90,11 @@ export const UpdateClientWalkWindow = {
     effective_end:   { type: 'string', format: 'date' }
   }
 };
+
+export const WeekQuery = {
+  type: 'object',
+  properties: {
+    week_start: { type: 'string', format: 'date' }
+  },
+  required: ['week_start']
+};
