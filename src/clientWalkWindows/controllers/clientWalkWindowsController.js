@@ -10,7 +10,7 @@ import {
 } from '../services/clientWalkWindowsService.js';
 
 // 1) List all windows for current user
-e**xport** async function listWindows(request, reply) {
+export async function listWindows(request, reply) {
   const userId = request.user.userId;
   const data = await listClientWalkWindows(request.server, userId);
   // wrap in envelope
