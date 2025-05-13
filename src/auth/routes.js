@@ -43,7 +43,7 @@ export default async function authRoutes(fastify, opts) {
     register
   );
 
-  // 2) Login existing user
+  // 2) Login existing user — now returns both user + token
   fastify.post(
     '/login',
     {
@@ -60,6 +60,7 @@ export default async function authRoutes(fastify, opts) {
           200: {
             type: 'object',
             properties: {
+              user:  UserResponse,
               token: { type: 'string' }
             }
           }
