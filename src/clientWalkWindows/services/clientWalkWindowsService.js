@@ -67,3 +67,28 @@ export async function deleteClientWalkWindow(server, userId, id) {
     .eq('id', id);
   if (error) throw error;
 }
+/**
+ * List all windows “active” during the week starting `weekStart`
+ */
+export async function listWindowsForWeek(server, userId, weekStart) {
+  // 1) compute date boundaries
+  const start = new Date(weekStart);
+  const end   = new Date(start);
+  end.setDate(end.getDate() + 6);
+
+  // 2) fetch all windows for user
+  const { data: all, error } = await server.supabase
+    .from(TABLE)
+    .select('*')
+    .eq('user_id', userId);
+  if (error) throw error;
+
+  // 3) filter by effective date range
+  const filtered = all.filter(w => {
+    const effStart = new Date(w.effective_start);
+    const effEnd   = w.effective_end ? new Date(w.effective_end) : null;
+    return effStart <= end && (!effEnd || effEnd >= start);
+  });
+
+  return filtered;
+}
