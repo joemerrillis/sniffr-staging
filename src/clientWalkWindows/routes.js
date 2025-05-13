@@ -7,35 +7,30 @@ import {
   updateWindow,
   deleteWindow
 } from './controllers/clientWalkWindowsController.js';
+
 import {
   ClientWalkWindow,
+  WindowsEnvelope,
+  WindowEnvelope,
   CreateClientWalkWindow,
   UpdateClientWalkWindow
 } from './schemas/clientWalkWindowsSchemas.js';
 
 export default async function routes(fastify, opts) {
-  // 1) List all windows for current user
+  // 1) List
   fastify.get(
     '/',
     {
       schema: {
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              windows: {
-                type: 'array',
-                items: ClientWalkWindow
-              }
-            }
-          }
+          200: { $ref: 'WindowsEnvelope#' }
         }
       }
     },
     listWindows
   );
 
-  // 2) Get a single window by ID
+  // 2) Retrieve one
   fastify.get(
     '/:id',
     {
@@ -46,38 +41,28 @@ export default async function routes(fastify, opts) {
           required: ['id']
         },
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              window: ClientWalkWindow
-            }
-          }
+          200: { $ref: 'WindowEnvelope#' }
         }
       }
     },
     getWindow
   );
 
-  // 3) Create a new window
+  // 3) Create
   fastify.post(
     '/',
     {
       schema: {
         body: CreateClientWalkWindow,
         response: {
-          201: {
-            type: 'object',
-            properties: {
-              window: ClientWalkWindow
-            }
-          }
+          201: { $ref: 'WindowEnvelope#' }
         }
       }
     },
     createWindow
   );
 
-  // 4) Update an existing window
+  // 4) Update
   fastify.patch(
     '/:id',
     {
@@ -89,19 +74,14 @@ export default async function routes(fastify, opts) {
         },
         body: UpdateClientWalkWindow,
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              window: ClientWalkWindow
-            }
-          }
+          200: { $ref: 'WindowEnvelope#' }
         }
       }
     },
     updateWindow
   );
 
-  // 5) Delete a window
+  // 5) Delete
   fastify.delete(
     '/:id',
     {
