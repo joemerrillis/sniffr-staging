@@ -8,11 +8,11 @@ import {
 } from './schemas/clientWalkWindowsSchemas.js';
 
 export default fp(async function clientWalkWindowsModule(fastify, opts) {
-  // register only schemas that have an $id
+  // Register schemas by their $id so Fastify can resolve $ref
   fastify.addSchema(ClientWalkWindow);
   fastify.addSchema(WindowsEnvelope);
   fastify.addSchema(WindowEnvelope);
 
-  // now mount our routes under whatever prefix was passed in
+  // Mount routes under the prefix you pass in (e.g. '/client-windows')
   fastify.register(routes, opts);
 });
