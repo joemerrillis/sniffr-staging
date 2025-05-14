@@ -1,25 +1,26 @@
 // src/clientWalkWindows/schemas/clientWalkWindowsSchemas.js
 
-// Schema for a single client walk window
-export const Window = {
+export const ClientWalkWindow = {
   $id: 'ClientWalkWindow',
   type: 'object',
   properties: {
-    id:              { type: 'string', format: 'uuid' },
-    user_id:         { type: 'string', format: 'uuid' },
-    day_of_week:     { type: 'integer', minimum: 0, maximum: 6 },
-    window_start:    {
+    id:               { type: 'string', format: 'uuid' },
+    user_id:          { type: 'string', format: 'uuid' },
+    day_of_week:      { type: 'integer', minimum: 0, maximum: 6 },
+    // allow optional seconds, since your DB returns "HH:MM:SS"
+    window_start: {
       type: 'string',
-      pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$'   // <-- HH:MM only
+      pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)(:[0-5]\\d)?$'
     },
-    window_end:      {
+    window_end: {
       type: 'string',
-      pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$'   // <-- HH:MM only
+      pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)(:[0-5]\\d)?$'
     },
-    effective_start: { type: 'string', format: 'date' },
-    effective_end:   { type: ['string','null'], format: 'date' },
-    created_at:      { type: 'string', format: 'date-time' },
-    updated_at:      { type: 'string', format: 'date-time' }
+    effective_start:  { type: 'string', format: 'date' },
+    // allow null if omitted
+    effective_end:    { type: ['string', 'null'], format: 'date' },
+    created_at:       { type: 'string', format: 'date-time' },
+    updated_at:       { type: 'string', format: 'date-time' }
   },
   required: [
     'id',
@@ -31,7 +32,6 @@ export const Window = {
   ]
 };
 
-// Envelope for list responses
 export const WindowsEnvelope = {
   $id: 'WindowsEnvelope',
   type: 'object',
@@ -40,29 +40,31 @@ export const WindowsEnvelope = {
       type: 'array',
       items: { $ref: 'ClientWalkWindow#' }
     }
-  },
-  required: ['windows']
+  }
 };
 
-// Envelope for single‐item responses
 export const WindowEnvelope = {
   $id: 'WindowEnvelope',
   type: 'object',
   properties: {
     window: { $ref: 'ClientWalkWindow#' }
-  },
-  required: ['window']
+  }
 };
 
-// Body schema for creating a window
-export const CreateWindow = {
+export const CreateClientWalkWindow = {
   type: 'object',
   properties: {
     day_of_week:     { type: 'integer', minimum: 0, maximum: 6 },
-    window_start:    { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
-    window_end:      { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
+    window_start:    {
+      type: 'string',
+      pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$'  // omit seconds on input
+    },
+    window_end:      {
+      type: 'string',
+      pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$'
+    },
     effective_start: { type: 'string', format: 'date' },
-    effective_end:   { type: ['string','null'], format: 'date' }
+    effective_end:   { type: ['string', 'null'], format: 'date' }
   },
   required: [
     'day_of_week',
@@ -72,17 +74,23 @@ export const CreateWindow = {
   ]
 };
 
-// Body schema for updating a window
-export const UpdateWindow = {
+export const UpdateClientWalkWindow = {
   type: 'object',
   properties: {
     day_of_week:     { type: 'integer', minimum: 0, maximum: 6 },
-    window_start:    { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
-    window_end:      { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
+    window_start:    {
+      type: 'string',
+      pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$'
+    },
+    window_end:      {
+      type: 'string',
+      pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$'
+    },
     effective_start: { type: 'string', format: 'date' },
-    effective_end:   { type: ['string','null'], format: 'date' }
+    effective_end:   { type: ['string', 'null'], format: 'date' }
   }
 };
+
 
 // Query schema for listing windows in a week
 export const WeekQuery = {
