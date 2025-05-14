@@ -45,13 +45,13 @@ export default async function routes(fastify, opts) {
   }, listWindowsForWeek);
 
   // 4) Create a new window
-//  fastify.post('/', {
-  //  schema: {
-    //  body: CreateWindow,
-    //  response: { 201: Window }
-   // }
- // }, createWindow);
-    fastify.post('/', createWindow);
+  fastify.post('/', {
+    schema: {
+      body: CreateWindow,
+      response: { 201: Window }
+    }
+  }, createWindow);
+    
 
   // 5) Update an existing window
   fastify.patch('/:id', {
