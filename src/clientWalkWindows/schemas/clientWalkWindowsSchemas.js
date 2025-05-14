@@ -8,8 +8,14 @@ export const Window = {
     id:              { type: 'string', format: 'uuid' },
     user_id:         { type: 'string', format: 'uuid' },
     day_of_week:     { type: 'integer', minimum: 0, maximum: 6 },
-    window_start:    { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
-    window_end:      { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
+    window_start:    {
+      type: 'string',
+      pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$'   // <-- HH:MM only
+    },
+    window_end:      {
+      type: 'string',
+      pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$'   // <-- HH:MM only
+    },
     effective_start: { type: 'string', format: 'date' },
     effective_end:   { type: ['string','null'], format: 'date' },
     created_at:      { type: 'string', format: 'date-time' },
@@ -25,13 +31,36 @@ export const Window = {
   ]
 };
 
+// Envelope for list responses
+export const WindowsEnvelope = {
+  $id: 'WindowsEnvelope',
+  type: 'object',
+  properties: {
+    windows: {
+      type: 'array',
+      items: { $ref: 'ClientWalkWindow#' }
+    }
+  },
+  required: ['windows']
+};
+
+// Envelope for single‐item responses
+export const WindowEnvelope = {
+  $id: 'WindowEnvelope',
+  type: 'object',
+  properties: {
+    window: { $ref: 'ClientWalkWindow#' }
+  },
+  required: ['window']
+};
+
 // Body schema for creating a window
 export const CreateWindow = {
   type: 'object',
   properties: {
     day_of_week:     { type: 'integer', minimum: 0, maximum: 6 },
-    window_start:    { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
-    window_end:      { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
+    window_start:    { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
+    window_end:      { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
     effective_start: { type: 'string', format: 'date' },
     effective_end:   { type: ['string','null'], format: 'date' }
   },
@@ -48,8 +77,8 @@ export const UpdateWindow = {
   type: 'object',
   properties: {
     day_of_week:     { type: 'integer', minimum: 0, maximum: 6 },
-    window_start:    { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
-    window_end:      { type: 'string', pattern: '^([0-1]\\d|2[0-3]):([0-5]\\d)$' },
+    window_start:    { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
+    window_end:      { type: 'string', pattern: '^([01]\\d|2[0-3]):([0-5]\\d)$' },
     effective_start: { type: 'string', format: 'date' },
     effective_end:   { type: ['string','null'], format: 'date' }
   }
