@@ -15,6 +15,7 @@ import clientWalkersPlugin from './src/clientWalkers/index.js';
 import tenantClientsPlugin from './src/tenantClients/index.js';
 import walksPlugin from './src/walks/index.js';
 import clientWalkWindowsPlugin from './src/clientWalkWindows/index.js';
+import clientWalkRequestsPlugin from './src/clientWalkRequests/index.js';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
 fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
 fastify.register(walksPlugin, { prefix: '/walks' });
 fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
+fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
 
 
 const start = async () => {
