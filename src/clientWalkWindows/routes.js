@@ -7,20 +7,17 @@ import {
   updateWindow,
   deleteWindow
 } from './controllers/clientWalkWindowsController.js';
-
 import {
   CreateClientWalkWindow,
   UpdateClientWalkWindow
 } from './schemas/clientWalkWindowsSchemas.js';
 
-// src/clientWalkWindows/routes.js
-
 export default async function routes(fastify, opts) {
+  // 1) List all windows (optionally filter by week_start)
   fastify.get(
     '/',
     {
       schema: {
-        // Tell Fastify we support ?week_start=YYYY-MM-DD
         querystring: {
           type: 'object',
           properties: {
@@ -35,25 +32,7 @@ export default async function routes(fastify, opts) {
     listWindows
   );
 
-  // …the rest of your routes…
-}
-
-
-export default async function routes(fastify, opts) {
-  // 1) List all windows for current user
-  fastify.get(
-    '/',
-    {
-      schema: {
-        response: {
-          200: { $ref: 'WindowsEnvelope#' }
-        }
-      }
-    },
-    listWindows
-  );
-
-  // 2) Retrieve a single window by ID
+  // 2) Get a single window by ID
   fastify.get(
     '/:id',
     {
