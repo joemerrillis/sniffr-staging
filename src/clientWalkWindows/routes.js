@@ -13,6 +13,32 @@ import {
   UpdateClientWalkWindow
 } from './schemas/clientWalkWindowsSchemas.js';
 
+// src/clientWalkWindows/routes.js
+
+export default async function routes(fastify, opts) {
+  fastify.get(
+    '/',
+    {
+      schema: {
+        // Tell Fastify we support ?week_start=YYYY-MM-DD
+        querystring: {
+          type: 'object',
+          properties: {
+            week_start: { type: 'string', format: 'date' }
+          }
+        },
+        response: {
+          200: { $ref: 'WindowsEnvelope#' }
+        }
+      }
+    },
+    listWindows
+  );
+
+  // …the rest of your routes…
+}
+
+
 export default async function routes(fastify, opts) {
   // 1) List all windows for current user
   fastify.get(
