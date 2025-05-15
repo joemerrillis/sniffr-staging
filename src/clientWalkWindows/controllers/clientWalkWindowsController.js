@@ -18,10 +18,20 @@ function getUserId(request) {
 
 /**
  * GET /client-windows
+ * If ?week_start=YYYY-MM-DD is provided, returns only that week's windows,
+ * otherwise returns all windows for the current user.
  */
 export async function listWindows(request, reply) {
   const userId = getUserId(request);
-  const windows = await listClientWalkWindows(request.server, userId);
+  const { week_start } = request.query;
+
+  let windows;
+  if (week_start) {
+    windows = await listWindowsForWeekService(request.server, userId, week_start);
+  } else {
+    windows = await listClientWalkWindows(request.server, userId);
+  }
+
   reply.send({ windows });
 }
 
@@ -119,16 +129,4 @@ export async function deleteWindow(request, reply) {
   const { id } = request.params;
   await deleteClientWalkWindow(request.server, userId, id);
   reply.code(204).send();
-}
-
-/**
- * GET /client-windows/week
- */
-export async function listWindowsForWeek(request, reply) {
-  const userId = getUserId(request);
-  const { week_start } = request.query;
-
-  // Use our aliased service function
-  const windows = await listWindowsForWeekService(request.server, userId, week_start);
-  reply.send({ windows });
 }
