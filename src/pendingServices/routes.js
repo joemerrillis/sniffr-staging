@@ -11,10 +11,10 @@ import {
   PendingServiceEnvelope,
   ListQuery,
   SeedQuery
-} from '../schemas/pendingServicesSchemas.js';
+} from './schemas/pendingServicesSchemas.js';
 
 export default async function routes(fastify, opts) {
-  // List pending services for a given week
+  // 1) List pending services for a given week
   fastify.get(
     '/',
     {
@@ -29,7 +29,7 @@ export default async function routes(fastify, opts) {
     list
   );
 
-  // Seed recurring windows into pending_services
+  // 2) Seed recurring windows into pending_services
   fastify.post(
     '/seed',
     {
@@ -47,7 +47,7 @@ export default async function routes(fastify, opts) {
     seed
   );
 
-  // Confirm (mark paid) a pending service
+  // 3) Confirm (mark paid) a pending service
   fastify.patch(
     '/:id/confirm',
     {
@@ -66,7 +66,7 @@ export default async function routes(fastify, opts) {
     confirm
   );
 
-  // Delete (cancel) a pending service
+  // 4) Delete (cancel) a pending service
   fastify.delete(
     '/:id',
     {
