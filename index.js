@@ -16,7 +16,7 @@ import tenantClientsPlugin from './src/tenantClients/index.js';
 import walksPlugin from './src/walks/index.js';
 import clientWalkWindowsPlugin from './src/clientWalkWindows/index.js';
 import clientWalkRequestsPlugin from './src/clientWalkRequests/index.js';
-import pendingServicesPlugin from './pendingServices/index.js';
+import pendingServicesPlugin from './src/pendingServices/index.js';
 
 dotenv.config();
 
