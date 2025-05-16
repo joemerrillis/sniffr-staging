@@ -5,14 +5,14 @@ import {
   seed,
   confirm,
   remove
-} from './controllers.js';
+} from '../controllers/controllers.js';
 
 import {
   PendingServicesEnvelope,
   PendingServiceEnvelope,
   ListQuery,
   SeedQuery
-} from './schemas.js';
+} from '../schemas/schemas.js';
 
 export default async function routes(fastify, opts) {
   fastify.get(
