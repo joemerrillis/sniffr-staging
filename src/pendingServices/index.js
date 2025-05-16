@@ -8,11 +8,11 @@ import {
 } from './schemas/pendingServicesSchemas.js';
 
 export default fp(async function pendingServicesPlugin(fastify, opts) {
-  // Register your schemas
+  // Register your JSON Schemas
   fastify.addSchema(PendingService);
   fastify.addSchema(PendingServicesEnvelope);
   fastify.addSchema(PendingServiceEnvelope);
 
-  // But *only* register the routes here
+  // *Only* mount the routes from routes.js
   fastify.register(routes);
 });
