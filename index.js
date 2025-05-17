@@ -24,10 +24,6 @@ import pendingServicesPlugin from './src/pendingServices/index.js';
 
 dotenv.config();
 
-const fastify = Fastify({ logger: true });
-
-// --- Register Swagger/OpenAPI plugins ---
-// These go BEFORE your custom plugins/routes!
 fastify.register(fastifySwagger, {
   openapi: {
     info: {
@@ -35,9 +31,11 @@ fastify.register(fastifySwagger, {
       description: 'API documentation for dog walking SaaS + social layer',
       version: '1.0.0'
     }
-    // You can add 'servers', 'security', etc. here if you want later
-  }
+  },
+  exposeRoute: true,
+  routePrefix: '/docs'
 });
+
 
 
 // --- Core (Supabase client, error hooks, logging)
