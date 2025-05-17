@@ -1,9 +1,15 @@
 import Fastify from 'fastify';
 import fastifySwagger from '@fastify/swagger';
-import pkg from '@fastify/swagger/package.json' assert { type: 'json' };
+
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pkg = require('@fastify/swagger/package.json');
 console.log("FASTIFY SWAGGER VERSION:", pkg.version);
 
 const fastify = Fastify({ logger: true });
+
+// ...rest of your code...
+
 
 fastify.register(fastifySwagger, {
   openapi: {
