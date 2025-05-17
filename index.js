@@ -1,6 +1,11 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
 
+// --- Swagger Imports ---
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
+
+// --- Feature Plugins ---
 import corePlugin           from './src/core/index.js';
 import authPlugin           from './src/auth/index.js';            // plugin does JWT + decorate + global hook
 import usersPlugin          from './src/users/index.js';
@@ -22,21 +27,43 @@ dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
-// 1) Core (Supabase client, error hooks, logging)
+// --- Register Swagger/OpenAPI plugins ---
+// These go BEFORE your custom plugins/routes!
+fastify.register(fastifySwagger, {
+  openapi: {
+    info: {
+      title: 'Sniffr API',
+      description: 'API documentation for dog walking SaaS + social layer',
+      version: '1.0.0'
+    }
+    // You can add 'servers', 'security', etc. here if you want later
+  }
+});
+
+fastify.register(fastifySwaggerUi, {
+  routePrefix: '/docs',   // Docs available at /docs
+  uiConfig: {
+    docExpansion: 'list', // Expand endpoints list by default (nice for browsing)
+    deepLinking: false,
+  },
+  staticCSP: true,
+  transformSpecification: (swaggerObject, request, reply) => {
+    // Optionally customize the OpenAPI doc here
+    return swaggerObject;
+  },
+  transformSpecificationClone: true
+});
+
+// --- Core (Supabase client, error hooks, logging)
 fastify.register(corePlugin);
 
-// 2) Public health check (no auth required)
+// --- Public health check (no auth required)
 fastify.get('/healthz', async () => ({ status: 'ok' }));
 
-
-// 3) Auth‐plugin:
-//    - Registers @fastify/jwt
-//    - Decorates fastify.authenticate
-//    - Adds global onRequest hook to protect subsequent routes
-//    - Registers /auth routes
+// --- Auth plugin (JWT, /auth routes, protects subsequent routes)
 fastify.register(authPlugin);
 
-// 4) Mount your application modules (now protected):
+// --- Application modules (all with prefixes for isolation)
 fastify.register(usersPlugin,          { prefix: '/users' });
 fastify.register(tenantsPlugin,        { prefix: '/tenants' });
 fastify.register(domainsPlugin,        { prefix: '/domains' });
@@ -45,13 +72,12 @@ fastify.register(visibilityPlugin,     { prefix: '/dogs/:id/visibility' });
 fastify.register(dogFriendsPlugin,     { prefix: '/dog-friends' });
 fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
 fastify.register(employeesPlugin,      { prefix: '/employees' });
-fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
-fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
-fastify.register(walksPlugin, { prefix: '/walks' });
-fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
-fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
-fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
-
+fastify.register(clientWalkersPlugin,  { prefix: '/client-walkers' });
+fastify.register(tenantClientsPlugin,  { prefix: '/tenant-clients' });
+fastify.register(walksPlugin,          { prefix: '/walks' });
+fastify.register(clientWalkWindowsPlugin,   { prefix: '/client-windows' });
+fastify.register(clientWalkRequestsPlugin,  { prefix: '/client-walk-requests' });
+fastify.register(pendingServicesPlugin,     { prefix: '/pending-services' });
 
 const start = async () => {
   try {
