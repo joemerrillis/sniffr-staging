@@ -28,9 +28,11 @@ export default fp(async function jwtPlugin(fastify, opts) {
     // Allow unauthenticated access to:
     //  - Health check: GET or HEAD on '/'
     //  - All /auth routes (login, register, etc.)
+    //  - All /docs and /docs/json (Swagger UI and OpenAPI spec)
     if (
       (url === '/' && (method === 'GET' || method === 'HEAD')) ||
-      url.startsWith('/auth')
+      url.startsWith('/auth') ||
+      url.startsWith('/docs')
     ) {
       return;
     }
