@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 
 // --- Swagger Imports ---
 import fastifySwagger from '@fastify/swagger';
-import fastifySwaggerUi from '@fastify/swagger-ui';
 
 // --- Feature Plugins ---
 import corePlugin           from './src/core/index.js';
@@ -40,19 +39,6 @@ fastify.register(fastifySwagger, {
   }
 });
 
-fastify.register(fastifySwaggerUi, {
-  routePrefix: '/docs',   // Docs available at /docs
-  uiConfig: {
-    docExpansion: 'list', // Expand endpoints list by default (nice for browsing)
-    deepLinking: false,
-  },
-  staticCSP: true,
-  transformSpecification: (swaggerObject, request, reply) => {
-    // Optionally customize the OpenAPI doc here
-    return swaggerObject;
-  },
-  transformSpecificationClone: true
-});
 
 // --- Core (Supabase client, error hooks, logging)
 fastify.register(corePlugin);
