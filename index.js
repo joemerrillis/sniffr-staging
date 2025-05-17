@@ -26,7 +26,8 @@ const fastify = Fastify({ logger: true });
 fastify.register(corePlugin);
 
 // 2) Public health check (no auth required)
-fastify.get('/', async () => ({ status: 'ok' }));
+fastify.get('/healthz', async () => ({ status: 'ok' }));
+
 
 // 3) Auth‐plugin:
 //    - Registers @fastify/jwt
