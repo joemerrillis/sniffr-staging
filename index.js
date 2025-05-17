@@ -5,7 +5,7 @@ import fastifySwagger from '@fastify/swagger';
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
-import authPlugin from './src/auth/index.js'; // plugin does JWT + decorate + global hook
+import authPlugin from './src/auth/index.js';
 import usersPlugin from './src/users/index.js';
 import tenantsPlugin from './src/tenants/index.js';
 import domainsPlugin from './src/domains/index.js';
@@ -59,4 +59,19 @@ fastify.register(employeesPlugin, { prefix: '/employees' });
 fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
 fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
 fastify.register(walksPlugin, { prefix: '/walks' });
-fastify.register(clientWalk
+fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
+fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
+fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
+
+const start = async () => {
+  try {
+    const port = Number(process.env.PORT) || 3000;
+    await fastify.listen({ port, host: '0.0.0.0' });
+    fastify.log.info(`🚀 Server listening on 0.0.0.0:${port}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
