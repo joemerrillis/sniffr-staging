@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import fastifySwagger from '@fastify/swagger';
+import pkg from '@fastify/swagger/package.json' assert { type: 'json' };
+console.log("FASTIFY SWAGGER VERSION:", pkg.version);
 
 const fastify = Fastify({ logger: true });
 
