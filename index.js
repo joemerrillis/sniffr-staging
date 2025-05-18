@@ -48,7 +48,8 @@ fastify.get('/healthz', {
 
 // Start the server
 try {
-  await fastify.listen({ port: 3000 });
+  const port = Number(process.env.PORT) || 3000;
+await fastify.listen({ port, host: '0.0.0.0' });
   console.log('Server is running at http://localhost:3000');
   console.log('Swagger UI available at http://localhost:3000/docs');
 } catch (err) {
