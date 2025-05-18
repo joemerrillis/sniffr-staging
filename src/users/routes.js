@@ -2,7 +2,6 @@ import { userSchemas } from './schemas/users.js';
 import {
   list,
   retrieve,
-  create,
   modify,
   remove
 } from './controllers/usersController.js';
@@ -48,21 +47,6 @@ export default async function usersRoutes(fastify, opts) {
       }
     }
   }, retrieve);
-
-  fastify.post('/', {
-    schema: {
-      description: 'Create user.',
-      tags: ['Users'],
-      body: userSchemas.CreateUser,
-      response: {
-        201: {
-          type: 'object',
-          properties: { user: userSchemas.User },
-          required: ['user']
-        }
-      }
-    }
-  }, create);
 
   fastify.patch('/:id', {
     schema: {
