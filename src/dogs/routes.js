@@ -10,7 +10,6 @@ import {
 } from './controllers/dogsController.js';
 
 export default async function dogsRoutes(fastify, opts) {
-  // List all dogs (optionally filter by tenant or owner)
   fastify.get('/', {
     schema: {
       description: 'List all dogs. Optionally filter by tenant or owner.',
@@ -33,26 +32,7 @@ export default async function dogsRoutes(fastify, opts) {
               description: 'Array of dog objects'
             }
           },
-          required: ['dogs'],
-          examples: {
-            dogsList: {
-              summary: "Example response",
-              value: {
-                dogs: [
-                  {
-                    id: "bde9c1e8-4e47-41cf-838b-2bfbde62eaa7",
-                    tenant_id: null,
-                    owner_id: "6e11a3d2-25d3-4f7d-91db-56e4306b8e38",
-                    name: "Fido",
-                    photo_url: null,
-                    birthdate: "2017-08-13",
-                    universal_profile_id: null,
-                    created_at: "2023-06-15T11:00:00Z"
-                  }
-                ]
-              }
-            }
-          }
+          required: ['dogs']
         },
         400: {
           description: 'Invalid query parameters',
@@ -65,7 +45,6 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, list);
 
-  // Retrieve a dog by ID
   fastify.get('/:id', {
     schema: {
       description: 'Get details about a specific dog by its ID.',
@@ -84,24 +63,7 @@ export default async function dogsRoutes(fastify, opts) {
           properties: {
             dog: dogSchemas.Dog
           },
-          required: ['dog'],
-          examples: {
-            singleDog: {
-              summary: "Example response",
-              value: {
-                dog: {
-                  id: "bde9c1e8-4e47-41cf-838b-2bfbde62eaa7",
-                  tenant_id: null,
-                  owner_id: "6e11a3d2-25d3-4f7d-91db-56e4306b8e38",
-                  name: "Fido",
-                  photo_url: null,
-                  birthdate: "2017-08-13",
-                  universal_profile_id: null,
-                  created_at: "2023-06-15T11:00:00Z"
-                }
-              }
-            }
-          }
+          required: ['dog']
         },
         404: {
           description: 'Dog not found',
@@ -114,7 +76,6 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, retrieve);
 
-  // Create a new dog
   fastify.post('/', {
     schema: {
       description: 'Create a new dog profile.',
@@ -139,24 +100,7 @@ export default async function dogsRoutes(fastify, opts) {
           description: 'Dog created successfully',
           type: 'object',
           properties: { dog: dogSchemas.Dog },
-          required: ['dog'],
-          examples: {
-            createdDog: {
-              summary: "Created dog response",
-              value: {
-                dog: {
-                  id: "NEW_UUID",
-                  tenant_id: "a0e1a2b3-5e77-49fa-b87e-3bc11b66e184",
-                  owner_id: "6e11a3d2-25d3-4f7d-91db-56e4306b8e38",
-                  name: "Fido",
-                  photo_url: null,
-                  birthdate: "2017-08-13",
-                  universal_profile_id: null,
-                  created_at: "2023-06-15T11:00:00Z"
-                }
-              }
-            }
-          }
+          required: ['dog']
         },
         400: {
           description: 'Invalid input',
@@ -169,7 +113,6 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, create);
 
-  // Update a dog
   fastify.patch('/:id', {
     schema: {
       description: 'Update an existing dog profile.',
@@ -218,7 +161,6 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, modify);
 
-  // Delete a dog
   fastify.delete('/:id', {
     schema: {
       description: 'Delete a dog by its ID.',
@@ -243,7 +185,6 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, remove);
 
-  // Generate a signed upload URL for dog photo
   fastify.post('/:id/photo-upload-url', {
     schema: {
       description: 'Generate a signed upload URL to upload a dog’s photo.',
@@ -276,7 +217,6 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, photoUploadUrl);
 
-  // Export owner media (e.g., photos of all their dogs)
   fastify.get('/owners/:ownerId/media/export', {
     schema: {
       description: 'Export all media (photos, etc) belonging to the specified owner.',
