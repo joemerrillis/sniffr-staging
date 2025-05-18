@@ -8,9 +8,6 @@ console.log("FASTIFY SWAGGER VERSION:", pkg.version);
 
 const fastify = Fastify({ logger: true });
 
-// ...rest of your code...
-
-
 fastify.register(fastifySwagger, {
   openapi: {
     info: {
