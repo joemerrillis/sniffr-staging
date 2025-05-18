@@ -1,4 +1,4 @@
-import { userSchemas } from './schemas/usersSchemas.js';
+import { userSchemas } from './schemas/users.js';
 import {
   list,
   retrieve,
