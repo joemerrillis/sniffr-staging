@@ -28,8 +28,7 @@ export default async function dogsRoutes(fastify, opts) {
           properties: {
             dogs: { 
               type: 'array',
-              items: dogSchemas.Dog,
-              description: 'Array of dog objects'
+              items: dogSchemas.Dog
             }
           },
           required: ['dogs']
@@ -164,6 +163,7 @@ export default async function dogsRoutes(fastify, opts) {
       response: {
         204: {
           description: 'Dog deleted successfully'
+          // No 'type' or 'properties' for 204, as it returns no content.
         },
         404: {
           description: 'Dog not found',
@@ -190,10 +190,10 @@ export default async function dogsRoutes(fastify, opts) {
           description: 'Photo upload URL and metadata',
           type: 'object',
           properties: {
-            uploadUrl: { type: 'string', format: 'uri', description: 'URL to upload photo' },
-            uploadMethod: { type: 'string', description: 'HTTP method to use for upload' },
-            uploadHeaders: { type: 'object', description: 'Headers required for upload' },
-            publicUrl: { type: 'string', format: 'uri', description: 'Public URL for the uploaded photo' }
+            uploadUrl: { type: 'string', format: 'uri' },
+            uploadMethod: { type: 'string' },
+            uploadHeaders: { type: 'object' },
+            publicUrl: { type: 'string', format: 'uri' }
           },
           required: ['uploadUrl','uploadMethod','uploadHeaders','publicUrl']
         },
@@ -222,7 +222,7 @@ export default async function dogsRoutes(fastify, opts) {
           description: 'Exported media files (typically a downloadable archive or link)',
           type: 'object',
           properties: {
-            url: { type: 'string', format: 'uri', description: 'URL to download exported media' }
+            url: { type: 'string', format: 'uri' }
           },
           required: ['url']
         },
