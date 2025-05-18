@@ -1,46 +1,57 @@
 import Fastify from 'fastify';
-import fastifySwagger from '@fastify/swagger';
-
-// Print installed Swagger version
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pkg = require('@fastify/swagger/package.json');
-console.log("FASTIFY SWAGGER VERSION:", pkg.version);
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 
 const fastify = Fastify({ logger: true });
 
-// Register Swagger docs at /docs
-fastify.register(fastifySwagger, {
+// Register Swagger plugin
+await fastify.register(swagger, {
   openapi: {
     info: {
-      title: 'Swagger Minimal Test',
+      title: 'SniffrPack API',
+      description: 'API documentation for SniffrPack',
       version: '1.0.0'
-    }
-  },
-  exposeRoute: true,
-  routePrefix: '/docs'
+    },
+    servers: [
+      { url: 'http://localhost:3000', description: 'Local server' }
+    ]
+  }
 });
 
-// Health check
-fastify.get('/healthz', async () => ({ status: 'ok' }));
-
-const start = async () => {
-  try {
-    const port = Number(process.env.PORT) || 3000;
-    await fastify.listen({ port, host: '0.0.0.0' });
-
-    // After server is ready, print all registered routes
-    fastify.ready(err => {
-      if (err) throw err;
-      console.log('REGISTERED ROUTES:');
-      console.log(fastify.printRoutes());
-    });
-
-    fastify.log.info(`🚀 Minimal server listening`);
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
+// Register Swagger UI plugin
+await fastify.register(swaggerUi, {
+  routePrefix: '/docs',
+  uiConfig: {
+    docExpansion: 'full',
+    deepLinking: false
   }
-};
+});
 
-start();
+// Example route
+fastify.get('/healthz', {
+  schema: {
+    description: 'Health check endpoint',
+    tags: ['Health'],
+    response: {
+      200: {
+        description: 'Successful response',
+        type: 'object',
+        properties: {
+          status: { type: 'string' }
+        }
+      }
+    }
+  }
+}, async (request, reply) => {
+  return { status: 'ok' };
+});
+
+// Start the server
+try {
+  await fastify.listen({ port: 3000 });
+  console.log('Server is running at http://localhost:3000');
+  console.log('Swagger UI available at http://localhost:3000/docs');
+} catch (err) {
+  fastify.log.error(err);
+  process.exit(1);
+}
