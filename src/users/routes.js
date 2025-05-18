@@ -1,11 +1,23 @@
-// src/users/routes.js
-import { userSchemas } from './schemas/users.js';
-import { list, retrieve, modify, remove } from './controllers/usersController.js';
+import { userSchemas } from './schemas/usersSchemas.js';
+import {
+  list,
+  retrieve,
+  create,
+  modify,
+  remove
+} from './controllers/usersController.js';
 
 export default async function usersRoutes(fastify, opts) {
-  // List all users: returns { users: [] }
   fastify.get('/', {
     schema: {
+      description: 'List all users.',
+      tags: ['Users'],
+      querystring: {
+        type: 'object',
+        properties: {
+          tenant_id: { type: 'string', format: 'uuid' }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -18,61 +30,72 @@ export default async function usersRoutes(fastify, opts) {
     }
   }, list);
 
-  // Retrieve single user: wrap in { user: {} }
   fastify.get('/:id', {
     schema: {
+      description: 'Get user by ID.',
+      tags: ['Users'],
       params: {
         type: 'object',
-        properties: {
-          id: { type: 'string', format: 'uuid' }
-        },
+        properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
       response: {
         200: {
           type: 'object',
-          properties: {
-            user: userSchemas.User
-          },
+          properties: { user: userSchemas.User },
           required: ['user']
         }
       }
     }
   }, retrieve);
 
-  // Update user: accept new profile fields, return { user: {} }
+  fastify.post('/', {
+    schema: {
+      description: 'Create user.',
+      tags: ['Users'],
+      body: userSchemas.CreateUser,
+      response: {
+        201: {
+          type: 'object',
+          properties: { user: userSchemas.User },
+          required: ['user']
+        }
+      }
+    }
+  }, create);
+
   fastify.patch('/:id', {
     schema: {
+      description: 'Update user.',
+      tags: ['Users'],
       params: {
         type: 'object',
-        properties: {
-          id: { type: 'string', format: 'uuid' }
-        },
+        properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
       body: userSchemas.UpdateUser,
       response: {
         200: {
           type: 'object',
-          properties: {
-            user: userSchemas.User
-          },
+          properties: { user: userSchemas.User },
           required: ['user']
         }
       }
     }
   }, modify);
 
-  // Delete user: no response body (204 No Content)
   fastify.delete('/:id', {
     schema: {
+      description: 'Delete user.',
+      tags: ['Users'],
       params: {
         type: 'object',
-        properties: {
-          id: { type: 'string', format: 'uuid' }
-        },
+        properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
+      },
+      response: {
+        204: {} // No content on successful delete
       }
     }
   }, remove);
-};
+}
