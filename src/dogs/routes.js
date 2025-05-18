@@ -12,7 +12,7 @@ import {
 export default async function dogsRoutes(fastify, opts) {
   fastify.get('/', {
     schema: {
-      description: 'List all dogs. Optionally filter by tenant or owner.',
+      description: 'List all dogs.',
       tags: ['Dogs'],
       querystring: {
         type: 'object',
@@ -25,18 +25,9 @@ export default async function dogsRoutes(fastify, opts) {
         200: {
           type: 'object',
           properties: {
-            dogs: { 
-              type: 'array',
-              items: dogSchemas.Dog
-            }
+            dogs: { type: 'array', items: dogSchemas.Dog }
           },
           required: ['dogs']
-        },
-        400: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
         }
       }
     }
@@ -44,28 +35,18 @@ export default async function dogsRoutes(fastify, opts) {
 
   fastify.get('/:id', {
     schema: {
-      description: 'Get details about a specific dog by its ID.',
+      description: 'Get dog by ID.',
       tags: ['Dogs'],
       params: {
         type: 'object',
-        properties: {
-          id: { type: 'string', format: 'uuid' }
-        },
+        properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
       response: {
         200: {
           type: 'object',
-          properties: {
-            dog: dogSchemas.Dog
-          },
+          properties: { dog: dogSchemas.Dog },
           required: ['dog']
-        },
-        404: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
         }
       }
     }
@@ -73,7 +54,7 @@ export default async function dogsRoutes(fastify, opts) {
 
   fastify.post('/', {
     schema: {
-      description: 'Create a new dog profile.',
+      description: 'Create dog.',
       tags: ['Dogs'],
       body: dogSchemas.CreateDog,
       response: {
@@ -81,12 +62,6 @@ export default async function dogsRoutes(fastify, opts) {
           type: 'object',
           properties: { dog: dogSchemas.Dog },
           required: ['dog']
-        },
-        400: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
         }
       }
     }
@@ -94,7 +69,7 @@ export default async function dogsRoutes(fastify, opts) {
 
   fastify.patch('/:id', {
     schema: {
-      description: 'Update an existing dog profile.',
+      description: 'Update dog.',
       tags: ['Dogs'],
       params: {
         type: 'object',
@@ -107,27 +82,15 @@ export default async function dogsRoutes(fastify, opts) {
           type: 'object',
           properties: { dog: dogSchemas.Dog },
           required: ['dog']
-        },
-        400: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
-        },
-        404: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
         }
       }
     }
   }, modify);
 
-  // ** THIS IS THE CRITICAL FIX FOR DELETE **
+  // ** THE CRUCIAL FIX IS RIGHT HERE **
   fastify.delete('/:id', {
     schema: {
-      description: 'Delete a dog by its ID.',
+      description: 'Delete dog.',
       tags: ['Dogs'],
       params: {
         type: 'object',
@@ -135,23 +98,14 @@ export default async function dogsRoutes(fastify, opts) {
         required: ['id']
       },
       response: {
-        204: {
-          description: 'Dog deleted successfully'
-          // 204 should NOT have type/properties—no body, just status!
-        },
-        404: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
-        }
+        204: {} // No schema at all. No type, no properties, not even description.
       }
     }
   }, remove);
 
   fastify.post('/:id/photo-upload-url', {
     schema: {
-      description: 'Generate a signed upload URL to upload a dog’s photo.',
+      description: 'Get signed photo upload URL.',
       tags: ['Dogs'],
       params: {
         type: 'object',
@@ -168,12 +122,6 @@ export default async function dogsRoutes(fastify, opts) {
             publicUrl: { type: 'string', format: 'uri' }
           },
           required: ['uploadUrl','uploadMethod','uploadHeaders','publicUrl']
-        },
-        404: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
         }
       }
     }
@@ -181,7 +129,7 @@ export default async function dogsRoutes(fastify, opts) {
 
   fastify.get('/owners/:ownerId/media/export', {
     schema: {
-      description: 'Export all media (photos, etc) belonging to the specified owner.',
+      description: 'Export owner media.',
       tags: ['Dogs'],
       params: {
         type: 'object',
@@ -191,16 +139,8 @@ export default async function dogsRoutes(fastify, opts) {
       response: {
         200: {
           type: 'object',
-          properties: {
-            url: { type: 'string', format: 'uri' }
-          },
+          properties: { url: { type: 'string', format: 'uri' } },
           required: ['url']
-        },
-        404: {
-          type: 'object',
-          properties: {
-            error: { type: 'string' }
-          }
         }
       }
     }
