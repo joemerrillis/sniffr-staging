@@ -83,17 +83,14 @@ export default async function dogsRoutes(fastify, opts) {
       body: {
         ...dogSchemas.CreateDog,
         description: 'Dog profile data to create.',
-        examples: {
-          example1: {
-            summary: "Sample dog to create",
-            value: {
-              owner_id: "6e11a3d2-25d3-4f7d-91db-56e4306b8e38",
-              name: "Fido",
-              birthdate: "2017-08-13",
-              tenant_id: "a0e1a2b3-5e77-49fa-b87e-3bc11b66e184"
-            }
+        examples: [
+          {
+            owner_id: "6e11a3d2-25d3-4f7d-91db-56e4306b8e38",
+            name: "Fido",
+            birthdate: "2017-08-13",
+            tenant_id: "a0e1a2b3-5e77-49fa-b87e-3bc11b66e184"
           }
-        }
+        ]
       },
       response: {
         201: {
@@ -125,16 +122,10 @@ export default async function dogsRoutes(fastify, opts) {
       body: {
         ...dogSchemas.UpdateDog,
         description: 'Dog fields to update',
-        examples: {
-          updateName: {
-            summary: "Change dog name",
-            value: { name: "Rover" }
-          },
-          updateBirthdate: {
-            summary: "Change birthdate",
-            value: { birthdate: "2019-05-23" }
-          }
-        }
+        examples: [
+          { name: "Rover" },
+          { birthdate: "2019-05-23" }
+        ]
       },
       response: {
         200: {
