@@ -1,17 +1,21 @@
+// src/clientWalkWindows/routes.js
+
+import {
+  Window,
+  CreateClientWalkWindow,
+  UpdateClientWalkWindow
+} from './schemas/clientWalkWindowsSchemas.js';
+
 import {
   list,
-  get,
+  retrieve,
   create,
   update,
   remove
 } from './controllers/clientWalkWindowsController.js';
-import {
-  Window,
-  CreateWindow,
-  UpdateWindow
-} from './schemas/clientWalkWindowsSchemas.js';
 
-export default async function routes(fastify, opts) {
+export default async function clientWalkWindowsRoutes(fastify, opts) {
+  // List all client walk windows
   fastify.get('/', {
     schema: {
       description: 'List all client walk windows.',
@@ -20,9 +24,10 @@ export default async function routes(fastify, opts) {
     }
   }, list);
 
+  // Retrieve a single client walk window
   fastify.get('/:id', {
     schema: {
-      description: 'Retrieve a client walk window by ID.',
+      description: 'Get a single client walk window by ID.',
       tags: ['ClientWalkWindows'],
       params: {
         type: 'object',
@@ -31,31 +36,34 @@ export default async function routes(fastify, opts) {
       },
       response: { 200: Window }
     }
-  }, get);
+  }, retrieve);
 
+  // Create a new client walk window
   fastify.post('/', {
     schema: {
       description: 'Create a new client walk window.',
       tags: ['ClientWalkWindows'],
-      body: CreateWindow,
+      body: CreateClientWalkWindow,
       response: { 201: Window }
     }
   }, create);
 
+  // Update an existing client walk window
   fastify.patch('/:id', {
     schema: {
-      description: 'Update an existing client walk window.',
+      description: 'Update a client walk window.',
       tags: ['ClientWalkWindows'],
       params: {
         type: 'object',
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-      body: UpdateWindow,
+      body: UpdateClientWalkWindow,
       response: { 200: Window }
     }
   }, update);
 
+  // Delete a client walk window
   fastify.delete('/:id', {
     schema: {
       description: 'Delete a client walk window.',
@@ -65,7 +73,7 @@ export default async function routes(fastify, opts) {
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-      response: { 204: {} }
+      response: { 204: {} } // No body on 204
     }
   }, remove);
 }
