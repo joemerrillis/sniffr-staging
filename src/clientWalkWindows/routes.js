@@ -1,42 +1,40 @@
-// src/clientWalkWindows/routes.js
-
 import {
-  Window,
+  ClientWalkWindow,
   CreateClientWalkWindow,
   UpdateClientWalkWindow
 } from './schemas/clientWalkWindowsSchemas.js';
 
 import {
   list,
-  retrieve,
+  get,
   create,
   update,
   remove
 } from './controllers/clientWalkWindowsController.js';
 
-export default async function clientWalkWindowsRoutes(fastify, opts) {
+export default async function routes(fastify, opts) {
   // List all client walk windows
   fastify.get('/', {
     schema: {
       description: 'List all client walk windows.',
       tags: ['ClientWalkWindows'],
-      response: { 200: { type: 'array', items: Window } }
+      response: { 200: { type: 'array', items: ClientWalkWindow } }
     }
   }, list);
 
-  // Retrieve a single client walk window
+  // Get a single client walk window by ID
   fastify.get('/:id', {
     schema: {
-      description: 'Get a single client walk window by ID.',
+      description: 'Get a client walk window by ID.',
       tags: ['ClientWalkWindows'],
       params: {
         type: 'object',
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-      response: { 200: Window }
+      response: { 200: ClientWalkWindow }
     }
-  }, retrieve);
+  }, get);
 
   // Create a new client walk window
   fastify.post('/', {
@@ -44,7 +42,7 @@ export default async function clientWalkWindowsRoutes(fastify, opts) {
       description: 'Create a new client walk window.',
       tags: ['ClientWalkWindows'],
       body: CreateClientWalkWindow,
-      response: { 201: Window }
+      response: { 201: ClientWalkWindow }
     }
   }, create);
 
@@ -59,7 +57,7 @@ export default async function clientWalkWindowsRoutes(fastify, opts) {
         required: ['id']
       },
       body: UpdateClientWalkWindow,
-      response: { 200: Window }
+      response: { 200: ClientWalkWindow }
     }
   }, update);
 
@@ -73,7 +71,7 @@ export default async function clientWalkWindowsRoutes(fastify, opts) {
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-      response: { 204: {} } // No body on 204
+      response: { 204: {} }
     }
   }, remove);
 }
