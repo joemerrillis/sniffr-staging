@@ -20,7 +20,7 @@ import tenantClientsPlugin from './src/tenantClients/index.js';
 import walksPlugin from './src/walks/index.js';
 import clientWalkWindowsPlugin from './src/clientWalkWindows/index.js';
 import clientWalkRequestsPlugin from './src/clientWalkRequests/index.js';
-import pendingServicesPlugin from './src/pendingServices/index.js';
+// import pendingServicesPlugin from './src/pendingServices/index.js';
 
 dotenv.config();
 
@@ -68,7 +68,7 @@ await fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
 await fastify.register(walksPlugin, { prefix: '/walks' });
 await fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
 await fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
-await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
+// await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
 
 const start = async () => {
   try {
