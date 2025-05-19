@@ -1,6 +1,8 @@
 // src/pendingServices/routes.js
 console.log("PENDING SERVICES ROUTES REGISTERED");
 console.trace("PENDING SERVICES ROUTES REGISTERED");
+console.log("PENDING SERVICES ROUTES REGISTERED", import.meta.url);
+
 
 import {
   list,
