@@ -6,8 +6,7 @@ import {
   createClientWalkWindow,
   updateClientWalkWindow,
   deleteClientWalkWindow,
-  listWindowsForWeek as listWindowsForWeekService,
-  listClientWindowsForTenant
+  listWindowsForWeek
 } from '../services/clientWalkWindowsService.js';
 
 /**
@@ -28,9 +27,41 @@ export async function listWindows(request, reply) {
 
   let windows;
   if (week_start) {
-    windows = await listWindowsForWeekService(request.server, userId, week_start);
+    windows = await listWindowsForWeek(request.server, userId, week_start);
   } else {
     windows = await listClientWalkWindows(request.server, userId);
+  }
+
+  reply.send({ windows });
+}
+
+/**
+ * TENANT: List all windows for a client (optionally for a given week).
+ * Only returns results if the (tenant_id, client_id) association exists in tenant_clients.
+ * GET /tenants/:tenant_id/clients/:client_id/walk-windows
+ */
+export async function listClientWindowsForTenant(request, reply) {
+  const { tenant_id, client_id } = request.params;
+  const { week_start } = request.query;
+
+  // Security: check that tenant_id has access to client_id
+  const { data: tenantClient, error } = await request.server.supabase
+    .from('tenant_clients')
+    .select('id')
+    .eq('tenant_id', tenant_id)
+    .eq('client_id', client_id)
+    .eq('accepted', true)
+    .single();
+
+  if (error || !tenantClient) {
+    return reply.code(404).send({ error: 'Client not found for this tenant.' });
+  }
+
+  let windows;
+  if (week_start) {
+    windows = await listWindowsForWeek(request.server, client_id, week_start);
+  } else {
+    windows = await listClientWalkWindows(request.server, client_id);
   }
 
   reply.send({ windows });
@@ -131,37 +162,13 @@ export async function deleteWindow(request, reply) {
   await deleteClientWalkWindow(request.server, userId, id);
   reply.code(204).send();
 }
-// Add this to your exports (at the bottom or with the others):
 
-import { listClientWalkWindows, listWindowsForWeek } from '../services/clientWalkWindowsService.js';
-
-/**
- * TENANT: List all windows for a client (optionally for a given week).
- * Only returns results if the (tenant_id, client_id) association exists in tenant_clients.
- */
-export async function listClientWindowsForTenant(request, reply) {
-  const { tenant_id, client_id } = request.params;
-  const { week_start } = request.query;
-
-  // Security: check that tenant_id has access to client_id
-  const { data: tenantClient, error } = await request.server.supabase
-    .from('tenant_clients')
-    .select('id')
-    .eq('tenant_id', tenant_id)
-    .eq('client_id', client_id)
-    .eq('accepted', true)
-    .single();
-
-  if (error || !tenantClient) {
-    return reply.code(404).send({ error: 'Client not found for this tenant.' });
-  }
-
-  let windows;
-  if (week_start) {
-    windows = await listWindowsForWeek(request.server, client_id, week_start);
-  } else {
-    windows = await listClientWalkWindows(request.server, client_id);
-  }
-
-  reply.send({ windows });
-}
+// Export all functions for use in routes.js
+export {
+  listWindows,
+  listClientWindowsForTenant,
+  getWindow,
+  createWindow,
+  updateWindow,
+  deleteWindow
+};
