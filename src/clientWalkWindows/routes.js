@@ -9,11 +9,11 @@ import {
 } from './schemas/clientWalkWindowsSchemas.js';
 
 import {
-  listClientWalkWindows,
-  getClientWalkWindow,
-  createClientWalkWindow,
-  updateClientWalkWindow,
-  removeClientWalkWindow
+  listWindows,
+  getWindow,
+  createWindow,
+  updateWindow,
+  deleteWindow
 } from './controllers/clientWalkWindowsController.js';
 
 export default async function routes(fastify, opts) {
@@ -22,14 +22,20 @@ export default async function routes(fastify, opts) {
     '/',
     {
       schema: {
-        description: 'List all client walk windows.',
+        description: 'List all client walk windows. If ?week_start=YYYY-MM-DD is provided, returns only that week\'s windows.',
         tags: ['ClientWalkWindows'],
+        querystring: {
+          type: 'object',
+          properties: {
+            week_start: { type: 'string', format: 'date' }
+          }
+        },
         response: {
           200: WindowsEnvelope
         }
       }
     },
-    listClientWalkWindows
+    listWindows
   );
 
   // 2) GET A SINGLE CLIENT WALK WINDOW BY ID
@@ -49,7 +55,7 @@ export default async function routes(fastify, opts) {
         }
       }
     },
-    getClientWalkWindow
+    getWindow
   );
 
   // 3) CREATE A NEW CLIENT WALK WINDOW
@@ -65,7 +71,7 @@ export default async function routes(fastify, opts) {
         }
       }
     },
-    createClientWalkWindow
+    createWindow
   );
 
   // 4) UPDATE AN EXISTING CLIENT WALK WINDOW
@@ -86,7 +92,7 @@ export default async function routes(fastify, opts) {
         }
       }
     },
-    updateClientWalkWindow
+    updateWindow
   );
 
   // 5) DELETE A CLIENT WALK WINDOW
@@ -104,6 +110,6 @@ export default async function routes(fastify, opts) {
         response: { 204: {} }
       }
     },
-    removeClientWalkWindow
+    deleteWindow
   );
 }
