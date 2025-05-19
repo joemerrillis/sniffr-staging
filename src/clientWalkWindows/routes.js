@@ -5,11 +5,11 @@ import {
 } from './schemas/clientWalkWindowsSchemas.js';
 
 import {
-  list,
-  get,
-  create,
-  update,
-  remove
+  listClientWalkWindows,
+  getClientWalkWindow,
+  createClientWalkWindow,
+  updateClientWalkWindow,
+  removeClientWalkWindow
 } from './controllers/clientWalkWindowsController.js';
 
 export default async function routes(fastify, opts) {
@@ -20,7 +20,7 @@ export default async function routes(fastify, opts) {
       tags: ['ClientWalkWindows'],
       response: { 200: { type: 'array', items: ClientWalkWindow } }
     }
-  }, list);
+  }, listClientWalkWindows);
 
   // Get a single client walk window by ID
   fastify.get('/:id', {
@@ -34,7 +34,7 @@ export default async function routes(fastify, opts) {
       },
       response: { 200: ClientWalkWindow }
     }
-  }, get);
+  }, getClientWalkWindow);
 
   // Create a new client walk window
   fastify.post('/', {
@@ -44,7 +44,7 @@ export default async function routes(fastify, opts) {
       body: CreateClientWalkWindow,
       response: { 201: ClientWalkWindow }
     }
-  }, create);
+  }, createClientWalkWindow);
 
   // Update an existing client walk window
   fastify.patch('/:id', {
@@ -59,7 +59,7 @@ export default async function routes(fastify, opts) {
       body: UpdateClientWalkWindow,
       response: { 200: ClientWalkWindow }
     }
-  }, update);
+  }, updateClientWalkWindow);
 
   // Delete a client walk window
   fastify.delete('/:id', {
@@ -73,5 +73,5 @@ export default async function routes(fastify, opts) {
       },
       response: { 204: {} }
     }
-  }, remove);
+  }, removeClientWalkWindow);
 }
