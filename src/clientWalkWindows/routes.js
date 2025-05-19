@@ -1,109 +1,71 @@
-// src/clientWalkWindows/routes.js
-
 import {
-  listWindows,
-  getWindow,
-  createWindow,
-  updateWindow,
-  deleteWindow
+  list,
+  get,
+  create,
+  update,
+  remove
 } from './controllers/clientWalkWindowsController.js';
 import {
-  CreateClientWalkWindow,
-  UpdateClientWalkWindow
+  Window,
+  CreateWindow,
+  UpdateWindow
 } from './schemas/clientWalkWindowsSchemas.js';
 
 export default async function routes(fastify, opts) {
-  // 1) List all windows (optionally filter by week_start)
-  fastify.get(
-    '/',
-    {
-      schema: {
-        querystring: {
-          type: 'object',
-          properties: {
-            week_start: { type: 'string', format: 'date' }
-          }
-        },
-        response: {
-          200: { $ref: 'WindowsEnvelope#' }
-        }
-      }
-    },
-    listWindows
-  );
+  fastify.get('/', {
+    schema: {
+      description: 'List all client walk windows.',
+      tags: ['ClientWalkWindows'],
+      response: { 200: { type: 'array', items: Window } }
+    }
+  }, list);
 
-  // 2) Get a single window by ID
-  fastify.get(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' }
-          },
-          required: ['id']
-        },
-        response: {
-          200: { $ref: 'WindowEnvelope#' }
-        }
-      }
-    },
-    getWindow
-  );
+  fastify.get('/:id', {
+    schema: {
+      description: 'Retrieve a client walk window by ID.',
+      tags: ['ClientWalkWindows'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      response: { 200: Window }
+    }
+  }, get);
 
-  // 3) Create a new window
-  fastify.post(
-    '/',
-    {
-      schema: {
-        body: CreateClientWalkWindow,
-        response: {
-          201: { $ref: 'WindowEnvelope#' }
-        }
-      }
-    },
-    createWindow
-  );
+  fastify.post('/', {
+    schema: {
+      description: 'Create a new client walk window.',
+      tags: ['ClientWalkWindows'],
+      body: CreateWindow,
+      response: { 201: Window }
+    }
+  }, create);
 
-  // 4) Update an existing window
-  fastify.patch(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' }
-          },
-          required: ['id']
-        },
-        body: UpdateClientWalkWindow,
-        response: {
-          200: { $ref: 'WindowEnvelope#' }
-        }
-      }
-    },
-    updateWindow
-  );
+  fastify.patch('/:id', {
+    schema: {
+      description: 'Update an existing client walk window.',
+      tags: ['ClientWalkWindows'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      body: UpdateWindow,
+      response: { 200: Window }
+    }
+  }, update);
 
-  // 5) Delete a window
-  fastify.delete(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' }
-          },
-          required: ['id']
-        },
-        response: {
-          204: { type: 'null' }
-        }
-      }
-    },
-    deleteWindow
-  );
+  fastify.delete('/:id', {
+    schema: {
+      description: 'Delete a client walk window.',
+      tags: ['ClientWalkWindows'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      response: { 204: {} }
+    }
+  }, remove);
 }
