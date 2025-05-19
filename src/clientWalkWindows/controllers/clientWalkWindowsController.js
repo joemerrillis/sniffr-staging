@@ -21,7 +21,7 @@ function getUserId(request) {
  * If ?week_start=YYYY-MM-DD is provided, returns only that week's windows,
  * otherwise returns all windows for the current user.
  */
-export async function listWindows(request, reply) {
+async function listWindows(request, reply) {
   const userId = getUserId(request);
   const { week_start } = request.query;
 
@@ -40,7 +40,7 @@ export async function listWindows(request, reply) {
  * Only returns results if the (tenant_id, client_id) association exists in tenant_clients.
  * GET /tenants/:tenant_id/clients/:client_id/walk-windows
  */
-export async function listClientWindowsForTenant(request, reply) {
+async function listClientWindowsForTenant(request, reply) {
   const { tenant_id, client_id } = request.params;
   const { week_start } = request.query;
 
@@ -70,7 +70,7 @@ export async function listClientWindowsForTenant(request, reply) {
 /**
  * GET /client-windows/:id
  */
-export async function getWindow(request, reply) {
+async function getWindow(request, reply) {
   const userId = getUserId(request);
   const { id } = request.params;
   const window = await getClientWalkWindow(request.server, userId, id);
@@ -81,7 +81,7 @@ export async function getWindow(request, reply) {
 /**
  * POST /client-windows
  */
-export async function createWindow(request, reply) {
+async function createWindow(request, reply) {
   const userId = getUserId(request);
   const {
     day_of_week,
@@ -118,7 +118,7 @@ export async function createWindow(request, reply) {
 /**
  * PATCH /client-windows/:id
  */
-export async function updateWindow(request, reply) {
+async function updateWindow(request, reply) {
   const userId = getUserId(request);
   const { id } = request.params;
   const {
@@ -156,14 +156,13 @@ export async function updateWindow(request, reply) {
 /**
  * DELETE /client-windows/:id
  */
-export async function deleteWindow(request, reply) {
+async function deleteWindow(request, reply) {
   const userId = getUserId(request);
   const { id } = request.params;
   await deleteClientWalkWindow(request.server, userId, id);
   reply.code(204).send();
 }
 
-// Export all functions for use in routes.js
 export {
   listWindows,
   listClientWindowsForTenant,
