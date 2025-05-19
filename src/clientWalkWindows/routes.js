@@ -13,16 +13,17 @@ import {
   getWindow,
   createWindow,
   updateWindow,
-  deleteWindow
+  deleteWindow,
+  listClientWindowsForTenant  // <-- NEW
 } from './controllers/clientWalkWindowsController.js';
 
 export default async function routes(fastify, opts) {
-  // 1) LIST ALL CLIENT WALK WINDOWS
+  // 1) LIST ALL CLIENT WALK WINDOWS (client only)
   fastify.get(
     '/',
     {
       schema: {
-        description: 'List all client walk windows. If ?week_start=YYYY-MM-DD is provided, returns only that week\'s windows.',
+        description: 'List all client walk windows for the authenticated user. Optionally filter by week_start.',
         tags: ['ClientWalkWindows'],
         querystring: {
           type: 'object',
@@ -38,7 +39,36 @@ export default async function routes(fastify, opts) {
     listWindows
   );
 
-  // 2) GET A SINGLE CLIENT WALK WINDOW BY ID
+  // 2) TENANT: List all walk windows for a specific client (with optional week_start)
+  fastify.get(
+    '/tenants/:tenant_id/clients/:client_id/walk-windows',
+    {
+      schema: {
+        description: 'Tenant endpoint: List all walk windows for a given client, optionally filtered by week_start.',
+        tags: ['TenantClientWalkWindows'],
+        params: {
+          type: 'object',
+          properties: {
+            tenant_id: { type: 'string', format: 'uuid' },
+            client_id: { type: 'string', format: 'uuid' }
+          },
+          required: ['tenant_id', 'client_id']
+        },
+        querystring: {
+          type: 'object',
+          properties: {
+            week_start: { type: 'string', format: 'date' }
+          }
+        },
+        response: {
+          200: WindowsEnvelope
+        }
+      }
+    },
+    listClientWindowsForTenant
+  );
+
+  // 3) GET A SINGLE CLIENT WALK WINDOW BY ID
   fastify.get(
     '/:id',
     {
@@ -58,7 +88,7 @@ export default async function routes(fastify, opts) {
     getWindow
   );
 
-  // 3) CREATE A NEW CLIENT WALK WINDOW
+  // 4) CREATE A NEW CLIENT WALK WINDOW
   fastify.post(
     '/',
     {
@@ -74,7 +104,7 @@ export default async function routes(fastify, opts) {
     createWindow
   );
 
-  // 4) UPDATE AN EXISTING CLIENT WALK WINDOW
+  // 5) UPDATE AN EXISTING CLIENT WALK WINDOW
   fastify.patch(
     '/:id',
     {
@@ -95,7 +125,7 @@ export default async function routes(fastify, opts) {
     updateWindow
   );
 
-  // 5) DELETE A CLIENT WALK WINDOW
+  // 6) DELETE A CLIENT WALK WINDOW
   fastify.delete(
     '/:id',
     {
