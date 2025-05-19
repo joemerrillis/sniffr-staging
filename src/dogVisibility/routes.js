@@ -9,76 +9,100 @@ import {
 } from './controllers/dogVisibilityController.js';
 
 export default async function visibilityRoutes(fastify, opts) {
-  // Create visibility record for a dog
-  fastify.post('/:id/visibility', {
-    schema: {
-      params: {
-        type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
-      },
-      body: dogVisibilitySchemas.UpdateVisibility,     // { is_visible: boolean }
-      response: {
-        201: {
+  // 1) CREATE VISIBILITY RECORD FOR A DOG
+  fastify.post(
+    '/:id/visibility',
+    {
+      schema: {
+        description: 'Create a visibility record for a dog.',
+        tags: ['DogVisibility'],
+        params: {
           type: 'object',
-          properties: {
-            visibility: dogVisibilitySchemas.Visibility
-          },
-          required: ['visibility']
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        body: dogVisibilitySchemas.UpdateVisibility,
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              visibility: dogVisibilitySchemas.Visibility
+            },
+            required: ['visibility']
+          }
         }
       }
-    }
-  }, createVisibility);
+    },
+    createVisibility
+  );
 
-  // Get current visibility
-  fastify.get('/:id/visibility', {
-    schema: {
-      params: {
-        type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
-      },
-      response: {
-        200: {
+  // 2) GET CURRENT VISIBILITY
+  fastify.get(
+    '/:id/visibility',
+    {
+      schema: {
+        description: 'Get current visibility for a dog.',
+        tags: ['DogVisibility'],
+        params: {
           type: 'object',
-          properties: {
-            visibility: dogVisibilitySchemas.Visibility
-          },
-          required: ['visibility']
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              visibility: dogVisibilitySchemas.Visibility
+            },
+            required: ['visibility']
+          }
         }
       }
-    }
-  }, getVisibility);
+    },
+    getVisibility
+  );
 
-  // Update (toggle) visibility
-  fastify.patch('/:id/visibility', {
-    schema: {
-      params: {
-        type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
-      },
-      body: dogVisibilitySchemas.UpdateVisibility,
-      response: {
-        200: {
+  // 3) UPDATE (TOGGLE) VISIBILITY
+  fastify.patch(
+    '/:id/visibility',
+    {
+      schema: {
+        description: 'Update (toggle) visibility for a dog.',
+        tags: ['DogVisibility'],
+        params: {
           type: 'object',
-          properties: {
-            visibility: dogVisibilitySchemas.Visibility
-          },
-          required: ['visibility']
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        body: dogVisibilitySchemas.UpdateVisibility,
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              visibility: dogVisibilitySchemas.Visibility
+            },
+            required: ['visibility']
+          }
         }
       }
-    }
-  }, updateVisibility);
+    },
+    updateVisibility
+  );
 
-  // Delete visibility record
-  fastify.delete('/:id/visibility', {
-    schema: {
-      params: {
-        type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
+  // 4) DELETE VISIBILITY RECORD
+  fastify.delete(
+    '/:id/visibility',
+    {
+      schema: {
+        description: 'Delete a visibility record for a dog.',
+        tags: ['DogVisibility'],
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        }
       }
-    }
-  }, deleteVisibility);
+    },
+    deleteVisibility
+  );
 }
