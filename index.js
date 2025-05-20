@@ -70,7 +70,7 @@ await fastify.register(walksPlugin, { prefix: '/walks' });
 await fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
 await fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
 await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
-fastify.register(schedulingPlugin, { prefix: '/scheduling' });
+await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
 
 const start = async () => {
   try {
