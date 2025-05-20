@@ -2,6 +2,7 @@
 
 export const boardingSchemas = {
   Boarding: {
+    $id: 'Boarding',
     type: 'object',
     properties: {
       id:                   { type: 'string', format: 'uuid' },
@@ -26,6 +27,7 @@ export const boardingSchemas = {
     ]
   },
   CreateBoarding: {
+    $id: 'CreateBoarding',
     type: 'object',
     properties: {
       tenant_id:      { type: 'string', format: 'uuid' },
@@ -47,6 +49,7 @@ export const boardingSchemas = {
     ]
   },
   UpdateBoarding: {
+    $id: 'UpdateBoarding',
     type: 'object',
     properties: {
       drop_off_day:   { type: 'string', format: 'date' },
