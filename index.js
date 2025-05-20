@@ -21,7 +21,7 @@ import walksPlugin from './src/walks/index.js';
 import clientWalkWindowsPlugin from './src/clientWalkWindows/index.js';
 import clientWalkRequestsPlugin from './src/clientWalkRequests/index.js';
 import pendingServicesPlugin from './src/pendingServices/index.js';
-import schedulingPlugin from './scheduling/index.js';
+import schedulingPlugin from './src/scheduling/index.js';
 
 dotenv.config();
 
