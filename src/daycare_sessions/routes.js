@@ -1,102 +1,98 @@
-// src/daycare_sessions/routes.js
-
 import {
   listDaycareSessions,
-  getDaycareSession,
+  getDaycareSessionById,
   createDaycareSession,
   updateDaycareSession,
-  deleteDaycareSession,
+  deleteDaycareSession
 } from './controllers/daycareSessionsController.js';
 
-import {
-  DaycareSession,
-  DaycareSessionEnvelope,
-  DaycareSessionListEnvelope,
-  CreateDaycareSessionRequest,
-  UpdateDaycareSessionRequest,
-} from './schemas/daycareSessionsSchemas.js';
+import { daycareSessionSchemas } from './schemas/daycareSessionsSchemas.js';
 
 export default async function routes(fastify, opts) {
+  // Register schemas for Swagger
+  fastify.addSchema({ ...daycareSessionSchemas.DaycareSession, $id: 'DaycareSession' });
+
   // List all daycare sessions
   fastify.get('/', {
     schema: {
       tags: ['Daycare Sessions'],
-      summary: 'List all daycare sessions',
       response: {
-        200: DaycareSessionListEnvelope,
-      },
+        200: {
+          type: 'array',
+          items: { $ref: 'DaycareSession#' }
+        }
+      }
     },
-    handler: listDaycareSessions,
+    handler: listDaycareSessions
   });
 
-  // Create new daycare session
-  fastify.post('/', {
-    schema: {
-      tags: ['Daycare Sessions'],
-      summary: 'Create new daycare session',
-      body: CreateDaycareSessionRequest,
-      response: {
-        201: DaycareSessionEnvelope,
-      },
-    },
-    handler: createDaycareSession,
-  });
-
-  // Get a single daycare session by ID
+  // Get single session by ID
   fastify.get('/:id', {
     schema: {
       tags: ['Daycare Sessions'],
-      summary: 'Get daycare session by ID',
       params: {
         type: 'object',
         properties: {
-          id: { type: 'string', format: 'uuid' },
+          id: { type: 'string', format: 'uuid' }
         },
-        required: ['id'],
+        required: ['id']
       },
       response: {
-        200: DaycareSessionEnvelope,
-      },
+        200: { $ref: 'DaycareSession#' }
+      }
     },
-    handler: getDaycareSession,
+    handler: getDaycareSessionById
   });
 
-  // Update a daycare session
+  // Create a new session
+  fastify.post('/', {
+    schema: {
+      tags: ['Daycare Sessions'],
+      body: daycareSessionSchemas.CreateDaycareSession,
+      response: {
+        201: { $ref: 'DaycareSession#' }
+      }
+    },
+    handler: createDaycareSession
+  });
+
+  // Update a session
   fastify.patch('/:id', {
     schema: {
       tags: ['Daycare Sessions'],
-      summary: 'Update daycare session by ID',
       params: {
         type: 'object',
         properties: {
-          id: { type: 'string', format: 'uuid' },
+          id: { type: 'string', format: 'uuid' }
         },
-        required: ['id'],
+        required: ['id']
       },
-      body: UpdateDaycareSessionRequest,
+      body: daycareSessionSchemas.UpdateDaycareSession,
       response: {
-        200: DaycareSessionEnvelope,
-      },
+        200: { $ref: 'DaycareSession#' }
+      }
     },
-    handler: updateDaycareSession,
+    handler: updateDaycareSession
   });
 
-  // Delete a daycare session
+  // Delete a session
   fastify.delete('/:id', {
     schema: {
       tags: ['Daycare Sessions'],
-      summary: 'Delete daycare session by ID',
       params: {
         type: 'object',
         properties: {
-          id: { type: 'string', format: 'uuid' },
+          id: { type: 'string', format: 'uuid' }
         },
-        required: ['id'],
+        required: ['id']
       },
       response: {
-        204: { type: 'null', description: 'No content' },
-      },
+        204: {
+          description: 'No Content',
+          type: 'null'
+        }
+      }
     },
-    handler: deleteDaycareSession,
+    handler: deleteDaycareSession
   });
 }
