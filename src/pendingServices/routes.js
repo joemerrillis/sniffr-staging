@@ -1,68 +1,40 @@
 // src/pendingServices/routes.js
-console.log("PENDING SERVICES ROUTES REGISTERED");
-console.trace("PENDING SERVICES ROUTES REGISTERED");
-console.log("PENDING SERVICES ROUTES REGISTERED", import.meta.url);
-
 
 import {
   list,
-  seed,
-  confirm,
-  remove
+  retrieve,
+  remove,
+  listForClient,
+  removeForClient
 } from './controllers/pendingServicesController.js';
+
 import {
   PendingServicesEnvelope,
-  PendingServiceEnvelope,
-  ListQuery,
-  SeedQuery
+  PendingServiceEnvelope
 } from './schemas/pendingServicesSchemas.js';
 
 export default async function routes(fastify, opts) {
-  // List pending services for a given week
+  // CLIENT: List all pending services for current user
   fastify.get(
     '/',
     {
-      preHandler: [fastify.authenticate],
       schema: {
-        description: 'List all pending services for a given week.',
+        description: 'List all pending services in the current user’s cart.',
         tags: ['PendingServices'],
-        querystring: ListQuery,
         response: {
-          200: { $ref: 'PendingServicesEnvelope#' }
+          200: PendingServicesEnvelope
         }
       }
     },
     list
   );
 
-  // Seed recurring windows into pending_services
-  fastify.post(
-    '/seed',
+  // CLIENT: Get a single pending service by id
+  fastify.get(
+    '/:id',
     {
-      preHandler: [fastify.authenticate],
       schema: {
-        description: 'Seed recurring walk windows as pending services for the given week.',
-        tags: ['PendingServices'],
-        querystring: SeedQuery,
-        response: {
-          200: {
-            type: 'object',
-            properties: { success: { type: 'boolean' } },
-            required: ['success']
-          }
-        }
-      }
-    },
-    seed
-  );
-
-  // Confirm (mark paid) a pending service
-  fastify.patch(
-    '/:id/confirm',
-    {
-      preHandler: [fastify.authenticate],
-      schema: {
-        description: 'Mark a pending service as confirmed (paid).',
+        description: 'Get a single pending service by id.',
         tags: ['PendingServices'],
         params: {
           type: 'object',
@@ -70,29 +42,73 @@ export default async function routes(fastify, opts) {
           required: ['id']
         },
         response: {
-          200: { $ref: 'PendingServiceEnvelope#' }
+          200: PendingServiceEnvelope
         }
       }
     },
-    confirm
+    retrieve
   );
 
-  // Delete (cancel) a pending service
+  // CLIENT: Delete a pending service (remove from cart)
   fastify.delete(
     '/:id',
     {
-      preHandler: [fastify.authenticate],
       schema: {
-        description: 'Delete (cancel) a pending service.',
+        description: 'Delete (remove) a pending service from the cart.',
         tags: ['PendingServices'],
         params: {
           type: 'object',
           properties: { id: { type: 'string', format: 'uuid' } },
           required: ['id']
         },
-        response: { 204: {} }
+        response: { 204: { type: 'null' } }
       }
     },
     remove
+  );
+
+  // TENANT: List all pending services for a specific client
+  fastify.get(
+    '/tenants/:tenant_id/clients/:client_id/pending-services',
+    {
+      schema: {
+        description: 'Tenant: List all pending services for a specific client.',
+        tags: ['TenantPendingServices'],
+        params: {
+          type: 'object',
+          properties: {
+            tenant_id: { type: 'string', format: 'uuid' },
+            client_id: { type: 'string', format: 'uuid' }
+          },
+          required: ['tenant_id', 'client_id']
+        },
+        response: {
+          200: PendingServicesEnvelope
+        }
+      }
+    },
+    listForClient
+  );
+
+  // TENANT: Delete a pending service for a client (if needed)
+  fastify.delete(
+    '/tenants/:tenant_id/clients/:client_id/pending-services/:id',
+    {
+      schema: {
+        description: 'Tenant: Delete a pending service for a client.',
+        tags: ['TenantPendingServices'],
+        params: {
+          type: 'object',
+          properties: {
+            tenant_id: { type: 'string', format: 'uuid' },
+            client_id: { type: 'string', format: 'uuid' },
+            id:        { type: 'string', format: 'uuid' }
+          },
+          required: ['tenant_id', 'client_id', 'id']
+        },
+        response: { 204: { type: 'null' } }
+      }
+    },
+    removeForClient
   );
 }
