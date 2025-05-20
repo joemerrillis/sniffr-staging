@@ -22,6 +22,7 @@ import clientWalkWindowsPlugin from './src/clientWalkWindows/index.js';
 import clientWalkRequestsPlugin from './src/clientWalkRequests/index.js';
 import pendingServicesPlugin from './src/pendingServices/index.js';
 import schedulingPlugin from './src/scheduling/index.js';
+import availabilityPlugin from './src/availability/index.js';
 
 dotenv.config();
 
@@ -71,6 +72,7 @@ await fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
 await fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
 await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
 await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
+await fastify.register(availabilityPlugin, { prefix: '/availability' });
 
 const start = async () => {
   try {
