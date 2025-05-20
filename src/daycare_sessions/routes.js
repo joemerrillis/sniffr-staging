@@ -1,90 +1,102 @@
-import { daycareSessionSchemas } from './schemas/daycareSessionsSchemas.js';
+// src/daycare_sessions/routes.js
+
 import {
-  list,
-  retrieve,
-  create,
-  modify,
-  remove
+  listDaycareSessions,
+  getDaycareSession,
+  createDaycareSession,
+  updateDaycareSession,
+  deleteDaycareSession,
 } from './controllers/daycareSessionsController.js';
 
+import {
+  DaycareSession,
+  DaycareSessionEnvelope,
+  DaycareSessionListEnvelope,
+  CreateDaycareSessionRequest,
+  UpdateDaycareSessionRequest,
+} from './schemas/daycareSessionsSchemas.js';
+
 export default async function routes(fastify, opts) {
-  // List
+  // List all daycare sessions
   fastify.get('/', {
     schema: {
-      querystring: {
-        type: 'object',
-        properties: {
-          tenant_id: { type: 'string', format: 'uuid' },
-          dog_id:    { type: 'string', format: 'uuid' }
-        }
-      },
+      tags: ['Daycare Sessions'],
+      summary: 'List all daycare sessions',
       response: {
-        200: {
-          type: 'object',
-          properties: {
-            sessions: { type: 'array', items: daycareSessionSchemas.DaycareSession }
-          }
-        }
-      }
-    }
-  }, list);
-
-  // Get single
-  fastify.get('/:id', {
-    schema: {
-      params: {
-        type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
+        200: DaycareSessionListEnvelope,
       },
-      response: {
-        200: {
-          type: 'object',
-          properties: { session: daycareSessionSchemas.DaycareSession }
-        }
-      }
-    }
-  }, retrieve);
+    },
+    handler: listDaycareSessions,
+  });
 
-  // Create
+  // Create new daycare session
   fastify.post('/', {
     schema: {
-      body: daycareSessionSchemas.CreateDaycareSession,
+      tags: ['Daycare Sessions'],
+      summary: 'Create new daycare session',
+      body: CreateDaycareSessionRequest,
       response: {
-        201: {
-          type: 'object',
-          properties: { session: daycareSessionSchemas.DaycareSession }
-        }
-      }
-    }
-  }, create);
+        201: DaycareSessionEnvelope,
+      },
+    },
+    handler: createDaycareSession,
+  });
 
-  // Update
+  // Get a single daycare session by ID
+  fastify.get('/:id', {
+    schema: {
+      tags: ['Daycare Sessions'],
+      summary: 'Get daycare session by ID',
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+        },
+        required: ['id'],
+      },
+      response: {
+        200: DaycareSessionEnvelope,
+      },
+    },
+    handler: getDaycareSession,
+  });
+
+  // Update a daycare session
   fastify.patch('/:id', {
     schema: {
+      tags: ['Daycare Sessions'],
+      summary: 'Update daycare session by ID',
       params: {
         type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+        },
+        required: ['id'],
       },
-      body: daycareSessionSchemas.UpdateDaycareSession,
+      body: UpdateDaycareSessionRequest,
       response: {
-        200: {
-          type: 'object',
-          properties: { session: daycareSessionSchemas.DaycareSession }
-        }
-      }
-    }
-  }, modify);
+        200: DaycareSessionEnvelope,
+      },
+    },
+    handler: updateDaycareSession,
+  });
 
-  // Delete
+  // Delete a daycare session
   fastify.delete('/:id', {
     schema: {
+      tags: ['Daycare Sessions'],
+      summary: 'Delete daycare session by ID',
       params: {
         type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
-      }
-    }
-  }, remove);
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+        },
+        required: ['id'],
+      },
+      response: {
+        204: { type: 'null', description: 'No content' },
+      },
+    },
+    handler: deleteDaycareSession,
+  });
 }
