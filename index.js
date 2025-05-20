@@ -24,6 +24,7 @@ import pendingServicesPlugin from './src/pendingServices/index.js';
 import schedulingPlugin from './src/scheduling/index.js';
 import availabilityPlugin from './src/availability/index.js';
 import boardingsPlugin from './src/boardings/index.js';
+import daycareSessionsPlugin from './src/daycare_sessions/index.js';
 
 dotenv.config();
 
@@ -75,6 +76,7 @@ await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
 await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
 await fastify.register(availabilityPlugin, { prefix: '/availability' });
 await fastify.register(boardingsPlugin, { prefix: '/boardings' });
+await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
 
 const start = async () => {
   try {
