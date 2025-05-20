@@ -1,4 +1,4 @@
-import supabase from '../core/supabaseClient.js';
+import supabase from '../../core/supabase.js';
 
 export async function listDaycareSessions(filters = {}) {
   let query = supabase.from('daycare_sessions').select('*');
