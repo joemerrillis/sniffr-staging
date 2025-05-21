@@ -25,6 +25,7 @@ import schedulingPlugin from './src/scheduling/index.js';
 import availabilityPlugin from './src/availability/index.js';
 import boardingsPlugin from './src/boardings/index.js';
 import daycareSessionsPlugin from './src/daycare_sessions/index.js';
+import purchasesPlugin from './src/purchases/index.js';
 
 dotenv.config();
 
@@ -77,6 +78,7 @@ await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
 await fastify.register(availabilityPlugin, { prefix: '/availability' });
 await fastify.register(boardingsPlugin, { prefix: '/boardings' });
 await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
+await fastify.register(purchasesPlugin, { prefix: '/purchases' });
 
 const start = async () => {
   try {
