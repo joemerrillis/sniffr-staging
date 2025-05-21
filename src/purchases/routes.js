@@ -1,4 +1,3 @@
-// src/purchases/routes.js
 import {
   checkout,
   list,
@@ -8,7 +7,6 @@ import {
 import { purchasesSchemas } from './schemas/purchasesSchemas.js';
 
 export default async function routes(fastify, opts) {
-  // POST /purchases/checkout
   fastify.post(
     '/checkout',
     {
@@ -16,13 +14,12 @@ export default async function routes(fastify, opts) {
         body: purchasesSchemas.CheckoutRequest,
         response: { 201: purchasesSchemas.CheckoutResponse },
         tags: ['Purchases'],
-        summary: 'Initiate purchase and return payment link',
+        summary: 'Initiate purchase and promote immediately (mock payment)',
       },
     },
     checkout
   );
 
-  // GET /purchases
   fastify.get(
     '/',
     {
@@ -45,7 +42,6 @@ export default async function routes(fastify, opts) {
     list
   );
 
-  // GET /purchases/:id
   fastify.get(
     '/:id',
     {
@@ -70,7 +66,6 @@ export default async function routes(fastify, opts) {
     retrieve
   );
 
-  // POST /purchases/webhook/:provider
   fastify.post(
     '/webhook/:provider',
     {
@@ -85,7 +80,7 @@ export default async function routes(fastify, opts) {
         body: purchasesSchemas.WebhookPayload,
         response: { 200: { type: 'object', properties: { ok: { type: 'boolean' } } } },
         tags: ['Purchases'],
-        summary: 'Handle payment provider webhooks',
+        summary: 'Stub webhook endpoint (future use)',
       },
     },
     webhook
