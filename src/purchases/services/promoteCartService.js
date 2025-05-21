@@ -1,12 +1,51 @@
-// src/purchases/services/promoteCartService.js
 import supabase from '../../core/supabase.js';
 
-// TODO: make this atomic and idempotent!
 export async function promoteCart(purchase) {
-  // For each pending_service in purchase.cart:
-  //   - Look up the pending_service details
-  //   - Promote to walks/boardings/daycare_sessions as needed
-  //   - Remove from pending_services
-  //   - Notify users
-  // This is a complex business rule—stub for now.
+  // Assume purchase.cart is an array of pending_services IDs
+  const { cart, tenant_id, user_id } = purchase;
+
+  for (const pendingServiceId of cart) {
+    // Get the pending_service row
+    const { data: pending, error } = await supabase
+      .from('pending_services')
+      .select('*')
+      .eq('id', pendingServiceId)
+      .single();
+    if (error || !pending) continue;
+
+    // Promote to correct service table
+    if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
+      await supabase.from('walks').insert([{
+        tenant_id,
+        dog_id: pending.dog_id,
+        walker_id: null, // Or assign based on logic
+        scheduled_at: pending.service_date,
+        duration_minutes: pending.details?.length_minutes || 30,
+        status: 'scheduled',
+        created_at: new Date().toISOString()
+      }]);
+    } else if (pending.service_type === 'boarding') {
+      await supabase.from('boardings').insert([{
+        tenant_id,
+        dog_id: pending.dog_id,
+        drop_off_day: pending.details?.start_date || pending.service_date,
+        pick_up_day: pending.details?.end_date || pending.service_date,
+        price: pending.details?.price || 0,
+        status: 'scheduled',
+        created_at: new Date().toISOString()
+      }]);
+    } else if (pending.service_type === 'daycare') {
+      await supabase.from('daycare_sessions').insert([{
+        tenant_id,
+        dog_id: pending.dog_id,
+        dropoff_time: pending.service_date,
+        expected_pickup_time: pending.details?.expected_pickup_time,
+        penalty_amount: 0,
+        created_at: new Date().toISOString()
+      }]);
+    }
+
+    // Remove from pending_services
+    await supabase.from('pending_services').delete().eq('id', pendingServiceId);
+  }
 }
