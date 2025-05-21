@@ -1,30 +1,23 @@
-// src/purchases/controllers/purchasesController.js
 import {
   createPurchase,
   listPurchases,
-  getPurchase,
-  updatePurchaseStatus,
+  getPurchase
 } from '../services/purchasesService.js';
+import { promoteCart } from '../services/promoteCartService.js';
 
-import { promoteCart } from '../services/promoteCartService.js'; // see note below
-
-// Simulated provider registry (stripe, paypal, etc.)
-import { getPaymentProviderHandler } from '../services/paymentProviders.js';
+// For mock: You can hardcode or stub these (expand later as needed)
+async function calculateTotal(cart) { return 100; }
+async function inferTypeFromCart(cart) { return 'walk'; }
 
 export async function checkout(req, reply) {
   const { cart, payment_method } = req.body;
-  // TODO: Get user/tenant from session/auth (stubbed here)
-  const user_id = req.user?.id || req.body.user_id; // fallback for local testing
+  const user_id = req.user?.id || req.body.user_id;
   const tenant_id = req.user?.tenant_id || req.body.tenant_id;
-  // TODO: Validate cart, calculate total, detect type if needed
-  const amount = await calculateTotal(cart); // you’ll need to implement
-  const type = await inferTypeFromCart(cart); // or pass in explicitly
+  const amount = await calculateTotal(cart);
+  const type = await inferTypeFromCart(cart);
 
-  // Prepare payment provider logic (returns paymentUrl, reference_id)
-  const provider = getPaymentProviderHandler(payment_method);
-  const { paymentUrl, reference_id } = await provider.initiateCheckout({ amount, user_id, cart });
-
-  // Create purchase row
+  // Immediately create purchase as 'paid'
+  const now = new Date().toISOString();
   const purchase = await createPurchase({
     tenant_id,
     user_id,
@@ -32,14 +25,18 @@ export async function checkout(req, reply) {
     payment_method,
     type,
     amount,
-    reference_id
+    reference_id: `mock-${Date.now()}`,
+    status: 'paid',
+    paid_at: now
   });
 
-  reply.code(201).send({ purchase, paymentUrl });
+  // Instantly promote all services
+  await promoteCart(purchase);
+
+  reply.code(201).send({ purchase, paymentUrl: null });
 }
 
 export async function list(req, reply) {
-  // TODO: scope by auth role
   const user_id = req.user?.id;
   const tenant_id = req.user?.tenant_id;
   const isAdmin = req.user?.role === 'tenant_admin' || req.user?.role === 'platform_admin';
@@ -53,27 +50,7 @@ export async function retrieve(req, reply) {
   reply.send({ purchase });
 }
 
+// The webhook is still here for future use, but is a stub for now
 export async function webhook(req, reply) {
-  const { provider } = req.params;
-  const handler = getPaymentProviderHandler(provider);
-  // Verify signature/authenticity
-  const verified = handler.verifyWebhook(req);
-  if (!verified) return reply.code(401).send({ error: 'Invalid signature' });
-
-  const event = req.body;
-  const reference_id = handler.getReferenceId(event);
-  const purchase = await findPurchaseByReference(reference_id); // add to services
-  if (!purchase) return reply.code(404).send({ error: 'Purchase not found' });
-
-  // Idempotency: skip if already paid
-  if (purchase.status === 'paid') return reply.code(200).send({ ok: true });
-
-  // Mark as paid, set paid_at
-  const now = new Date().toISOString();
-  await updatePurchaseStatus(purchase.id, 'paid', reference_id, now);
-
-  // Promote cart (atomic)
-  await promoteCart(purchase);
-
   reply.code(200).send({ ok: true });
 }
