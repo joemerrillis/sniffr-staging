@@ -4,120 +4,116 @@ import {
   retrieve,
   create,
   modify,
-  remove,
+  remove
 } from './controllers/daycareSessionsController.js';
 
 import { daycareSessionSchemas } from './schemas/daycareSessionsSchemas.js';
 
 export default async function routes(fastify, opts) {
-  // Register schemas
-  fastify.addSchema(daycareSessionSchemas.DaycareSession);
-  fastify.addSchema(daycareSessionSchemas.CreateDaycareSession);
-  fastify.addSchema(daycareSessionSchemas.UpdateDaycareSession);
+  // Register schemas ONLY if not already registered
+  if (!fastify.getSchema('DaycareSession')) {
+    fastify.addSchema(daycareSessionSchemas.DaycareSession);
+  }
+  if (!fastify.getSchema('CreateDaycareSession')) {
+    fastify.addSchema(daycareSessionSchemas.CreateDaycareSession);
+  }
+  if (!fastify.getSchema('UpdateDaycareSession')) {
+    fastify.addSchema(daycareSessionSchemas.UpdateDaycareSession);
+  }
 
-  // List all daycare sessions (optionally filtered)
+  // List all daycare sessions
   fastify.get('/', {
     schema: {
       tags: ['Daycare Sessions'],
-      querystring: {
-        type: 'object',
-        properties: {
-          tenant_id: { type: 'string', format: 'uuid' },
-          dog_id:    { type: 'string', format: 'uuid' },
-        },
-      },
       response: {
         200: {
           type: 'object',
           properties: {
             sessions: {
               type: 'array',
-              items: { $ref: 'DaycareSession#' },
-            },
-          },
-        },
-      },
-    },
-    handler: list,
-  });
+              items: { $ref: 'DaycareSession#' }
+            }
+          }
+        }
+      }
+    }
+  }, list);
 
-  // Get a single daycare session by ID
+  // Retrieve a specific daycare session
   fastify.get('/:id', {
     schema: {
       tags: ['Daycare Sessions'],
       params: {
         type: 'object',
         properties: {
-          id: { type: 'string', format: 'uuid' },
+          id: { type: 'string', format: 'uuid' }
         },
-        required: ['id'],
+        required: ['id']
       },
       response: {
         200: {
           type: 'object',
           properties: {
-            session: { $ref: 'DaycareSession#' },
-          },
-        },
-      },
-    },
-    handler: retrieve,
-  });
+            session: { $ref: 'DaycareSession#' }
+          }
+        }
+      }
+    }
+  }, retrieve);
 
-  // Create a new daycare session
+  // Create a daycare session
   fastify.post('/', {
     schema: {
       tags: ['Daycare Sessions'],
-      body: daycareSessionSchemas.CreateDaycareSession,
+      body: { $ref: 'CreateDaycareSession#' },
       response: {
         201: {
           type: 'object',
           properties: {
-            session: { $ref: 'DaycareSession#' },
-          },
-        },
-      },
-    },
-    handler: create,
-  });
+            session: { $ref: 'DaycareSession#' }
+          }
+        }
+      }
+    }
+  }, create);
 
-  // Update an existing daycare session by ID
+  // Update a daycare session
   fastify.patch('/:id', {
     schema: {
       tags: ['Daycare Sessions'],
       params: {
         type: 'object',
         properties: {
-          id: { type: 'string', format: 'uuid' },
+          id: { type: 'string', format: 'uuid' }
         },
-        required: ['id'],
+        required: ['id']
       },
-      body: daycareSessionSchemas.UpdateDaycareSession,
+      body: { $ref: 'UpdateDaycareSession#' },
       response: {
         200: {
           type: 'object',
           properties: {
-            session: { $ref: 'DaycareSession#' },
-          },
-        },
-      },
-    },
-    handler: modify,
-  });
+            session: { $ref: 'DaycareSession#' }
+          }
+        }
+      }
+    }
+  }, modify);
 
-  // Delete a daycare session by ID
+  // Delete a daycare session
   fastify.delete('/:id', {
     schema: {
       tags: ['Daycare Sessions'],
       params: {
         type: 'object',
         properties: {
-          id: { type: 'string', format: 'uuid' },
+          id: { type: 'string', format: 'uuid' }
         },
-        required: ['id'],
+        required: ['id']
       },
-      response: { 204: { type: 'null' } },
-    },
-    handler: remove,
-  });
+      response: {
+        204: { type: 'null' }
+      }
+    }
+  }, remove);
 }
