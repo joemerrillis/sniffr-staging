@@ -142,12 +142,13 @@ export default async function routes(fastify, opts) {
     deleteWindow
   );
 
-  // 7) SEED PENDING WALKS FOR CURRENT WEEK (NEW)
+  // 7) SEED PENDING WALKS FOR CURRENT WEEK (FIXED: add tags here!)
   fastify.post(
     '/seed-now',
     {
       schema: {
         description: 'Seed pending walks for the remainder of this week based on current walk windows.',
+        tags: ['ClientWalkWindows'], // <-- Add this line
         body: {
           type: 'object',
           properties: {
