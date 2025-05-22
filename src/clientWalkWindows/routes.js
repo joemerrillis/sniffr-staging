@@ -1,5 +1,3 @@
-// src/clientWalkWindows/routes.js
-
 import {
   ClientWalkWindow,
   CreateClientWalkWindow,
@@ -14,7 +12,8 @@ import {
   createWindow,
   updateWindow,
   deleteWindow,
-  listClientWindowsForTenant  // <-- NEW
+  listClientWindowsForTenant,
+  seedWalksForCurrentWeek // <-- NEW
 } from './controllers/clientWalkWindowsController.js';
 
 export default async function routes(fastify, opts) {
@@ -141,5 +140,31 @@ export default async function routes(fastify, opts) {
       }
     },
     deleteWindow
+  );
+
+  // 7) SEED PENDING WALKS FOR CURRENT WEEK (NEW)
+  fastify.post(
+    '/seed-now',
+    {
+      schema: {
+        description: 'Seed pending walks for the remainder of this week based on current walk windows.',
+        body: {
+          type: 'object',
+          properties: {
+            user_id: { type: 'string', format: 'uuid' } // Optional: fallback to auth if omitted
+          }
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              seeded: { type: 'integer' } // How many were created
+            }
+          }
+        }
+      },
+      preHandler: [fastify.authenticate]
+    },
+    seedWalksForCurrentWeek
   );
 }
