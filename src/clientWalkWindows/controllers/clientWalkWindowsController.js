@@ -1,12 +1,11 @@
-// src/clientWalkWindows/controllers/clientWalkWindowsController.js
-
 import {
   listClientWalkWindows,
   getClientWalkWindow,
   createClientWalkWindow,
   updateClientWalkWindow,
   deleteClientWalkWindow,
-  listWindowsForWeek
+  listWindowsForWeek,
+  seedPendingWalksForWeek // <-- NEW (for seeding)
 } from '../services/clientWalkWindowsService.js';
 
 /**
@@ -163,11 +162,27 @@ async function deleteWindow(request, reply) {
   reply.code(204).send();
 }
 
+/**
+ * POST /client-windows/seed-now
+ * Seeds pending walks for the remainder of this week based on current walk windows.
+ */
+async function seedWalksForCurrentWeek(request, reply) {
+  const userId = request.body.user_id || request.user.id || request.user.sub;
+  const today = new Date();
+  // Get the next Sunday
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
+
+  const seededCount = await seedPendingWalksForWeek(request.server, userId, today, endOfWeek);
+  reply.send({ seeded: seededCount });
+}
+
 export {
   listWindows,
   listClientWindowsForTenant,
   getWindow,
   createWindow,
   updateWindow,
-  deleteWindow
+  deleteWindow,
+  seedWalksForCurrentWeek // <-- NEW export for seeding
 };
