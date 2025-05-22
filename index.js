@@ -38,7 +38,19 @@ await fastify.register(fastifySwagger, {
       title: 'Sniffr API',
       description: 'API documentation for dog walking SaaS + social layer',
       version: '1.0.0'
-    }
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        }
+      }
+    },
+    security: [
+      { bearerAuth: [] }
+    ]
   }
 });
 // --- Register Swagger UI ---
