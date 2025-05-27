@@ -4,7 +4,7 @@ alter table walk_delegations enable row level security;
 alter table meet_and_greets enable row level security;
 
 -- Only tenants or clients involved can see delegations
-create policy if not exists can_view_own_delegations
+create policy can_view_own_delegations
   on walk_delegations for select
   using (
     client_id = auth.uid()
@@ -13,7 +13,7 @@ create policy if not exists can_view_own_delegations
   );
 
 -- Only involved parties can view meet and greets
-create policy if not exists can_view_own_meet_and_greets
+create policy can_view_own_meet_and_greets
   on meet_and_greets for select
   using (
     client_id = auth.uid()
