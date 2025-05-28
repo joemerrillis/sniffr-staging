@@ -1,11 +1,10 @@
 // src/purchases/services/promoteCartService.js
 
 export async function promoteCart(server, purchase) {
-  // Assume purchase.cart is an array of pending_services IDs
   const { cart, tenant_id, user_id } = purchase;
 
   for (const pendingServiceId of cart) {
-    // Get the pending_service row
+    // Fetch the pending_service row by UUID
     const { data: pending, error } = await server.supabase
       .from('pending_services')
       .select('*')
@@ -13,39 +12,58 @@ export async function promoteCart(server, purchase) {
       .single();
     if (error || !pending) continue;
 
-    // Promote to correct service table
+    // Promote walk
     if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
       await server.supabase.from('walks').insert([{
         tenant_id,
         dog_id: pending.dog_id,
-        walker_id: null, // Or assign based on logic
+        user_id: pending.user_id, // This is the client/user, not walker
         scheduled_at: pending.service_date,
         duration_minutes: pending.details?.length_minutes || 30,
-        status: 'scheduled',
+        status: 'draft',
         created_at: new Date().toISOString()
       }]);
-    } else if (pending.service_type === 'boarding') {
+
+      // Delete only the origin client_walk_request, which will trigger pending_services cleanup
+      if (pending.request_id) {
+        await server.supabase.from('client_walk_requests').delete().eq('id', pending.request_id);
+      }
+    }
+
+    // Promote boarding (example; customize as needed)
+    else if (pending.service_type === 'boarding') {
       await server.supabase.from('boardings').insert([{
         tenant_id,
         dog_id: pending.dog_id,
+        user_id: pending.user_id,
         drop_off_day: pending.details?.start_date || pending.service_date,
         pick_up_day: pending.details?.end_date || pending.service_date,
         price: pending.details?.price || 0,
-        status: 'scheduled',
+        status: 'draft',
         created_at: new Date().toISOString()
       }]);
-    } else if (pending.service_type === 'daycare') {
+      if (pending.boarding_request_id) {
+        await server.supabase.from('boardings').delete().eq('id', pending.boarding_request_id);
+      }
+    }
+
+    // Promote daycare (example; customize as needed)
+    else if (pending.service_type === 'daycare') {
       await server.supabase.from('daycare_sessions').insert([{
         tenant_id,
         dog_id: pending.dog_id,
+        user_id: pending.user_id,
         dropoff_time: pending.service_date,
         expected_pickup_time: pending.details?.expected_pickup_time,
         penalty_amount: 0,
+        status: 'draft',
         created_at: new Date().toISOString()
       }]);
+      if (pending.daycare_request_id) {
+        await server.supabase.from('daycare_sessions').delete().eq('id', pending.daycare_request_id);
+      }
     }
 
-    // Remove from pending_services
-    await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
+    // Other service types: add additional promotion logic here as you expand
   }
 }
