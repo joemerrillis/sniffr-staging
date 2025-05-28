@@ -1,12 +1,12 @@
-import supabase from '../../core/supabase.js';
+// src/purchases/services/promoteCartService.js
 
-export async function promoteCart(purchase) {
+export async function promoteCart(server, purchase) {
   // Assume purchase.cart is an array of pending_services IDs
   const { cart, tenant_id, user_id } = purchase;
 
   for (const pendingServiceId of cart) {
     // Get the pending_service row
-    const { data: pending, error } = await supabase
+    const { data: pending, error } = await server.supabase
       .from('pending_services')
       .select('*')
       .eq('id', pendingServiceId)
@@ -15,7 +15,7 @@ export async function promoteCart(purchase) {
 
     // Promote to correct service table
     if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
-      await supabase.from('walks').insert([{
+      await server.supabase.from('walks').insert([{
         tenant_id,
         dog_id: pending.dog_id,
         walker_id: null, // Or assign based on logic
@@ -25,7 +25,7 @@ export async function promoteCart(purchase) {
         created_at: new Date().toISOString()
       }]);
     } else if (pending.service_type === 'boarding') {
-      await supabase.from('boardings').insert([{
+      await server.supabase.from('boardings').insert([{
         tenant_id,
         dog_id: pending.dog_id,
         drop_off_day: pending.details?.start_date || pending.service_date,
@@ -35,7 +35,7 @@ export async function promoteCart(purchase) {
         created_at: new Date().toISOString()
       }]);
     } else if (pending.service_type === 'daycare') {
-      await supabase.from('daycare_sessions').insert([{
+      await server.supabase.from('daycare_sessions').insert([{
         tenant_id,
         dog_id: pending.dog_id,
         dropoff_time: pending.service_date,
@@ -46,6 +46,6 @@ export async function promoteCart(purchase) {
     }
 
     // Remove from pending_services
-    await supabase.from('pending_services').delete().eq('id', pendingServiceId);
+    await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
   }
 }
