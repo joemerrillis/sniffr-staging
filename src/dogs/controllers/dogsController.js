@@ -6,7 +6,8 @@ import {
   createDog,
   updateDog,
   deleteDog,
-  generatePhotoUploadUrl
+  generatePhotoUploadUrl,
+  createDogOwner // <-- Add this import!
 } from '../services/dogsService.js';
 
 /**
@@ -34,7 +35,14 @@ export async function retrieve(request, reply) {
  */
 export async function create(request, reply) {
   const payload = request.body;
+  const user_id = request.user?.id ?? request.user?.sub; // get user_id from JWT
+
+  // 1. Create the dog record
   const dog = await createDog(request.server, payload);
+
+  // 2. Create dog-owner relationship
+  await createDogOwner(request.server, { dog_id: dog.id, user_id });
+
   reply.code(201).send({ dog });
 }
 
@@ -65,12 +73,8 @@ export async function remove(request, reply) {
  * — Returns a signed URL for the client to upload a dog photo
  */
 export async function photoUploadUrl(request, reply) {
-  // routes use “:id” for the dog identifier
   const { id: dogId } = request.params;
-
-  // generatePhotoUploadUrl returns the signed URL string
   const signedUrl = await generatePhotoUploadUrl(request.server, dogId);
-
   reply.send({ url: signedUrl });
 }
 
@@ -80,7 +84,6 @@ export async function photoUploadUrl(request, reply) {
  */
 export async function exportOwnerMedia(request, reply) {
   const { ownerId } = request.params;
-
   // TODO: fetch & package owner’s media, then stream or send back
   reply.send({ media: [] });
 }
