@@ -41,6 +41,19 @@ export async function createDog(server, payload) {
 }
 
 /**
+ * Create a dog-owner relationship (link dog to user)
+ */
+export async function createDogOwner(server, { dog_id, user_id }) {
+  const { data, error } = await server.supabase
+    .from('dog_owners')
+    .insert([{ dog_id, user_id }])
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Update an existing dog
  */
 export async function updateDog(server, id, payload) {
