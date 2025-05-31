@@ -49,16 +49,7 @@ export async function promoteCart(server, purchase) {
       if (pending.request_id) {
         await server.supabase.from('client_walk_requests').delete().eq('id', pending.request_id);
       }
-    }
-
-    // Boarding and daycare logic unchanged...
-    // ...
-  }
-}
-
-
-    // Promote boarding (example; customize as needed)
-    else if (pending.service_type === 'boarding') {
+    } else if (pending.service_type === 'boarding') {
       await server.supabase.from('boardings').insert([{
         tenant_id,
         dog_id: pending.dog_id,
@@ -72,10 +63,7 @@ export async function promoteCart(server, purchase) {
       if (pending.boarding_request_id) {
         await server.supabase.from('boardings').delete().eq('id', pending.boarding_request_id);
       }
-    }
-
-    // Promote daycare (example; customize as needed)
-    else if (pending.service_type === 'daycare') {
+    } else if (pending.service_type === 'daycare') {
       await server.supabase.from('daycare_sessions').insert([{
         tenant_id,
         dog_id: pending.dog_id,
@@ -90,7 +78,6 @@ export async function promoteCart(server, purchase) {
         await server.supabase.from('daycare_sessions').delete().eq('id', pending.daycare_request_id);
       }
     }
-
     // Other service types: add additional promotion logic here as you expand
   }
 }
