@@ -12,15 +12,36 @@ export async function promoteCart(server, purchase) {
       .single();
     if (error || !pending) continue;
 
-    // Promote walk
     if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
+      // 1. Calculate the middle of the window
+      let scheduled_at = pending.service_date; // fallback if window is missing
+      if (pending.details?.window_start && pending.details?.window_end) {
+        const start = new Date(pending.details.window_start);
+        const end = new Date(pending.details.window_end);
+        scheduled_at = new Date((start.getTime() + end.getTime()) / 2).toISOString();
+      }
+
+      // 2. Lookup the default walker for this tenant/client
+      let walker_id = null;
+      const { data: tenantClient } = await server.supabase
+        .from('tenant_clients')
+        .select('primary_walker_id')
+        .eq('tenant_id', tenant_id)
+        .eq('client_id', pending.user_id) // this is the client
+        .maybeSingle();
+
+      if (tenantClient?.primary_walker_id) {
+        walker_id = tenantClient.primary_walker_id;
+      }
+
       await server.supabase.from('walks').insert([{
         tenant_id,
         dog_id: pending.dog_id,
-        user_id: pending.user_id, // This is the client/user, not walker
-        scheduled_at: pending.service_date,
+        user_id: pending.user_id,
+        walker_id,
+        scheduled_at,
         duration_minutes: pending.details?.length_minutes || 30,
-        status: 'draft',
+        status: 'unscheduled',
         created_at: new Date().toISOString()
       }]);
 
@@ -29,6 +50,12 @@ export async function promoteCart(server, purchase) {
         await server.supabase.from('client_walk_requests').delete().eq('id', pending.request_id);
       }
     }
+
+    // Boarding and daycare logic unchanged...
+    // ...
+  }
+}
+
 
     // Promote boarding (example; customize as needed)
     else if (pending.service_type === 'boarding') {
