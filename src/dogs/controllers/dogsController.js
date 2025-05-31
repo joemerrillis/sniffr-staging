@@ -7,7 +7,7 @@ import {
   updateDog,
   deleteDog,
   generatePhotoUploadUrl,
-  createDogOwner // <-- Add this import!
+  createDogOwner
 } from '../services/dogsService.js';
 
 /**
@@ -40,8 +40,8 @@ export async function create(request, reply) {
   // 1. Create the dog record
   const dog = await createDog(request.server, payload);
 
-  // 2. Create dog-owner relationship
-  await createDogOwner(request.server, { dog_id: dog.id, user_id });
+  // 2. Create dog-owner relationship (role must be provided)
+  await createDogOwner(request.server, { dog_id: dog.id, user_id, role: 'owner' });
 
   reply.code(201).send({ dog });
 }
