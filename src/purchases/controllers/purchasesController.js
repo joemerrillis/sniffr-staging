@@ -16,8 +16,25 @@ async function inferTypeFromCart(server, cart) { return 'walk'; }
 export async function checkout(request, reply) {
   const { cart, payment_method } = request.body;
   const user_id = request.user?.id || request.body.user_id;
-  const tenant_id = request.user?.tenant_id || request.body.tenant_id;
   const server = request.server;
+
+  // ---- NEW LOGIC: Look up tenant_id from pending_services in the cart ----
+  const { data: services, error } = await server.supabase
+    .from('pending_services')
+    .select('tenant_id')
+    .in('id', cart);
+
+  if (error || !services?.length) {
+    return reply.code(400).send({ error: 'Could not find cart items or tenant_id.' });
+  }
+
+  // For now: require all cart items have the same tenant_id (normal case)
+  const uniqueTenantIds = [...new Set(services.map(s => s.tenant_id))];
+  if (uniqueTenantIds.length > 1) {
+    return reply.code(400).send({ error: 'All cart items must belong to the same tenant.' });
+  }
+
+  const tenant_id = uniqueTenantIds[0];
 
   const amount = await calculateTotal(server, cart);
   const type = await inferTypeFromCart(server, cart);
