@@ -42,11 +42,12 @@ export async function createDog(server, payload) {
 
 /**
  * Create a dog-owner relationship (link dog to user)
+ * Always sets role to 'owner'.
  */
 export async function createDogOwner(server, { dog_id, user_id }) {
   const { data, error } = await server.supabase
     .from('dog_owners')
-    .insert([{ dog_id, user_id }])
+    .insert([{ dog_id, user_id, role: 'owner' }])
     .select('*')
     .single();
   if (error) throw error;
