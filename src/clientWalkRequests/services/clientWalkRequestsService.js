@@ -1,4 +1,5 @@
 // src/clientWalkRequests/services/clientWalkRequestsService.js
+
 export async function listClientWalkRequests(server, userId) {
   const { data, error } = await server.supabase
     .from('client_walk_requests')
@@ -21,6 +22,7 @@ export async function getClientWalkRequest(server, userId, id) {
 }
 
 export async function createClientWalkRequest(server, payload) {
+  // payload should already have user_id and tenant_id set
   const { data, error } = await server.supabase
     .from('client_walk_requests')
     .insert(payload)
