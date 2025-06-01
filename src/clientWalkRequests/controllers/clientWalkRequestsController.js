@@ -35,7 +35,7 @@ export async function createRequest(request, reply) {
   console.log('Original request body:', request.body);
   // --- LOGGING ENDS HERE ---
 
-  const { walk_date, window_start, window_end } = request.body;
+  const { walk_date, window_start, window_end, dog_ids } = request.body;
 
   // Determine the correct tenant_id
   let tenant_id = null;
@@ -61,7 +61,8 @@ export async function createRequest(request, reply) {
     console.log('Resolved tenant_id from tenant_clients:', tenant_id);
   }
 
-  const payload = { user_id: userId, tenant_id, walk_date, window_start, window_end };
+  // Compose payload including dog_ids array
+  const payload = { user_id: userId, tenant_id, walk_date, window_start, window_end, dog_ids };
 
   // Log the final payload that will be sent to the service/DB:
   console.log('Final payload sent to service:', payload);
