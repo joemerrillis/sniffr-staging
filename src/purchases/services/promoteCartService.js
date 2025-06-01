@@ -61,7 +61,8 @@ export async function promoteCart(server, purchase) {
         walker_id = tenantClient.primary_walker_id;
       }
 
-      await server.supabase.from('walks').insert([{
+      // 3. Prepare payload and log it
+      const walkPayload = {
         tenant_id,
         dog_id: pending.dog_id,
         user_id: pending.user_id,
@@ -70,7 +71,16 @@ export async function promoteCart(server, purchase) {
         duration_minutes: pending.details?.length_minutes || 30,
         status: 'unscheduled',
         created_at: new Date().toISOString()
-      }]);
+      };
+      console.log('Walk insert payload:', walkPayload);
+
+      const { error: walkInsertError, data: walkInsertData } = await server.supabase.from('walks').insert([walkPayload]);
+
+      if (walkInsertError) {
+        console.error('Failed to insert walk:', walkInsertError);
+      } else {
+        console.log('Walk insert result:', walkInsertData);
+      }
 
       // Delete only the origin client_walk_request, which will trigger pending_services cleanup
       if (pending.request_id) {
