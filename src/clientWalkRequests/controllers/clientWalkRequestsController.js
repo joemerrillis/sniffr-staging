@@ -50,7 +50,7 @@ export async function createRequest(request, reply) {
     const { data: tenantClient, error } = await request.server.supabase
       .from('tenant_clients')
       .select('tenant_id')
-      .eq('client_id', userId)
+      .eq('user_id', userId)
       .eq('accepted', true)
       .maybeSingle();
 
