@@ -62,15 +62,22 @@ export async function getClientWalkRequest(server, userId, id) {
 
 export async function createClientWalkRequest(server, payload) {
   // payload should already have user_id, tenant_id, and dog_ids (array)
-  const { dog_ids, ...rest } = payload;
+  const { dog_ids, window_start, window_end, walk_date, user_id, ...rest } = payload;
+  // 1. Insert client_walk_request
   const { data, error } = await server.supabase
     .from('client_walk_requests')
-    .insert(rest)
+    .insert({
+      user_id,
+      walk_date,
+      window_start,
+      window_end,
+      ...rest
+    })
     .select('*')
     .single();
   if (error) throw error;
 
-  // Insert a row in service_dogs for each dog
+  // 2. Insert a row in service_dogs for each dog
   if (Array.isArray(dog_ids) && dog_ids.length) {
     const dogRows = dog_ids.map(dog_id => ({
       service_type: 'client_walk_request',
@@ -83,10 +90,34 @@ export async function createClientWalkRequest(server, payload) {
     if (dogError) throw dogError;
   }
 
-  // Return with dog_ids array for immediate response
+  // 3. Insert into pending_services (the cart) for immediate UI update
+  const pendingInsert = {
+    user_id,
+    service_date: walk_date,
+    service_type: 'walk',
+    request_id: data.id,
+    dog_ids,
+    details: {
+      window_start,
+      window_end,
+    },
+    is_confirmed: false,
+  };
+
+  const { data: pendingServiceRows, error: pendingError } = await server.supabase
+    .from('pending_services')
+    .insert([pendingInsert])
+    .select('*');
+
+  if (pendingError) throw pendingError;
+
+  // 4. Return walk request and the new cart row for controller/UI
   return {
-    ...data,
-    dog_ids: dog_ids || [],
+    walk_request: {
+      ...data,
+      dog_ids: dog_ids || [],
+    },
+    pending_service: pendingServiceRows[0] || null,
   };
 }
 
