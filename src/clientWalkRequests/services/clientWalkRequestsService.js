@@ -61,13 +61,15 @@ export async function getClientWalkRequest(server, userId, id) {
 }
 
 export async function createClientWalkRequest(server, payload) {
-  // payload should already have user_id, tenant_id, and dog_ids (array)
-  const { dog_ids, window_start, window_end, walk_date, user_id, ...rest } = payload;
+  // FIX: Explicitly destructure tenant_id from payload
+  const { dog_ids, window_start, window_end, walk_date, user_id, tenant_id, ...rest } = payload;
+
   // 1. Insert client_walk_request
   const { data, error } = await server.supabase
     .from('client_walk_requests')
     .insert({
       user_id,
+      tenant_id, // Make sure tenant_id is included in insert!
       walk_date,
       window_start,
       window_end,
