@@ -1,5 +1,22 @@
 // src/purchases/services/promoteCartService.js
 
+function combineDateAndTime(dateStr, timeStr) {
+  // Ensures both date and time exist
+  if (!dateStr || !timeStr) return null;
+  // Returns an ISO string, Z means UTC (adjust if needed)
+  return `${dateStr}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}Z`;
+}
+
+function averageTimeISO(dateStr, startStr, endStr) {
+  const startISO = combineDateAndTime(dateStr, startStr);
+  const endISO = combineDateAndTime(dateStr, endStr);
+  if (!startISO || !endISO) return null;
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+  if (isNaN(start) || isNaN(end)) return null;
+  return new Date((start.getTime() + end.getTime()) / 2).toISOString();
+}
+
 export async function promoteCart(server, purchase) {
   const { cart, tenant_id, user_id } = purchase;
 
@@ -13,12 +30,22 @@ export async function promoteCart(server, purchase) {
     if (error || !pending) continue;
 
     if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
-      // 1. Calculate the middle of the window
+      // 1. Calculate the middle of the window using service_date and window_start/end
       let scheduled_at = pending.service_date; // fallback if window is missing
       if (pending.details?.window_start && pending.details?.window_end) {
-        const start = new Date(pending.details.window_start);
-        const end = new Date(pending.details.window_end);
-        scheduled_at = new Date((start.getTime() + end.getTime()) / 2).toISOString();
+        scheduled_at = averageTimeISO(
+          pending.service_date,
+          pending.details.window_start,
+          pending.details.window_end
+        );
+      } else if (pending.details?.window_start) {
+        // Fallback: use window_start as the walk start time
+        scheduled_at = combineDateAndTime(pending.service_date, pending.details.window_start);
+      }
+
+      if (!scheduled_at || isNaN(new Date(scheduled_at))) {
+        console.error('Invalid scheduled_at value:', scheduled_at, pending);
+        throw new Error('Invalid walk window times or date');
       }
 
       // 2. Lookup the default walker for this tenant/client
@@ -27,7 +54,7 @@ export async function promoteCart(server, purchase) {
         .from('tenant_clients')
         .select('primary_walker_id')
         .eq('tenant_id', tenant_id)
-        .eq('client_id', pending.user_id) // this is the client
+        .eq('user_id', pending.user_id) // now using user_id (client)
         .maybeSingle();
 
       if (tenantClient?.primary_walker_id) {
