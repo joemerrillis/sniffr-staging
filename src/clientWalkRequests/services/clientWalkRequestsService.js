@@ -1,5 +1,23 @@
 // src/clientWalkRequests/services/clientWalkRequestsService.js
 
+// Helper to fetch dog_ids for a set of walk request IDs
+async function getDogIdsForRequests(server, requestIds) {
+  if (!requestIds.length) return {};
+  const { data, error } = await server.supabase
+    .from('service_dogs')
+    .select('service_id, dog_id')
+    .eq('service_type', 'client_walk_request')
+    .in('service_id', requestIds);
+  if (error) throw error;
+  // Group by service_id
+  const mapping = {};
+  for (const row of data) {
+    if (!mapping[row.service_id]) mapping[row.service_id] = [];
+    mapping[row.service_id].push(row.dog_id);
+  }
+  return mapping;
+}
+
 export async function listClientWalkRequests(server, userId) {
   const { data, error } = await server.supabase
     .from('client_walk_requests')
@@ -7,7 +25,16 @@ export async function listClientWalkRequests(server, userId) {
     .eq('user_id', userId)
     .order('walk_date', { ascending: true });
   if (error) throw error;
-  return data;
+
+  // Get all request IDs
+  const requestIds = data.map(req => req.id);
+  const dogMap = await getDogIdsForRequests(server, requestIds);
+
+  // Attach dog_ids to each request
+  return data.map(req => ({
+    ...req,
+    dog_ids: dogMap[req.id] || [],
+  }));
 }
 
 export async function getClientWalkRequest(server, userId, id) {
@@ -18,12 +45,23 @@ export async function getClientWalkRequest(server, userId, id) {
     .eq('id', id)
     .single();
   if (error) throw error;
-  return data;
+
+  // Fetch dog_ids for this request
+  const { data: dogs, error: dogError } = await server.supabase
+    .from('service_dogs')
+    .select('dog_id')
+    .eq('service_type', 'client_walk_request')
+    .eq('service_id', id);
+  if (dogError) throw dogError;
+
+  return {
+    ...data,
+    dog_ids: dogs ? dogs.map(d => d.dog_id) : [],
+  };
 }
 
 export async function createClientWalkRequest(server, payload) {
   // payload should already have user_id, tenant_id, and dog_ids (array)
-  // We'll remove dog_ids from the payload for the main insert, then handle service_dogs
   const { dog_ids, ...rest } = payload;
   const { data, error } = await server.supabase
     .from('client_walk_requests')
@@ -45,7 +83,11 @@ export async function createClientWalkRequest(server, payload) {
     if (dogError) throw dogError;
   }
 
-  return data;
+  // Return with dog_ids array for immediate response
+  return {
+    ...data,
+    dog_ids: dog_ids || [],
+  };
 }
 
 export async function updateClientWalkRequest(server, userId, id, payload) {
@@ -57,6 +99,7 @@ export async function updateClientWalkRequest(server, userId, id, payload) {
     .eq('id', id)
     .single();
   if (error) throw error;
+  // Optionally handle dog_ids update logic here in the future!
   return data;
 }
 
