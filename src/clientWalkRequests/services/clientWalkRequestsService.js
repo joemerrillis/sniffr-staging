@@ -91,16 +91,55 @@ export async function createClientWalkRequest(server, payload) {
 }
 
 export async function updateClientWalkRequest(server, userId, id, payload) {
+  // Separate out dog_ids if present
+  const { dog_ids, ...rest } = payload;
+
+  // 1. Update the main walk request fields (if any)
   const { data, error } = await server.supabase
     .from('client_walk_requests')
-    .update(payload)
+    .update(rest)
     .select('*')
     .eq('user_id', userId)
     .eq('id', id)
     .single();
   if (error) throw error;
-  // Optionally handle dog_ids update logic here in the future!
-  return data;
+
+  // 2. If dog_ids array provided, update service_dogs entries
+  if (Array.isArray(dog_ids)) {
+    // a) Delete existing entries for this request
+    const { error: delErr } = await server.supabase
+      .from('service_dogs')
+      .delete()
+      .eq('service_type', 'client_walk_request')
+      .eq('service_id', id);
+    if (delErr) throw delErr;
+
+    // b) Insert new dog_ids
+    if (dog_ids.length) {
+      const dogRows = dog_ids.map(dog_id => ({
+        service_type: 'client_walk_request',
+        service_id: id,
+        dog_id,
+      }));
+      const { error: dogError } = await server.supabase
+        .from('service_dogs')
+        .insert(dogRows);
+      if (dogError) throw dogError;
+    }
+  }
+
+  // 3. Fetch latest dog_ids for this request (for output)
+  const { data: dogs, error: dogErr } = await server.supabase
+    .from('service_dogs')
+    .select('dog_id')
+    .eq('service_type', 'client_walk_request')
+    .eq('service_id', id);
+  if (dogErr) throw dogErr;
+
+  return {
+    ...data,
+    dog_ids: dogs ? dogs.map(d => d.dog_id) : [],
+  };
 }
 
 export async function deleteClientWalkRequest(server, userId, id) {
