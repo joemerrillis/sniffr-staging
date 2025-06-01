@@ -56,11 +56,16 @@ export default async function routes(fastify, opts) {
         description: 'Create a new walk request for a day/time outside regular windows.',
         tags: ['ClientWalkRequests'],
         body: CreateClientWalkRequest,
-        response: {
-          201: { $ref: 'RequestEnvelope#' }
-        }
-      }
-    },
+response: {
+  201: {
+    type: 'object',
+    properties: {
+      request: { $ref: 'ClientWalkRequest#' },
+      pending_service: { type: 'object' }
+    }
+  }
+}
+
     createRequest
   );
 
