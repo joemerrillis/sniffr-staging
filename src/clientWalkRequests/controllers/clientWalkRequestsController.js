@@ -70,7 +70,7 @@ export async function createRequest(request, reply) {
   try {
     // Service now returns: { walk_request, pending_service }
     const { walk_request, pending_service } = await createClientWalkRequest(request.server, payload);
-    reply.code(201).send({ walk_request, pending_service });
+    reply.code(201).send({ request: walk_request, pending_service }); // <-- changed key!
   } catch (e) {
     // Optional: You could also sanitize the error message here
     reply.code(400).send({ error: e.message || e });
