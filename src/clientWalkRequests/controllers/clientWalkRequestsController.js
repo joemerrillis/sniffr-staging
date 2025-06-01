@@ -67,8 +67,14 @@ export async function createRequest(request, reply) {
   // Log the final payload that will be sent to the service/DB:
   console.log('Final payload sent to service:', payload);
 
-  const req = await createClientWalkRequest(request.server, payload);
-  reply.code(201).send({ request: req });
+  try {
+    // Service now returns: { walk_request, pending_service }
+    const { walk_request, pending_service } = await createClientWalkRequest(request.server, payload);
+    reply.code(201).send({ walk_request, pending_service });
+  } catch (e) {
+    // Optional: You could also sanitize the error message here
+    reply.code(400).send({ error: e.message || e });
+  }
 }
 
 export async function updateRequest(request, reply) {
