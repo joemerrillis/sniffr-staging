@@ -93,6 +93,7 @@ export async function createClientWalkRequest(server, payload) {
   // 3. Insert into pending_services (the cart) for immediate UI update
   const pendingInsert = {
     user_id,
+    tenant_id, 
     service_date: walk_date,
     service_type: 'walk',
     request_id: data.id,
