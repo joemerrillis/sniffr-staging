@@ -22,13 +22,29 @@ export async function getClientWalkRequest(server, userId, id) {
 }
 
 export async function createClientWalkRequest(server, payload) {
-  // payload should already have user_id and tenant_id set
+  // payload should already have user_id, tenant_id, and dog_ids (array)
+  // We'll remove dog_ids from the payload for the main insert, then handle service_dogs
+  const { dog_ids, ...rest } = payload;
   const { data, error } = await server.supabase
     .from('client_walk_requests')
-    .insert(payload)
+    .insert(rest)
     .select('*')
     .single();
   if (error) throw error;
+
+  // Insert a row in service_dogs for each dog
+  if (Array.isArray(dog_ids) && dog_ids.length) {
+    const dogRows = dog_ids.map(dog_id => ({
+      service_type: 'client_walk_request',
+      service_id: data.id,
+      dog_id,
+    }));
+    const { error: dogError } = await server.supabase
+      .from('service_dogs')
+      .insert(dogRows);
+    if (dogError) throw dogError;
+  }
+
   return data;
 }
 
