@@ -1,9 +1,7 @@
 // src/purchases/services/promoteCartService.js
 
 function combineDateAndTime(dateStr, timeStr) {
-  // Ensures both date and time exist
   if (!dateStr || !timeStr) return null;
-  // Returns an ISO string, Z means UTC (adjust if needed)
   return `${dateStr}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}Z`;
 }
 
@@ -21,7 +19,6 @@ export async function promoteCart(server, purchase) {
   const { cart, tenant_id, user_id } = purchase;
 
   for (const pendingServiceId of cart) {
-    // Fetch the pending_service row by UUID
     const { data: pending, error } = await server.supabase
       .from('pending_services')
       .select('*')
@@ -30,8 +27,7 @@ export async function promoteCart(server, purchase) {
     if (error || !pending) continue;
 
     if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
-      // 1. Calculate the middle of the window using service_date and window_start/end
-      let scheduled_at = pending.service_date; // fallback if window is missing
+      let scheduled_at = pending.service_date;
       if (pending.details?.window_start && pending.details?.window_end) {
         scheduled_at = averageTimeISO(
           pending.service_date,
@@ -39,7 +35,6 @@ export async function promoteCart(server, purchase) {
           pending.details.window_end
         );
       } else if (pending.details?.window_start) {
-        // Fallback: use window_start as the walk start time
         scheduled_at = combineDateAndTime(pending.service_date, pending.details.window_start);
       }
 
@@ -48,41 +43,44 @@ export async function promoteCart(server, purchase) {
         throw new Error('Invalid walk window times or date');
       }
 
-      // 2. Lookup the default walker for this tenant/client
+      // Array of dogs for this walk window
+      const dogIds = pending.dog_ids || (pending.dog_id ? [pending.dog_id] : []);
+      if (!dogIds.length) {
+        console.error('No dog_ids found in pending_service:', pending);
+        continue;
+      }
+
       let walker_id = null;
       const { data: tenantClient } = await server.supabase
         .from('tenant_clients')
         .select('primary_walker_id')
         .eq('tenant_id', tenant_id)
-        .eq('user_id', pending.user_id) // now using user_id (client)
+        .eq('user_id', pending.user_id)
         .maybeSingle();
 
       if (tenantClient?.primary_walker_id) {
         walker_id = tenantClient.primary_walker_id;
       }
 
-      // 3. Prepare payload and log it
       const walkPayload = {
         tenant_id,
-        dog_id: pending.dog_id,
+        dog_ids: dogIds,  // Note: now an array!
         user_id: pending.user_id,
         walker_id,
         scheduled_at,
         duration_minutes: pending.details?.length_minutes || 30,
-        status: 'unscheduled',
+        status: 'pending', // Use correct status value for your enum
         created_at: new Date().toISOString()
       };
       console.log('Walk insert payload:', walkPayload);
 
       const { error: walkInsertError, data: walkInsertData } = await server.supabase.from('walks').insert([walkPayload]);
-
       if (walkInsertError) {
         console.error('Failed to insert walk:', walkInsertError);
       } else {
         console.log('Walk insert result:', walkInsertData);
       }
 
-      // Delete only the origin client_walk_request, which will trigger pending_services cleanup
       if (pending.request_id) {
         await server.supabase.from('client_walk_requests').delete().eq('id', pending.request_id);
       }
