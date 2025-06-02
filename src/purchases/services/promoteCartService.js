@@ -50,26 +50,36 @@ export async function promoteCart(server, purchase) {
         continue;
       }
 
+      // Assign walker if there's only one employee for the tenant (autofill), or use primary_walker_id as fallback
       let walker_id = null;
-      const { data: tenantClient } = await server.supabase
-        .from('tenant_clients')
-        .select('primary_walker_id')
-        .eq('tenant_id', tenant_id)
-        .eq('user_id', pending.user_id)
-        .maybeSingle();
-
-      if (tenantClient?.primary_walker_id) {
-        walker_id = tenantClient.primary_walker_id;
+      // Try to get all employees for this tenant
+      const { data: employees, error: empError } = await server.supabase
+        .from('employees')
+        .select('user_id')
+        .eq('tenant_id', tenant_id);
+      if (!empError && employees && employees.length === 1) {
+        walker_id = employees[0].user_id;
+      } else {
+        // Fallback to tenantClient (if your logic supports "primary walker")
+        const { data: tenantClient } = await server.supabase
+          .from('tenant_clients')
+          .select('primary_walker_id')
+          .eq('tenant_id', tenant_id)
+          .eq('user_id', pending.user_id)
+          .maybeSingle();
+        if (tenantClient?.primary_walker_id) {
+          walker_id = tenantClient.primary_walker_id;
+        }
       }
 
       const walkPayload = {
         tenant_id,
-        dog_ids: dogIds,  // Note: now an array!
+        dog_ids: dogIds,
         user_id: pending.user_id,
         walker_id,
         scheduled_at,
         duration_minutes: pending.details?.length_minutes || 30,
-        status: 'pending', // Use correct status value for your enum
+        status: 'unscheduled', // always at creation now
         created_at: new Date().toISOString()
       };
       console.log('Walk insert payload:', walkPayload);
