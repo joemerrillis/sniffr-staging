@@ -14,9 +14,16 @@ export const tenantSchemas = {
       use_time_blocks: { type: 'boolean' },
       time_blocks_config: { type: ['object', 'null'] },
       features: { type: 'object' },
-      created_at: { type: 'string', format: 'date-time' }
+      created_at: { type: 'string', format: 'date-time' },
+      // New fields for window population config:
+      window_populate_frequency: { type: ['string', 'null'], description: 'daily, weekly, monthly, etc.' },
+      window_populate_day: { type: ['integer', 'null'], description: '0=Sunday, 1=Monday, etc.' },
+      window_lead_time_days: { type: ['integer', 'null'], description: 'Days ahead to fill' },
+      window_populate_time: { type: ['string', 'null'], description: 'Time of day (HH:MM:SS)' }
     },
-    required: ['id', 'name', 'slug', 'subscription_tier', 'use_time_blocks', 'features', 'created_at']
+    required: [
+      'id', 'name', 'slug', 'subscription_tier', 'use_time_blocks', 'features', 'created_at'
+    ]
   },
   CreateTenant: {
     type: 'object',
@@ -32,7 +39,12 @@ export const tenantSchemas = {
       gusto_token: { type: 'string' },
       use_time_blocks: { type: 'boolean' },
       time_blocks_config: { type: 'object' },
-      features: { type: ['object', 'null'] }
+      features: { type: ['object', 'null'] },
+      // New fields:
+      window_populate_frequency: { type: 'string', description: 'daily, weekly, monthly, etc.' },
+      window_populate_day: { type: 'integer', description: '0=Sunday, 1=Monday, etc.' },
+      window_lead_time_days: { type: 'integer', description: 'Days ahead to fill' },
+      window_populate_time: { type: 'string', description: 'Time of day (HH:MM:SS)' }
     }
   },
   UpdateTenant: {
@@ -48,7 +60,12 @@ export const tenantSchemas = {
       gusto_token: { type: 'string' },
       use_time_blocks: { type: 'boolean' },
       time_blocks_config: { type: 'object' },
-      features: { type: ['object', 'null'] }
+      features: { type: ['object', 'null'] },
+      // New fields:
+      window_populate_frequency: { type: 'string', description: 'daily, weekly, monthly, etc.' },
+      window_populate_day: { type: 'integer', description: '0=Sunday, 1=Monday, etc.' },
+      window_lead_time_days: { type: 'integer', description: 'Days ahead to fill' },
+      window_populate_time: { type: 'string', description: 'Time of day (HH:MM:SS)' }
     }
   }
 };
