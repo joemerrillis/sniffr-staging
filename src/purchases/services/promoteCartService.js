@@ -26,6 +26,7 @@ export async function promoteCart(server, purchase) {
       .single();
     if (error || !pending) continue;
 
+    // --- Handle Walks ---
     if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
       let scheduled_at = pending.service_date;
       if (pending.details?.window_start && pending.details?.window_end) {
@@ -50,9 +51,8 @@ export async function promoteCart(server, purchase) {
         continue;
       }
 
-      // Assign walker if there's only one employee for the tenant (autofill), or use primary_walker_id as fallback
+      // Assign walker: autofill if only one, or fallback to tenantClient primary_walker_id
       let walker_id = null;
-      // Try to get all employees for this tenant
       const { data: employees, error: empError } = await server.supabase
         .from('employees')
         .select('user_id')
@@ -60,7 +60,6 @@ export async function promoteCart(server, purchase) {
       if (!empError && employees && employees.length === 1) {
         walker_id = employees[0].user_id;
       } else {
-        // Fallback to tenantClient (if your logic supports "primary walker")
         const { data: tenantClient } = await server.supabase
           .from('tenant_clients')
           .select('primary_walker_id')
@@ -91,10 +90,18 @@ export async function promoteCart(server, purchase) {
         console.log('Walk insert result:', walkInsertData);
       }
 
+      // --- Clean up logic ---
       if (pending.request_id) {
+        // This was a one-time walk request, so delete the original request (cart row should be removed by cascade, but can be safe to check)
         await server.supabase.from('client_walk_requests').delete().eq('id', pending.request_id);
+      } else if (pending.walk_window_id) {
+        // This was from a standing window, so ONLY delete the pending_services row
+        await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
       }
-    } else if (pending.service_type === 'boarding') {
+    }
+
+    // --- Handle Boardings ---
+    else if (pending.service_type === 'boarding') {
       await server.supabase.from('boardings').insert([{
         tenant_id,
         dog_id: pending.dog_id,
@@ -108,7 +115,10 @@ export async function promoteCart(server, purchase) {
       if (pending.boarding_request_id) {
         await server.supabase.from('boardings').delete().eq('id', pending.boarding_request_id);
       }
-    } else if (pending.service_type === 'daycare') {
+    }
+
+    // --- Handle Daycare ---
+    else if (pending.service_type === 'daycare') {
       await server.supabase.from('daycare_sessions').insert([{
         tenant_id,
         dog_id: pending.dog_id,
@@ -123,6 +133,6 @@ export async function promoteCart(server, purchase) {
         await server.supabase.from('daycare_sessions').delete().eq('id', pending.daycare_request_id);
       }
     }
-    // Other service types: add additional promotion logic here as you expand
+    // Add more service types here as needed!
   }
 }
