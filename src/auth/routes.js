@@ -8,18 +8,18 @@ const UserResponse = {
     id:           { type: 'string', format: 'uuid' },
     email:        { type: 'string', format: 'email' },
     name:         { type: 'string' },
-    role:         { type: 'string', enum: ['tenant_admin', 'client'] },
+    role:         { type: 'string', enum: ['tenant_admin', 'client', 'walker'] },
     created_at:   { type: 'string', format: 'date-time' }
   }
 };
 
 export default async function authRoutes(fastify, opts) {
-  // 1) REGISTER a new user (tenant-admin or client)
+  // 1) REGISTER a new user (tenant-admin, client, or walker)
   fastify.post(
     '/register',
     {
       schema: {
-        description: 'Register a new user as tenant-admin or client.',
+        description: 'Register a new user as tenant-admin, client, or walker.',
         tags: ['Auth'],
         body: {
           type: 'object',
@@ -28,7 +28,7 @@ export default async function authRoutes(fastify, opts) {
             email:    { type: 'string', format: 'email' },
             password: { type: 'string', minLength: 6 },
             name:     { type: 'string' },
-            role:     { type: 'string', enum: ['tenant_admin', 'client'], default: 'client' }
+            role:     { type: 'string', enum: ['tenant_admin', 'client', 'walker'], default: 'client' }
           }
         },
         response: {
