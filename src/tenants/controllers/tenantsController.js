@@ -29,11 +29,12 @@ export async function create(request, reply) {
 
   // 2) Ensure the creator exists in `users`
   try {
-    const { userId, email, name, role } = request.user;
+    const { id, userId, email, name, role } = request.user;
+    const safeUserId = id || userId; // Prefer id, fallback to userId if present
     await request.server.supabase
       .from('users')
       .upsert(
-        [{ id: userId, email, name, role }],
+        [{ id: safeUserId, email, name, role }],
         { onConflict: 'id', returning: 'minimal' }
       );
   } catch (upsertErr) {
@@ -43,13 +44,21 @@ export async function create(request, reply) {
   // 3) Auto-add the creator as the primary “walker” (employee)
   let seededEmployee = null;
   try {
-    const userId = request.user.userId;
+    // Debug log to inspect user payload and keys
+    console.log('user payload:', request.user);
+
+    const safeUserId = request.user.id || request.user.userId; // Try both for safety
+
+    if (!safeUserId) {
+      throw new Error('Unable to determine user_id for primary employee');
+    }
+
     const { data: employee, error: empErr } = await request.server.supabase
       .from('employees')
       .insert(
         [{
           tenant_id:  tenant.id,
-          user_id:    userId,
+          user_id:    safeUserId,
           is_primary: true
         }],
         { returning: 'representation' }
