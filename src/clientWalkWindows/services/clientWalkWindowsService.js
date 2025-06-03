@@ -1,20 +1,41 @@
 const TABLE = 'client_walk_windows';
 
-/**
- * List all windows for a given user
- */
+// --- Helper: Fetch dog_ids for a set of walk window IDs ---
+async function getDogIdsForWindows(server, windowIds) {
+  if (!windowIds.length) return {};
+  const { data, error } = await server.supabase
+    .from('service_dogs')
+    .select('service_id, dog_id')
+    .eq('service_type', 'client_walk_window')
+    .in('service_id', windowIds);
+  if (error) throw error;
+  // Group by service_id
+  const mapping = {};
+  for (const row of data) {
+    if (!mapping[row.service_id]) mapping[row.service_id] = [];
+    mapping[row.service_id].push(row.dog_id);
+  }
+  return mapping;
+}
+
+// List all windows for a given user
 export async function listClientWalkWindows(server, userId) {
   const { data, error } = await server.supabase
     .from(TABLE)
     .select('*')
     .eq('user_id', userId);
   if (error) throw error;
-  return data;
+
+  // Attach dog_ids to each window
+  const windowIds = data.map(w => w.id);
+  const dogMap = await getDogIdsForWindows(server, windowIds);
+  return data.map(w => ({
+    ...w,
+    dog_ids: dogMap[w.id] || [],
+  }));
 }
 
-/**
- * Get a single window by user + ID
- */
+// Get a single window by user + ID (with dog_ids)
 export async function getClientWalkWindow(server, userId, id) {
   const { data, error } = await server.supabase
     .from(TABLE)
@@ -23,41 +44,129 @@ export async function getClientWalkWindow(server, userId, id) {
     .eq('id', id)
     .single();
   if (error) throw error;
-  return data;
+
+  // Fetch dog_ids for this window
+  const { data: dogs, error: dogError } = await server.supabase
+    .from('service_dogs')
+    .select('dog_id')
+    .eq('service_type', 'client_walk_window')
+    .eq('service_id', id);
+  if (dogError) throw dogError;
+
+  return {
+    ...data,
+    dog_ids: dogs ? dogs.map(d => d.dog_id) : [],
+  };
 }
 
-/**
- * Create a new window
- */
+// Create a new window (writes service_dogs)
 export async function createClientWalkWindow(server, payload) {
+  const { dog_ids, user_id, tenant_id, ...rest } = payload;
+  // 1. Insert the window
   const { data, error } = await server.supabase
     .from(TABLE)
-    .insert([payload])
-    .select('*') // ensure full row returned
+    .insert({
+      user_id,
+      tenant_id,
+      ...rest
+    })
+    .select('*')
     .single();
   if (error) throw error;
-  return data;
+
+  // 2. Insert rows in service_dogs for each dog
+  let insertedDogs = [];
+  if (Array.isArray(dog_ids) && dog_ids.length) {
+    const dogRows = dog_ids.map(dog_id => ({
+      service_type: 'client_walk_window',
+      service_id: data.id,
+      dog_id,
+    }));
+    const { data: inserted, error: dogError } = await server.supabase
+      .from('service_dogs')
+      .insert(dogRows)
+      .select('*');
+    if (dogError) throw dogError;
+    insertedDogs = inserted;
+  }
+
+  return {
+    walk_window: {
+      ...data,
+      dog_ids: dog_ids || [],
+    },
+    service_dogs: insertedDogs,
+  };
 }
 
-/**
- * Update a window for a given user
- */
+// Update a window (updates service_dogs as needed)
 export async function updateClientWalkWindow(server, userId, id, payload) {
+  const { dog_ids, ...rest } = payload;
+
+  // 1. Update the window
   const { data, error } = await server.supabase
     .from(TABLE)
-    .update(payload)
-    .select('*') // ensure full updated row returned
+    .update(rest)
+    .select('*')
     .eq('user_id', userId)
     .eq('id', id)
     .single();
   if (error) throw error;
-  return data;
+
+  let updatedDogs = [];
+  if (Array.isArray(dog_ids)) {
+    // a) Delete existing dogs for this window
+    const { error: delErr } = await server.supabase
+      .from('service_dogs')
+      .delete()
+      .eq('service_type', 'client_walk_window')
+      .eq('service_id', id);
+    if (delErr) throw delErr;
+
+    // b) Insert new dog_ids
+    if (dog_ids.length) {
+      const dogRows = dog_ids.map(dog_id => ({
+        service_type: 'client_walk_window',
+        service_id: id,
+        dog_id,
+      }));
+      const { data: inserted, error: dogError } = await server.supabase
+        .from('service_dogs')
+        .insert(dogRows)
+        .select('*');
+      if (dogError) throw dogError;
+      updatedDogs = inserted;
+    }
+  }
+
+  // Fetch latest dog_ids for this window (for output)
+  const { data: dogs, error: dogErr } = await server.supabase
+    .from('service_dogs')
+    .select('dog_id')
+    .eq('service_type', 'client_walk_window')
+    .eq('service_id', id);
+  if (dogErr) throw dogErr;
+
+  return {
+    walk_window: {
+      ...data,
+      dog_ids: dogs ? dogs.map(d => d.dog_id) : [],
+    },
+    service_dogs: updatedDogs,
+  };
 }
 
-/**
- * Delete a window for a given user
- */
+// Delete a window (also delete service_dogs rows)
 export async function deleteClientWalkWindow(server, userId, id) {
+  // Delete all service_dogs for this window
+  const { error: dogError } = await server.supabase
+    .from('service_dogs')
+    .delete()
+    .eq('service_type', 'client_walk_window')
+    .eq('service_id', id);
+  if (dogError) throw dogError;
+
+  // Delete the window
   const { error } = await server.supabase
     .from(TABLE)
     .delete()
@@ -66,45 +175,45 @@ export async function deleteClientWalkWindow(server, userId, id) {
   if (error) throw error;
 }
 
-/**
- * List all windows “active” during the week starting `weekStart`
- */
+// List all windows “active” during the week starting weekStart (with dog_ids)
 export async function listWindowsForWeek(server, userId, weekStart) {
-  // 1) compute date boundaries
   const start = new Date(weekStart);
   const end   = new Date(start);
   end.setDate(end.getDate() + 6);
 
-  // 2) fetch all windows for user
   const { data: all, error } = await server.supabase
     .from(TABLE)
     .select('*')
     .eq('user_id', userId);
   if (error) throw error;
 
-  // 3) filter by effective date range
-  const filtered = all.filter(w => {
-    const effStart = new Date(w.effective_start);
-    const effEnd   = w.effective_end ? new Date(w.effective_end) : null;
-    return effStart <= end && (!effEnd || effEnd >= start);
-  });
+  // Attach dog_ids
+  const windowIds = all.map(w => w.id);
+  const dogMap = await getDogIdsForWindows(server, windowIds);
 
-  return filtered;
+  // Filter by effective date range
+  return all
+    .filter(w => {
+      const effStart = new Date(w.effective_start);
+      const effEnd   = w.effective_end ? new Date(w.effective_end) : null;
+      return effStart <= end && (!effEnd || effEnd >= start);
+    })
+    .map(w => ({
+      ...w,
+      dog_ids: dogMap[w.id] || [],
+    }));
 }
 
-/**
- * Seed pending walks for the given week, based on active windows.
- * Returns number of pending_services created.
- */
+// --- SEEDING: For each window, add full tenant/dog info to pending_services ---
 export async function seedPendingWalksForWeek(server, userId, startDate, endDate) {
-  // 1. Get the user’s windows
+  // 1. Get user’s windows (with tenant, etc)
   const { data: windows, error } = await server.supabase
-    .from('client_walk_windows')
+    .from(TABLE)
     .select('*')
     .eq('user_id', userId);
   if (error) throw error;
 
-  // 2. Build a date list from startDate to endDate
+  // 2. Build date list
   const days = [];
   let current = new Date(startDate);
   while (current <= endDate) {
@@ -112,10 +221,9 @@ export async function seedPendingWalksForWeek(server, userId, startDate, endDate
     current.setDate(current.getDate() + 1);
   }
 
-  // 3. For each day, check which windows match
   let created = 0;
   for (const day of days) {
-    const dow = day.getDay(); // 0 = Sunday
+    const dow = day.getDay();
     const dayStr = day.toISOString().slice(0, 10);
 
     windows
@@ -125,6 +233,15 @@ export async function seedPendingWalksForWeek(server, userId, startDate, endDate
         (!w.effective_end || new Date(w.effective_end) >= day)
       )
       .forEach(async w => {
+        // Get dog_ids for this window
+        const { data: dogs } = await server.supabase
+          .from('service_dogs')
+          .select('dog_id')
+          .eq('service_type', 'client_walk_window')
+          .eq('service_id', w.id);
+
+        const dog_ids = dogs ? dogs.map(d => d.dog_id) : [];
+
         // Only insert if not already pending
         const { data: exists } = await server.supabase
           .from('pending_services')
@@ -139,9 +256,11 @@ export async function seedPendingWalksForWeek(server, userId, startDate, endDate
             .from('pending_services')
             .insert([{
               user_id: userId,
+              tenant_id: w.tenant_id, // Pass through for full context!
               service_date: dayStr,
               service_type: 'walk_window',
               walk_window_id: w.id,
+              dog_ids,
               details: {
                 dow: w.day_of_week,
                 start: w.window_start,
