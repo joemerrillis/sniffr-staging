@@ -87,42 +87,77 @@ export default async function routes(fastify, opts) {
     getWindow
   );
 
-  // 4) CREATE A NEW CLIENT WALK WINDOW
-  fastify.post(
-    '/',
-    {
-      schema: {
-        description: 'Create a new client walk window.',
-        tags: ['ClientWalkWindows'],
-        body: CreateClientWalkWindow,
-        response: {
-          201: WindowEnvelope
-        }
-      }
-    },
-    createWindow
-  );
-
-  // 5) UPDATE AN EXISTING CLIENT WALK WINDOW
-  fastify.patch(
-    '/:id',
-    {
-      schema: {
-        description: 'Update a client walk window.',
-        tags: ['ClientWalkWindows'],
-        params: {
+ // 4) CREATE A NEW CLIENT WALK WINDOW
+fastify.post(
+  '/',
+  {
+    schema: {
+      description: 'Create a new client walk window.',
+      tags: ['ClientWalkWindows'],
+      body: CreateClientWalkWindow,
+      response: {
+        201: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
-        },
-        body: UpdateClientWalkWindow,
-        response: {
-          200: WindowEnvelope
+          properties: {
+            walk_window: ClientWalkWindow,
+            service_dogs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  service_type: { type: 'string' },
+                  service_id: { type: 'string', format: 'uuid' },
+                  dog_id: { type: 'string', format: 'uuid' }
+                }
+              }
+            }
+          }
         }
       }
-    },
-    updateWindow
-  );
+    }
+  },
+  createWindow
+);
+
+// 5) UPDATE AN EXISTING CLIENT WALK WINDOW
+fastify.patch(
+  '/:id',
+  {
+    schema: {
+      description: 'Update a client walk window.',
+      tags: ['ClientWalkWindows'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      body: UpdateClientWalkWindow,
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            walk_window: ClientWalkWindow,
+            service_dogs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  service_type: { type: 'string' },
+                  service_id: { type: 'string', format: 'uuid' },
+                  dog_id: { type: 'string', format: 'uuid' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  updateWindow
+);
+
 
   // 6) DELETE A CLIENT WALK WINDOW
   fastify.delete(
