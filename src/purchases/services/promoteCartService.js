@@ -15,6 +15,76 @@ function averageTimeISO(dateStr, startStr, endStr) {
   return new Date((start.getTime() + end.getTime()) / 2).toISOString();
 }
 
+async function findDefaultWalkerId(server, tenant_id, dogIds) {
+  // 1. Get all assignments for all dogs on this walk
+  let walkerPriorityTotals = {}; // {walker_id: total_priority}
+  const today = new Date();
+
+  // Keep track of which walkers are assigned to which dogs
+  let assignmentMatrix = {}; // {walker_id: Set of dog_ids}
+  for (const dogId of dogIds) {
+    const { data: assignments } = await server.supabase
+      .from('dog_assignments')
+      .select('walker_id, priority, start_date, end_date')
+      .eq('dog_id', dogId)
+      .eq('source', 'tenant')
+      .order('priority', { ascending: false });
+
+    if (assignments && assignments.length) {
+      const activeAssignments = assignments.filter(a =>
+        (!a.start_date || new Date(a.start_date) <= today) &&
+        (!a.end_date   || new Date(a.end_date)   >= today)
+      );
+      for (const a of activeAssignments) {
+        walkerPriorityTotals[a.walker_id] = (walkerPriorityTotals[a.walker_id] || 0) + (a.priority || 0);
+        if (!assignmentMatrix[a.walker_id]) assignmentMatrix[a.walker_id] = new Set();
+        assignmentMatrix[a.walker_id].add(dogId);
+      }
+    }
+  }
+
+  if (Object.keys(walkerPriorityTotals).length === 0) {
+    return null; // No default found, fallback needed
+  }
+
+  // 2. Find highest total priority
+  let maxPriority = Math.max(...Object.values(walkerPriorityTotals));
+  let candidates = Object.entries(walkerPriorityTotals)
+    .filter(([_, total]) => total === maxPriority)
+    .map(([walker_id]) => walker_id);
+
+  // 3. If tie, break by most recent walker for these dogs
+  if (candidates.length > 1) {
+    let mostRecentWalker = null;
+    let mostRecentDate = null;
+    // Find most recent walk for these dogs by any candidate walker
+    for (const walker_id of candidates) {
+      // Only look for walks performed by candidate walker for *any* of these dogs, for this tenant
+      const { data: recentWalk } = await server.supabase
+        .from('walks')
+        .select('scheduled_at')
+        .contains('dog_ids', dogIds) // assumes dog_ids is an array column
+        .eq('tenant_id', tenant_id)
+        .eq('walker_id', walker_id)
+        .order('scheduled_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (recentWalk && (!mostRecentDate || new Date(recentWalk.scheduled_at) > new Date(mostRecentDate))) {
+        mostRecentDate = recentWalk.scheduled_at;
+        mostRecentWalker = walker_id;
+      }
+    }
+    if (mostRecentWalker) {
+      return mostRecentWalker;
+    }
+    // If still tied (no walk history), just use the first
+    return candidates[0];
+  } else {
+    return candidates[0]; // Only one candidate
+  }
+}
+
 export async function promoteCart(server, purchase) {
   const { cart, tenant_id, user_id } = purchase;
 
@@ -51,23 +121,27 @@ export async function promoteCart(server, purchase) {
         continue;
       }
 
-      // Assign walker: autofill if only one, or fallback to tenantClient primary_walker_id
-      let walker_id = null;
-      const { data: employees, error: empError } = await server.supabase
-        .from('employees')
-        .select('user_id')
-        .eq('tenant_id', tenant_id);
-      if (!empError && employees && employees.length === 1) {
-        walker_id = employees[0].user_id;
-      } else {
-        const { data: tenantClient } = await server.supabase
-          .from('tenant_clients')
-          .select('primary_walker_id')
-          .eq('tenant_id', tenant_id)
-          .eq('user_id', pending.user_id)
-          .maybeSingle();
-        if (tenantClient?.primary_walker_id) {
-          walker_id = tenantClient.primary_walker_id;
+      // --- New walker assignment logic! ---
+      let walker_id = await findDefaultWalkerId(server, tenant_id, dogIds);
+
+      // If not found, fallback to existing logic: autofill if only one, or fallback to tenantClient primary_walker_id
+      if (!walker_id) {
+        const { data: employees, error: empError } = await server.supabase
+          .from('employees')
+          .select('user_id')
+          .eq('tenant_id', tenant_id);
+        if (!empError && employees && employees.length === 1) {
+          walker_id = employees[0].user_id;
+        } else {
+          const { data: tenantClient } = await server.supabase
+            .from('tenant_clients')
+            .select('primary_walker_id')
+            .eq('tenant_id', tenant_id)
+            .eq('user_id', pending.user_id)
+            .maybeSingle();
+          if (tenantClient?.primary_walker_id) {
+            walker_id = tenantClient.primary_walker_id;
+          }
         }
       }
 
