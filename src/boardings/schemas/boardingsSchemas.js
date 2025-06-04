@@ -7,7 +7,6 @@ export const boardingSchemas = {
     properties: {
       id:                   { type: 'string', format: 'uuid' },
       tenant_id:            { type: 'string', format: 'uuid' },
-      dog_id:               { type: 'string', format: 'uuid' },
       drop_off_day:         { type: 'string', format: 'date' },
       drop_off_block:       { type: 'string' },
       drop_off_time:        { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)(:[0-5]\\d)?$' },
@@ -31,7 +30,7 @@ export const boardingSchemas = {
       final_price:          { type: ['number', 'null'] }
     },
     required: [
-      'id','tenant_id','dog_id','drop_off_day','drop_off_block',
+      'id','tenant_id','drop_off_day','drop_off_block',
       'pick_up_day','pick_up_block','price','status','created_at','user_id'
     ]
   },
@@ -40,7 +39,6 @@ export const boardingSchemas = {
     type: 'object',
     properties: {
       tenant_id:      { type: 'string', format: 'uuid' },
-      dog_id:         { type: 'string', format: 'uuid' },
       drop_off_day:   { type: 'string', format: 'date' },
       drop_off_block: { type: 'string' },
       drop_off_time:  { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
@@ -57,7 +55,7 @@ export const boardingSchemas = {
       final_price:          { type: ['number', 'null'] }
     },
     required: [
-      'tenant_id','dog_id','drop_off_day','drop_off_block',
+      'tenant_id','drop_off_day','drop_off_block',
       'pick_up_day','pick_up_block','price'
     ]
   },
