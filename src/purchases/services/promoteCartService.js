@@ -15,8 +15,8 @@ function averageTimeISO(dateStr, startStr, endStr) {
   return new Date((start.getTime() + end.getTime()) / 2).toISOString();
 }
 
-// Helper to find the best walker (returns user_id)
-async function findDefaultWalkerId(server, tenant_id, dogIds, user_id, scheduled_at) {
+// Returns the best employees.id for walker_id
+async function findDefaultEmployeeId(server, tenant_id, dogIds, user_id, scheduled_at) {
   // Get all employees for this tenant (id, user_id)
   const { data: employees, error: empError } = await server.supabase
     .from('employees')
@@ -24,23 +24,24 @@ async function findDefaultWalkerId(server, tenant_id, dogIds, user_id, scheduled
     .eq('tenant_id', tenant_id);
   if (empError || !employees || !employees.length) return null;
 
-  // Build mapping: employees.id => employees.user_id
-  const employeeIdToUserId = {};
-  for (const emp of employees) {
-    employeeIdToUserId[emp.id] = emp.user_id;
-  }
-
-  // Fetch all dog_assignments for these dogs, with walker_id (employee.id) and priority
+  // Fetch all dog_assignments for these dogs
+  const today = scheduled_at ? scheduled_at.slice(0, 10) : (new Date()).toISOString().slice(0, 10);
   const { data: assignments, error: assignErr } = await server.supabase
     .from('dog_assignments')
-    .select('dog_id, walker_id, priority')
+    .select('dog_id, walker_id, priority, start_date, end_date')
     .in('dog_id', dogIds);
   if (assignErr) return null;
 
-  // Aggregate priorities for each walker (employee row id)
+  // Only consider assignments valid for the scheduled date
+  const validAssignments = assignments.filter(a =>
+    (!a.start_date || a.start_date <= today) &&
+    (!a.end_date || a.end_date >= today)
+  );
+
+  // Aggregate priorities for each walker (employees.id)
   const priorityMap = {};
   for (const dogId of dogIds) {
-    for (const a of assignments.filter(row => row.dog_id === dogId)) {
+    for (const a of validAssignments.filter(row => row.dog_id === dogId)) {
       if (!priorityMap[a.walker_id]) priorityMap[a.walker_id] = 0;
       priorityMap[a.walker_id] += Number(a.priority || 0);
     }
@@ -58,43 +59,39 @@ async function findDefaultWalkerId(server, tenant_id, dogIds, user_id, scheduled
       walkerCandidates.push(walkerId);
     }
   }
-  // Map walkerCandidates from employee.id to user_id (users.id)
-  const candidateUserIds = walkerCandidates
-    .map(eid => employeeIdToUserId[eid])
-    .filter(Boolean);
 
-  // If tie, pick previous walker if possible
-  let bestUserId = null;
-  if (candidateUserIds.length === 1) {
-    bestUserId = candidateUserIds[0];
-  } else if (candidateUserIds.length > 1) {
-    // Look up the most recent walk for any of the dogs with one of these walkers
+  // If a tie, tiebreak by "last walked"
+  let bestEmployeeId = null;
+  if (walkerCandidates.length === 1) {
+    bestEmployeeId = walkerCandidates[0];
+  } else if (walkerCandidates.length > 1) {
+    // Try to find last walk for these dogs with these walker candidates
     const { data: lastWalks } = await server.supabase
       .from('walks')
       .select('walker_id, scheduled_at, dog_ids')
       .contains('dog_ids', dogIds)
-      .in('walker_id', candidateUserIds)
+      .in('walker_id', walkerCandidates)
       .order('scheduled_at', { ascending: false })
       .limit(10);
+
     if (lastWalks && lastWalks.length > 0) {
-      for (const userId of candidateUserIds) {
-        if (lastWalks.some(walk => walk.walker_id === userId)) {
-          bestUserId = userId;
+      for (const empId of walkerCandidates) {
+        if (lastWalks.some(walk => walk.walker_id === empId)) {
+          bestEmployeeId = empId;
           break;
         }
       }
     }
-    // Otherwise, just pick the first user_id in the list
-    if (!bestUserId) bestUserId = candidateUserIds[0];
+    // Still tied: pick first
+    if (!bestEmployeeId) bestEmployeeId = walkerCandidates[0];
   }
 
-  // Fallback: if no dog_assignments or all priorities are zero, use only employee logic
-  if (!bestUserId) {
-    // Only one employee? Use them
-    if (employees.length === 1 && employees[0].user_id) {
-      return employees[0].user_id;
+  // Fallbacks
+  if (!bestEmployeeId) {
+    if (employees.length === 1) {
+      return employees[0].id;
     }
-    // Try to use tenantClient.primary_walker_id (must be a user_id)
+    // Try to use tenant_clients.primary_walker_id, but convert it to employees.id
     const { data: tenantClient } = await server.supabase
       .from('tenant_clients')
       .select('primary_walker_id')
@@ -102,13 +99,14 @@ async function findDefaultWalkerId(server, tenant_id, dogIds, user_id, scheduled
       .eq('user_id', user_id)
       .maybeSingle();
     if (tenantClient?.primary_walker_id) {
-      return tenantClient.primary_walker_id;
+      // Find employee for this tenant with that user_id
+      const emp = employees.find(e => e.user_id === tenantClient.primary_walker_id);
+      if (emp) return emp.id;
     }
-    // Otherwise, just return null
     return null;
   }
 
-  return bestUserId;
+  return bestEmployeeId;
 }
 
 export async function promoteCart(server, purchase) {
@@ -140,24 +138,23 @@ export async function promoteCart(server, purchase) {
         throw new Error('Invalid walk window times or date');
       }
 
-      // Array of dogs for this walk window
       const dogIds = pending.dog_ids || (pending.dog_id ? [pending.dog_id] : []);
       if (!dogIds.length) {
         console.error('No dog_ids found in pending_service:', pending);
         continue;
       }
 
-      // Find best walker_id (users.id)
-      const walker_id = await findDefaultWalkerId(server, tenant_id, dogIds, pending.user_id, scheduled_at);
+      // Find best walker_id (employees.id)
+      const walker_id = await findDefaultEmployeeId(server, tenant_id, dogIds, pending.user_id, scheduled_at);
 
       const walkPayload = {
         tenant_id,
         dog_ids: dogIds,
         user_id: pending.user_id,
-        walker_id,
+        walker_id, // <-- employees.id, not user_id!
         scheduled_at,
         duration_minutes: pending.details?.length_minutes || 30,
-        status: 'unscheduled', // always at creation now
+        status: 'unscheduled',
         created_at: new Date().toISOString()
       };
       console.log('Walk insert payload:', walkPayload);
