@@ -57,24 +57,19 @@ function validateBlockTimeFields(tenant, body) {
   } = body;
 
   if (tenant.use_time_blocks) {
-    // Require blocks
     if (!drop_off_block || !pick_up_block) {
       return 'This tenant requires drop_off_block and pick_up_block.';
     }
-    // Optionally: Validate block values (only if config provided)
     if (tenant.time_blocks_config && Array.isArray(tenant.time_blocks_config)) {
       const allowedBlocks = tenant.time_blocks_config;
       if (!allowedBlocks.includes(drop_off_block) || !allowedBlocks.includes(pick_up_block)) {
         return `Block values must be one of: ${allowedBlocks.join(', ')}`;
       }
     }
-    // Times are allowed, but not required
   } else {
-    // Require times
     if (!drop_off_time || !pick_up_time) {
       return 'This tenant requires drop_off_time and pick_up_time.';
     }
-    // Blocks are ignored, so don’t error if present
   }
   return null;
 }
@@ -82,10 +77,11 @@ function validateBlockTimeFields(tenant, body) {
 /**
  * Create a new boarding with one or more dogs.
  * Request body should contain an array of dog_ids as `dogs`.
+ * If not provided, all user's dogs (from dog_owner) are used.
  */
 export async function create(request, reply) {
   const userId = getUserId(request);
-  const {
+  let {
     tenant_id,
     drop_off_day,
     drop_off_block,
@@ -101,7 +97,7 @@ export async function create(request, reply) {
     booking_id,
     is_draft,
     final_price,
-    dogs // <-- Array of dog_ids
+    dogs // <-- Array of dog_ids, may be undefined
   } = request.body;
 
   // Tenant-aware validation
@@ -114,6 +110,16 @@ export async function create(request, reply) {
   const blockTimeErr = validateBlockTimeFields(tenant, request.body);
   if (blockTimeErr) {
     return reply.code(400).send({ error: blockTimeErr });
+  }
+
+  // If no dogs provided, fetch all the user's dogs from dog_owner table
+  if (!Array.isArray(dogs) || !dogs.length) {
+    const { data: ownedDogs, error: dogErr } = await request.server.supabase
+      .from('dog_owner')
+      .select('dog_id')
+      .eq('user_id', userId);
+    if (dogErr) return reply.code(400).send({ error: 'Could not fetch user dogs.' });
+    dogs = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
   }
 
   const payload = {
@@ -133,11 +139,10 @@ export async function create(request, reply) {
     booking_id,
     is_draft,
     final_price,
-    dogs // Array of dog_ids
+    dogs
   };
 
   try {
-    // Service should create the boarding, then insert service_dogs for each dog
     const { boarding, service_dogs } = await createBoarding(request.server, payload);
     reply.code(201).send({ boarding, service_dogs });
   } catch (e) {
@@ -148,10 +153,11 @@ export async function create(request, reply) {
 /**
  * Update an existing boarding, including changing its set of dogs.
  * PATCH body may contain any updatable fields, including `dogs` (array of dog_ids).
+ * If not provided, all user's dogs (from dog_owner) are used.
  */
 export async function modify(request, reply) {
   const { id } = request.params;
-  // If tenant_id is provided (not required for PATCH), use for validation
+  const userId = getUserId(request);
   const { tenant_id } = request.body;
 
   // Tenant-aware validation (only if tenant_id present in PATCH)
@@ -168,19 +174,30 @@ export async function modify(request, reply) {
     }
   }
 
+  // Prepare dogs array: If omitted, fetch from dog_owner
+  let { dogs } = request.body;
+  if (!Array.isArray(dogs) || !dogs.length) {
+    const { data: ownedDogs, error: dogErr } = await request.server.supabase
+      .from('dog_owner')
+      .select('dog_id')
+      .eq('user_id', userId);
+    if (dogErr) return reply.code(400).send({ error: 'Could not fetch user dogs.' });
+    dogs = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
+  }
+
   // Build payload as before
   const fields = [
     'drop_off_day', 'drop_off_block', 'drop_off_time', 'pick_up_day', 'pick_up_block', 'pick_up_time',
     'price', 'status', 'notes', 'proposed_drop_off_time', 'proposed_pick_up_time',
-    'proposed_changes', 'booking_id', 'is_draft', 'approved_by', 'approved_at', 'final_price', 'dogs'
+    'proposed_changes', 'booking_id', 'is_draft', 'approved_by', 'approved_at', 'final_price'
   ];
   const payload = {};
   for (const key of fields) {
     if (request.body[key] !== undefined) payload[key] = request.body[key];
   }
+  payload.dogs = dogs; // always set
 
   try {
-    // Service should update the boarding and sync service_dogs if dog array is present
     const { boarding, service_dogs } = await updateBoarding(request.server, id, payload);
     if (!boarding) return reply.code(404).send({ error: 'Boarding not found' });
     reply.send({ boarding, service_dogs });
