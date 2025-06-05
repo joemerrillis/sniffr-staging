@@ -27,7 +27,12 @@ export const boardingSchemas = {
       approved_by:          { type: ['string', 'null'], format: 'uuid' },
       approved_at:          { type: ['string', 'null'], format: 'date-time' },
       booking_id:           { type: ['string', 'null'], format: 'uuid' },
-      final_price:          { type: ['number', 'null'] }
+      final_price:          { type: ['number', 'null'] },
+      dogs: {
+        type: 'array',
+        items: { type: 'string', format: 'uuid' },
+        description: "Dog IDs associated with this boarding."
+      }
     },
     required: [
       'id','tenant_id','drop_off_day',
@@ -52,7 +57,12 @@ export const boardingSchemas = {
       proposed_changes:     { type: ['object', 'null'] },
       booking_id:           { type: ['string', 'null'], format: 'uuid' },
       is_draft:             { type: ['boolean', 'null'] },
-      final_price:          { type: ['number', 'null'] }
+      final_price:          { type: ['number', 'null'] },
+      dogs: {
+        type: 'array',
+        items: { type: 'string', format: 'uuid' },
+        description: "Dog IDs to associate with this boarding. If omitted, all dogs owned by the user will be included."
+      }
     },
     required: [
       'tenant_id','drop_off_day',
@@ -81,7 +91,12 @@ export const boardingSchemas = {
       is_draft:             { type: ['boolean', 'null'] },
       approved_by:          { type: ['string', 'null'], format: 'uuid' },
       approved_at:          { type: ['string', 'null'], format: 'date-time' },
-      final_price:          { type: ['number', 'null'] }
+      final_price:          { type: ['number', 'null'] },
+      dogs: {
+        type: 'array',
+        items: { type: 'string', format: 'uuid' },
+        description: "Dog IDs to associate with this boarding. If omitted, all dogs owned by the user will be included."
+      }
     }
   }
 };
