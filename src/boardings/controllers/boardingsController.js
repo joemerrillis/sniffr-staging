@@ -16,6 +16,19 @@ function getUserId(request) {
 }
 
 /**
+ * Fetch the tenant config for validation.
+ */
+async function getTenantConfig(server, tenant_id) {
+  const { data, error } = await server.supabase
+    .from('tenants')
+    .select('use_time_blocks, time_blocks_config')
+    .eq('id', tenant_id)
+    .single();
+  if (error) throw new Error('Tenant not found');
+  return data;
+}
+
+/**
  * List all boardings for a tenant, optionally filtering by client/user/booking.
  */
 export async function list(request, reply) {
@@ -32,6 +45,38 @@ export async function retrieve(request, reply) {
   const data = await getBoarding(request.server, id);
   if (!data) return reply.code(404).send({ error: 'Not found' });
   reply.send({ boarding: data });
+}
+
+/**
+ * Validate time/block fields against tenant config.
+ */
+function validateBlockTimeFields(tenant, body) {
+  const {
+    drop_off_block, pick_up_block,
+    drop_off_time, pick_up_time
+  } = body;
+
+  if (tenant.use_time_blocks) {
+    // Require blocks
+    if (!drop_off_block || !pick_up_block) {
+      return 'This tenant requires drop_off_block and pick_up_block.';
+    }
+    // Optionally: Validate block values (only if config provided)
+    if (tenant.time_blocks_config && Array.isArray(tenant.time_blocks_config)) {
+      const allowedBlocks = tenant.time_blocks_config;
+      if (!allowedBlocks.includes(drop_off_block) || !allowedBlocks.includes(pick_up_block)) {
+        return `Block values must be one of: ${allowedBlocks.join(', ')}`;
+      }
+    }
+    // Times are allowed, but not required
+  } else {
+    // Require times
+    if (!drop_off_time || !pick_up_time) {
+      return 'This tenant requires drop_off_time and pick_up_time.';
+    }
+    // Blocks are ignored, so don’t error if present
+  }
+  return null;
 }
 
 /**
@@ -59,7 +104,17 @@ export async function create(request, reply) {
     dogs // <-- Array of dog_ids
   } = request.body;
 
-  // You might want to add validation here for required fields, etc.
+  // Tenant-aware validation
+  let tenant;
+  try {
+    tenant = await getTenantConfig(request.server, tenant_id);
+  } catch (err) {
+    return reply.code(400).send({ error: err.message });
+  }
+  const blockTimeErr = validateBlockTimeFields(tenant, request.body);
+  if (blockTimeErr) {
+    return reply.code(400).send({ error: blockTimeErr });
+  }
 
   const payload = {
     tenant_id,
@@ -96,47 +151,33 @@ export async function create(request, reply) {
  */
 export async function modify(request, reply) {
   const { id } = request.params;
-  const {
-    drop_off_day,
-    drop_off_block,
-    drop_off_time,
-    pick_up_day,
-    pick_up_block,
-    pick_up_time,
-    price,
-    status,
-    notes,
-    proposed_drop_off_time,
-    proposed_pick_up_time,
-    proposed_changes,
-    booking_id,
-    is_draft,
-    approved_by,
-    approved_at,
-    final_price,
-    dogs // <-- Array of dog_ids
-  } = request.body;
+  // If tenant_id is provided (not required for PATCH), use for validation
+  const { tenant_id } = request.body;
 
-  const payload = {
-    ...(drop_off_day !== undefined && { drop_off_day }),
-    ...(drop_off_block !== undefined && { drop_off_block }),
-    ...(drop_off_time !== undefined && { drop_off_time }),
-    ...(pick_up_day !== undefined && { pick_up_day }),
-    ...(pick_up_block !== undefined && { pick_up_block }),
-    ...(pick_up_time !== undefined && { pick_up_time }),
-    ...(price !== undefined && { price }),
-    ...(status !== undefined && { status }),
-    ...(notes !== undefined && { notes }),
-    ...(proposed_drop_off_time !== undefined && { proposed_drop_off_time }),
-    ...(proposed_pick_up_time !== undefined && { proposed_pick_up_time }),
-    ...(proposed_changes !== undefined && { proposed_changes }),
-    ...(booking_id !== undefined && { booking_id }),
-    ...(is_draft !== undefined && { is_draft }),
-    ...(approved_by !== undefined && { approved_by }),
-    ...(approved_at !== undefined && { approved_at }),
-    ...(final_price !== undefined && { final_price }),
-    ...(dogs !== undefined && { dogs })
-  };
+  // Tenant-aware validation (only if tenant_id present in PATCH)
+  if (tenant_id) {
+    let tenant;
+    try {
+      tenant = await getTenantConfig(request.server, tenant_id);
+    } catch (err) {
+      return reply.code(400).send({ error: err.message });
+    }
+    const blockTimeErr = validateBlockTimeFields(tenant, request.body);
+    if (blockTimeErr) {
+      return reply.code(400).send({ error: blockTimeErr });
+    }
+  }
+
+  // Build payload as before
+  const fields = [
+    'drop_off_day', 'drop_off_block', 'drop_off_time', 'pick_up_day', 'pick_up_block', 'pick_up_time',
+    'price', 'status', 'notes', 'proposed_drop_off_time', 'proposed_pick_up_time',
+    'proposed_changes', 'booking_id', 'is_draft', 'approved_by', 'approved_at', 'final_price', 'dogs'
+  ];
+  const payload = {};
+  for (const key of fields) {
+    if (request.body[key] !== undefined) payload[key] = request.body[key];
+  }
 
   try {
     // Service should update the boarding and sync service_dogs if dog array is present
