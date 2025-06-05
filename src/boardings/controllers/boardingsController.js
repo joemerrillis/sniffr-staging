@@ -112,6 +112,20 @@ export async function create(request, reply) {
     return reply.code(400).send({ error: blockTimeErr });
   }
 
+  const { data: ownedDogs, error: dogErr } = await request.server.supabase
+  .from('dog_owner')
+  .select('dog_id')
+  .eq('user_id', userId);
+
+// Add logging right after the Supabase call:
+request.log.info({
+  userId,
+  ownedDogs,
+  dogErr,
+  source: 'auto-dog-assignment'
+}, 'Boarding dog auto-assignment debug info');
+
+
   // If no dogs provided, fetch all the user's dogs from dog_owner table
   if (!Array.isArray(dogs) || !dogs.length) {
     const { data: ownedDogs, error: dogErr } = await request.server.supabase
@@ -173,6 +187,18 @@ export async function modify(request, reply) {
       return reply.code(400).send({ error: blockTimeErr });
     }
   }
+const { data: ownedDogs, error: dogErr } = await request.server.supabase
+  .from('dog_owner')
+  .select('dog_id')
+  .eq('user_id', userId);
+
+// Add logging right after the Supabase call:
+request.log.info({
+  userId,
+  ownedDogs,
+  dogErr,
+  source: 'auto-dog-assignment'
+}, 'Boarding dog auto-assignment debug info');
 
   // Prepare dogs array: If omitted, fetch from dog_owner
   let { dogs } = request.body;
