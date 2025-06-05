@@ -77,7 +77,7 @@ function validateBlockTimeFields(tenant, body) {
 /**
  * Create a new boarding with one or more dogs.
  * Request body should contain an array of dog_ids as `dogs`.
- * If not provided, all user's dogs (from dog_owner) are used.
+ * If not provided, all user's dogs (from dog_owners) are used.
  */
 export async function create(request, reply) {
   const userId = getUserId(request);
@@ -113,7 +113,7 @@ export async function create(request, reply) {
   }
 
   const { data: ownedDogs, error: dogErr } = await request.server.supabase
-  .from('dog_owner')
+  .from('dog_owners')
   .select('dog_id')
   .eq('user_id', userId);
 
@@ -126,10 +126,10 @@ request.log.info({
 }, 'Boarding dog auto-assignment debug info');
 
 
-  // If no dogs provided, fetch all the user's dogs from dog_owner table
+  // If no dogs provided, fetch all the user's dogs from dog_owners table
   if (!Array.isArray(dogs) || !dogs.length) {
     const { data: ownedDogs, error: dogErr } = await request.server.supabase
-      .from('dog_owner')
+      .from('dog_owners')
       .select('dog_id')
       .eq('user_id', userId);
     if (dogErr) return reply.code(400).send({ error: 'Could not fetch user dogs.' });
@@ -167,7 +167,7 @@ request.log.info({
 /**
  * Update an existing boarding, including changing its set of dogs.
  * PATCH body may contain any updatable fields, including `dogs` (array of dog_ids).
- * If not provided, all user's dogs (from dog_owner) are used.
+ * If not provided, all user's dogs (from dog_owners) are used.
  */
 export async function modify(request, reply) {
   const { id } = request.params;
@@ -188,7 +188,7 @@ export async function modify(request, reply) {
     }
   }
 const { data: ownedDogs, error: dogErr } = await request.server.supabase
-  .from('dog_owner')
+  .from('dog_owners')
   .select('dog_id')
   .eq('user_id', userId);
 
@@ -200,11 +200,11 @@ request.log.info({
   source: 'auto-dog-assignment'
 }, 'Boarding dog auto-assignment debug info');
 
-  // Prepare dogs array: If omitted, fetch from dog_owner
+  // Prepare dogs array: If omitted, fetch from dog_owners
   let { dogs } = request.body;
   if (!Array.isArray(dogs) || !dogs.length) {
     const { data: ownedDogs, error: dogErr } = await request.server.supabase
-      .from('dog_owner')
+      .from('dog_owners')
       .select('dog_id')
       .eq('user_id', userId);
     if (dogErr) return reply.code(400).send({ error: 'Could not fetch user dogs.' });
