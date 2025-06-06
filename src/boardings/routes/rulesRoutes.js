@@ -1,9 +1,11 @@
 import {
   listPricingRules,
+  listBoardingPricing,
   createPricingRule,
+  createBoardingPricing,
   updatePricingRule,
   deletePricingRule,
-} from './controllers/pricingRulesController.js';
+} from '../controllers/boardingPricingController.js';
 
 export default async function boardingsRoutes(fastify, opts) {
   // ...existing boarding/price preview routes...
