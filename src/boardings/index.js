@@ -1,26 +1,28 @@
-// src/boardings/index.js
-
 import fp from 'fastify-plugin';
-import routes from './routes.js';                      // <--- FIXED
-import pricingRoutes from './routes/pricingRoutes.js';
-import rulesRoutes from './routes/rulesRoutes.js';
+import boardingsRoutes from './routes/routes.js';                   // your main boardings routes
+import pricingRoutes from './routes/pricingRoutes.js';              // pricing endpoints
+import rulesRoutes from './routes/rulesRoutes.js';                  // pricing rules endpoints
 
 import { boardingSchemas } from './schemas/boardingsSchemas.js';
-import * as pricingRuleSchemas from './schemas/pricingRulesSchemas.js';
+import { pricingRulesSchemas } from './schemas/pricingRulesSchemas.js';
 
 export default fp(async function boardingsPlugin(fastify, opts) {
-  // Register boardings schemas
+  // Register core boarding schemas
   fastify.addSchema(boardingSchemas.Boarding);
   fastify.addSchema(boardingSchemas.CreateBoarding);
   fastify.addSchema(boardingSchemas.UpdateBoarding);
 
-  // Register pricing rule schemas
-  for (const key in pricingRuleSchemas) {
-    fastify.addSchema(pricingRuleSchemas[key]);
+  // Register pricing rules schemas (if you have them)
+  if (pricingRulesSchemas) {
+    Object.values(pricingRulesSchemas).forEach(schema => fastify.addSchema(schema));
   }
 
-  // Register routes under /boardings
-  fastify.register(routes, { prefix: '/boardings' });
-  fastify.register(pricingRoutes, { prefix: '/boardings' });
-  fastify.register(rulesRoutes, { prefix: '/boardings' });
+  // Mount main boardings routes (should include CRUD for /boardings)
+  fastify.register(boardingsRoutes, opts);
+
+  // Mount pricing calculation routes (e.g. /boardings/pricing)
+  fastify.register(pricingRoutes, { prefix: '/pricing' });
+
+  // Mount rules management routes (e.g. /boardings/rules)
+  fastify.register(rulesRoutes, { prefix: '/rules' });
 });
