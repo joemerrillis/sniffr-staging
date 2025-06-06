@@ -1,4 +1,5 @@
-import { previewBoardingPrice } from './controllers/boardingPricingController.js';
+import { listBoardingPricing, createBoardingPricing } from '../controllers/boardingPricingController.js';
+
 
 export default async function boardingsRoutes(fastify, opts) {
   // ...existing boarding routes...
