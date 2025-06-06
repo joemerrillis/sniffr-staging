@@ -187,13 +187,7 @@ export async function promoteCart(server, purchase) {
     }
 
     // --- Handle Boardings ---
-    else if (pending.service_type === 'boarding') {
-      console.log('Processing BOARDING', pending.id, pending);
-
-      // Update existing boarding status instead of inserting/deleting
-    let newStatus = 'purchased';
-
-// (OPTIONAL: fetch boarding price if you want to compare with amount paid)
+  let newStatus = 'purchased';
 let boardingPrice = null;
 if (pending.boarding_request_id) {
   const { data: boardingRow, error: boardingErr } = await server.supabase
@@ -208,17 +202,10 @@ if (pending.boarding_request_id) {
     console.log('Boarding row for status update:', boardingRow);
   }
 }
-
-// Example: use payment logic to determine status
 if (boardingPrice !== null && typeof boardingPrice === 'number') {
-  if (amount < boardingPrice) {
-    newStatus = 'booked';
-  }
-} else if (amount < DEPOSIT_AMOUNT) {
-  newStatus = 'booked';
+  // Ignore incoming amount and always pay full price
+  purchase.amount = boardingPrice;
 }
-
-
       if (pending.boarding_request_id) {
         const { error: updateErr, data: updateResult } = await server.supabase.from('boardings')
           .update({ status: newStatus })
