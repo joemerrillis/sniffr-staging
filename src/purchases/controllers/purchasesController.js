@@ -12,7 +12,7 @@ import { promoteCart } from '../services/promoteCartService.js';
 /**
  * Calculate total and canonical type for a cart.
  * - For boardings: uses canonical price from boardings table.
- * - For walks/daycare: you can expand as needed.
+ * - For walks/daycare: uses price from pending_services.
  * - Errors if mixed types (for now).
  */
 async function canonicalCartInfo(server, cart) {
@@ -22,7 +22,10 @@ async function canonicalCartInfo(server, cart) {
     .select('id, tenant_id, service_type, boarding_request_id, price')
     .in('id', cart);
 
-  if (error || !services || services.length === 0) {
+  if (error) {
+    throw new Error('Database error fetching cart items: ' + error.message);
+  }
+  if (!services || services.length === 0) {
     throw new Error('Could not find cart items in pending_services.');
   }
 
@@ -69,9 +72,20 @@ async function canonicalCartInfo(server, cart) {
 
 export async function checkout(request, reply) {
   try {
-    const { cart, payment_method } = request.body;
+    let { cart, payment_method } = request.body;
     const user_id = request.user?.id || request.body.user_id;
     const server = request.server;
+
+    // --- Robust cart handling ---
+    if (typeof cart === 'string') {
+      cart = [cart];
+    }
+    if (!Array.isArray(cart) || cart.length === 0) {
+      return reply.code(400).send({ error: "Cart must be a non-empty array of pending_service IDs" });
+    }
+
+    // Log for debugging (optional, remove in prod)
+    // console.log("Checkout cart:", cart);
 
     // Canonical info: always correct type and amount
     const { tenant_id, type, amount } = await canonicalCartInfo(server, cart);
