@@ -10,16 +10,74 @@ import {
 import { promoteCart } from '../services/promoteCartService.js';
 
 /**
+ * For a walk pending_service, get price from client_walk_windows or client_walk_requests.
+ * (You can expand this logic for other types if you have custom pricing rules.)
+ */
+async function getWalkPrice(server, pending) {
+  // Try walk window first
+  if (pending.walk_window_id) {
+    const { data, error } = await server.supabase
+      .from('client_walk_windows')
+      .select('price')
+      .eq('id', pending.walk_window_id)
+      .single();
+    if (data && typeof data.price === 'number') return data.price;
+  }
+  // Otherwise try walk request
+  if (pending.request_id) {
+    const { data, error } = await server.supabase
+      .from('client_walk_requests')
+      .select('price')
+      .eq('id', pending.request_id)
+      .single();
+    if (data && typeof data.price === 'number') return data.price;
+  }
+  // Fallback
+  return 0;
+}
+
+/**
+ * For daycare, get price from daycare_sessions.
+ */
+async function getDaycarePrice(server, pending) {
+  if (pending.daycare_request_id) {
+    const { data, error } = await server.supabase
+      .from('daycare_sessions')
+      .select('price')
+      .eq('id', pending.daycare_request_id)
+      .single();
+    if (data && typeof data.price === 'number') return data.price;
+  }
+  // Fallback
+  return 0;
+}
+
+/**
+ * For boardings, get price from boardings.
+ */
+async function getBoardingPrice(server, pending) {
+  if (pending.boarding_request_id) {
+    const { data, error } = await server.supabase
+      .from('boardings')
+      .select('price')
+      .eq('id', pending.boarding_request_id)
+      .single();
+    if (data && typeof data.price === 'number') return data.price;
+  }
+  // Fallback
+  return 0;
+}
+
+/**
  * Calculate total and canonical type for a cart.
- * - For boardings: uses canonical price from boardings table.
- * - For walks/daycare: uses price from pending_services.
- * - Errors if mixed types (for now).
+ * All pricing is fetched from source-of-truth tables.
+ * Errors if mixed types (for now).
  */
 async function canonicalCartInfo(server, cart) {
   // Fetch all pending_services in the cart
   const { data: services, error } = await server.supabase
     .from('pending_services')
-    .select('id, tenant_id, service_type, boarding_request_id, price')
+    .select('id, tenant_id, service_type, walk_window_id, request_id, daycare_request_id, boarding_request_id')
     .in('id', cart);
 
   if (error) {
@@ -36,7 +94,7 @@ async function canonicalCartInfo(server, cart) {
   }
   const tenant_id = uniqueTenantIds[0];
 
-  // Determine service types in the cart
+  // Ensure all items are the same service type
   const uniqueTypes = [...new Set(services.map(s => s.service_type))];
   if (uniqueTypes.length !== 1) {
     throw new Error('All cart items must be the same service type.');
@@ -46,23 +104,17 @@ async function canonicalCartInfo(server, cart) {
   // Canonical total calculation
   let amount = 0;
   if (type === 'boarding') {
-    // Use canonical price from boardings table
     for (const s of services) {
-      if (!s.boarding_request_id) throw new Error('Boarding request missing ID');
-      const { data: boardingRow, error: boardingErr } = await server.supabase
-        .from('boardings')
-        .select('price')
-        .eq('id', s.boarding_request_id)
-        .single();
-      if (boardingErr || !boardingRow) throw new Error('Could not find boarding for price');
-      amount += Number(boardingRow.price || 0);
+      amount += await getBoardingPrice(server, s);
     }
   } else if (type === 'walk') {
-    // Use price from pending_services (expand as needed)
-    amount = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    for (const s of services) {
+      amount += await getWalkPrice(server, s);
+    }
   } else if (type === 'daycare') {
-    // Add daycare logic here if needed
-    amount = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    for (const s of services) {
+      amount += await getDaycarePrice(server, s);
+    }
   } else {
     throw new Error(`Unsupported service type: ${type}`);
   }
@@ -76,16 +128,11 @@ export async function checkout(request, reply) {
     const user_id = request.user?.id || request.body.user_id;
     const server = request.server;
 
-    // --- Robust cart handling ---
-    if (typeof cart === 'string') {
-      cart = [cart];
-    }
+    // Make sure cart is always an array
+    if (typeof cart === 'string') cart = [cart];
     if (!Array.isArray(cart) || cart.length === 0) {
       return reply.code(400).send({ error: "Cart must be a non-empty array of pending_service IDs" });
     }
-
-    // Log for debugging (optional, remove in prod)
-    // console.log("Checkout cart:", cart);
 
     // Canonical info: always correct type and amount
     const { tenant_id, type, amount } = await canonicalCartInfo(server, cart);
