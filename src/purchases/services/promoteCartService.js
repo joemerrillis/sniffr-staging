@@ -186,48 +186,49 @@ export async function promoteCart(server, purchase) {
       }
     }
 
-    // --- Handle Boardings ---
+  // --- Handle Boardings ---
+else if (pending.service_type === 'boarding') {
   let newStatus = 'purchased';
-let boardingPrice = null;
-if (pending.boarding_request_id) {
-  const { data: boardingRow, error: boardingErr } = await server.supabase
-    .from('boardings')
-    .select('id, price, status')
-    .eq('id', pending.boarding_request_id)
-    .single();
-  if (boardingErr) {
-    console.error('Could not fetch boarding row:', pending.boarding_request_id, boardingErr);
+  let boardingPrice = null;
+  if (pending.boarding_request_id) {
+    const { data: boardingRow, error: boardingErr } = await server.supabase
+      .from('boardings')
+      .select('id, price, status')
+      .eq('id', pending.boarding_request_id)
+      .single();
+    if (boardingErr) {
+      console.error('Could not fetch boarding row:', pending.boarding_request_id, boardingErr);
+    } else {
+      boardingPrice = boardingRow.price;
+      console.log('Boarding row for status update:', boardingRow);
+    }
+  }
+  if (boardingPrice !== null && typeof boardingPrice === 'number') {
+    // Ignore incoming amount and always pay full price
+    purchase.amount = boardingPrice;
+  }
+  if (pending.boarding_request_id) {
+    const { error: updateErr, data: updateResult } = await server.supabase.from('boardings')
+      .update({ status: newStatus })
+      .eq('id', pending.boarding_request_id)
+      .select();
+    if (updateErr) {
+      console.error('Failed to update boarding status:', pending.boarding_request_id, updateErr);
+    } else {
+      console.log('Boarding status updated:', updateResult);
+    }
   } else {
-    boardingPrice = boardingRow.price;
-    console.log('Boarding row for status update:', boardingRow);
+    console.warn('No boarding_request_id present in pending_service!', pending);
+  }
+
+  // Clean up the pending_services row
+  const { error: delErr } = await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
+  if (delErr) {
+    console.error('Failed to clean up pending_services row:', pendingServiceId, delErr);
+  } else {
+    console.log('pending_services row cleaned up:', pendingServiceId);
   }
 }
-if (boardingPrice !== null && typeof boardingPrice === 'number') {
-  // Ignore incoming amount and always pay full price
-  purchase.amount = boardingPrice;
-}
-      if (pending.boarding_request_id) {
-        const { error: updateErr, data: updateResult } = await server.supabase.from('boardings')
-          .update({ status: newStatus })
-          .eq('id', pending.boarding_request_id)
-          .select();
-        if (updateErr) {
-          console.error('Failed to update boarding status:', pending.boarding_request_id, updateErr);
-        } else {
-          console.log('Boarding status updated:', updateResult);
-        }
-      } else {
-        console.warn('No boarding_request_id present in pending_service!', pending);
-      }
-
-      // Clean up the pending_services row
-      const { error: delErr } = await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
-      if (delErr) {
-        console.error('Failed to clean up pending_services row:', pendingServiceId, delErr);
-      } else {
-        console.log('pending_services row cleaned up:', pendingServiceId);
-      }
-    }
 
     // --- Handle Daycare ---
     else if (pending.service_type === 'daycare') {
