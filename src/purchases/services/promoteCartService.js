@@ -191,32 +191,33 @@ export async function promoteCart(server, purchase) {
       console.log('Processing BOARDING', pending.id, pending);
 
       // Update existing boarding status instead of inserting/deleting
-      let newStatus = 'purchased';
+    let newStatus = 'purchased';
 
-      // Optional: fetch boarding price if you want to compare with amount paid
-      let boardingPrice = null;
-      if (pending.boarding_request_id) {
-        const { data: boardingRow, error: boardingErr } = await server.supabase
-          .from('boardings')
-          .select('id, price, status')
-          .eq('id', pending.boarding_request_id)
-          .single();
-        if (boardingErr) {
-          console.error('Could not fetch boarding row:', pending.boarding_request_id, boardingErr);
-        } else {
-          boardingPrice = boardingRow.price;
-          console.log('Boarding row for status update:', boardingRow);
-        }
-      }
+// (OPTIONAL: fetch boarding price if you want to compare with amount paid)
+let boardingPrice = null;
+if (pending.boarding_request_id) {
+  const { data: boardingRow, error: boardingErr } = await server.supabase
+    .from('boardings')
+    .select('id, price, status')
+    .eq('id', pending.boarding_request_id)
+    .single();
+  if (boardingErr) {
+    console.error('Could not fetch boarding row:', pending.boarding_request_id, boardingErr);
+  } else {
+    boardingPrice = boardingRow.price;
+    console.log('Boarding row for status update:', boardingRow);
+  }
+}
 
-      // Example: use payment logic to determine status
-      if (boardingPrice !== null && typeof boardingPrice === 'number') {
-        if (amount < boardingPrice) {
-          newStatus = 'booked';
-        }
-      } else if (amount < DEPOSIT_AMOUNT) {
-        newStatus = 'booked';
-      }
+// Example: use payment logic to determine status
+if (boardingPrice !== null && typeof boardingPrice === 'number') {
+  if (amount < boardingPrice) {
+    newStatus = 'booked';
+  }
+} else if (amount < DEPOSIT_AMOUNT) {
+  newStatus = 'booked';
+}
+
 
       if (pending.boarding_request_id) {
         const { error: updateErr, data: updateResult } = await server.supabase.from('boardings')
