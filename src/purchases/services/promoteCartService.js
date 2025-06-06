@@ -20,14 +20,20 @@ async function findDefaultEmployeeId(server, tenant_id, dogIds, user_id, schedul
     .from('employees')
     .select('id, user_id')
     .eq('tenant_id', tenant_id);
-  if (empError || !employees || !employees.length) return null;
+  if (empError || !employees || !employees.length) {
+    console.error('No employees found or error', empError, tenant_id);
+    return null;
+  }
 
   const today = scheduled_at ? scheduled_at.slice(0, 10) : (new Date()).toISOString().slice(0, 10);
   const { data: assignments, error: assignErr } = await server.supabase
     .from('dog_assignments')
     .select('dog_id, walker_id, priority, start_date, end_date')
     .in('dog_id', dogIds);
-  if (assignErr) return null;
+  if (assignErr) {
+    console.error('Assignment error', assignErr, dogIds);
+    return null;
+  }
 
   const validAssignments = assignments.filter(a =>
     (!a.start_date || a.start_date <= today) &&
@@ -99,22 +105,33 @@ async function findDefaultEmployeeId(server, tenant_id, dogIds, user_id, schedul
 
 export async function promoteCart(server, purchase) {
   const { cart, tenant_id, user_id, amount } = purchase;
-
-  // You might want to get the boardings total due (for comparison).
-  // For this example, assume you have a "deposit" threshold.
-  // Adjust logic to your app's payment requirements.
   const DEPOSIT_AMOUNT = 100; // adjust as needed
 
+  console.log('=== Promote Cart Start ===');
+  console.log('Purchase:', { cart, tenant_id, user_id, amount });
+
   for (const pendingServiceId of cart) {
+    console.log('--- Handling pendingServiceId:', pendingServiceId);
     const { data: pending, error } = await server.supabase
       .from('pending_services')
       .select('*')
       .eq('id', pendingServiceId)
       .single();
-    if (error || !pending) continue;
+
+    if (error) {
+      console.error('Could not find pending_service row:', pendingServiceId, error);
+      continue;
+    }
+    if (!pending) {
+      console.error('No pending_service data:', pendingServiceId);
+      continue;
+    }
+
+    console.log('Pending service:', pending);
 
     // --- Handle Walks ---
     if (pending.service_type === 'walk_window' || pending.service_type === 'walk') {
+      console.log('Processing WALK', pending.id, pending);
       let scheduled_at = pending.service_date;
       if (pending.details?.window_start && pending.details?.window_end) {
         scheduled_at = averageTimeISO(
@@ -136,8 +153,10 @@ export async function promoteCart(server, purchase) {
         console.error('No dog_ids found in pending_service:', pending);
         continue;
       }
+      console.log('Resolved dogIds for walk:', dogIds);
 
       const walker_id = await findDefaultEmployeeId(server, tenant_id, dogIds, pending.user_id, scheduled_at);
+      console.log('Walker resolved:', walker_id);
 
       const walkPayload = {
         tenant_id,
@@ -159,40 +178,97 @@ export async function promoteCart(server, purchase) {
       }
 
       if (pending.request_id) {
+        console.log('Cleaning up client_walk_requests:', pending.request_id);
         await server.supabase.from('client_walk_requests').delete().eq('id', pending.request_id);
       } else if (pending.walk_window_id) {
+        console.log('Cleaning up pending_services:', pendingServiceId);
         await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
       }
     }
 
     // --- Handle Boardings ---
     else if (pending.service_type === 'boarding') {
+      console.log('Processing BOARDING', pending.id, pending);
+
       // Update existing boarding status instead of inserting/deleting
-      let newStatus = 'purchased'; // Default to purchased
+      let newStatus = 'purchased';
 
-      // (OPTIONAL: fetch boarding price if you want to compare with amount paid)
-      // Example: if (amount < boarding.price) newStatus = 'booked';
-
-      // Use boarding_request_id to update the correct boarding row
+      // Optional: fetch boarding price if you want to compare with amount paid
+      let boardingPrice = null;
       if (pending.boarding_request_id) {
-        await server.supabase.from('boardings')
-          .update({ status: newStatus })
-          .eq('id', pending.boarding_request_id);
+        const { data: boardingRow, error: boardingErr } = await server.supabase
+          .from('boardings')
+          .select('id, price, status')
+          .eq('id', pending.boarding_request_id)
+          .single();
+        if (boardingErr) {
+          console.error('Could not fetch boarding row:', pending.boarding_request_id, boardingErr);
+        } else {
+          boardingPrice = boardingRow.price;
+          console.log('Boarding row for status update:', boardingRow);
+        }
       }
+
+      // Example: use payment logic to determine status
+      if (boardingPrice !== null && typeof boardingPrice === 'number') {
+        if (amount < boardingPrice) {
+          newStatus = 'booked';
+        }
+      } else if (amount < DEPOSIT_AMOUNT) {
+        newStatus = 'booked';
+      }
+
+      if (pending.boarding_request_id) {
+        const { error: updateErr, data: updateResult } = await server.supabase.from('boardings')
+          .update({ status: newStatus })
+          .eq('id', pending.boarding_request_id)
+          .select();
+        if (updateErr) {
+          console.error('Failed to update boarding status:', pending.boarding_request_id, updateErr);
+        } else {
+          console.log('Boarding status updated:', updateResult);
+        }
+      } else {
+        console.warn('No boarding_request_id present in pending_service!', pending);
+      }
+
       // Clean up the pending_services row
-      await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
+      const { error: delErr } = await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
+      if (delErr) {
+        console.error('Failed to clean up pending_services row:', pendingServiceId, delErr);
+      } else {
+        console.log('pending_services row cleaned up:', pendingServiceId);
+      }
     }
 
     // --- Handle Daycare ---
     else if (pending.service_type === 'daycare') {
-      // Update existing daycare_session status instead of inserting/deleting
+      console.log('Processing DAYCARE', pending.id, pending);
+
       if (pending.daycare_request_id) {
-        await server.supabase.from('daycare_sessions')
+        const { error: updateErr, data: updateResult } = await server.supabase.from('daycare_sessions')
           .update({ status: 'purchased' })
-          .eq('id', pending.daycare_request_id);
+          .eq('id', pending.daycare_request_id)
+          .select();
+        if (updateErr) {
+          console.error('Failed to update daycare_session status:', pending.daycare_request_id, updateErr);
+        } else {
+          console.log('Daycare status updated:', updateResult);
+        }
       }
-      await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
+      const { error: delErr } = await server.supabase.from('pending_services').delete().eq('id', pendingServiceId);
+      if (delErr) {
+        console.error('Failed to clean up pending_services row:', pendingServiceId, delErr);
+      } else {
+        console.log('pending_services row cleaned up:', pendingServiceId);
+      }
     }
-    // Add more service types here as needed!
+
+    // --- Handle Unknowns ---
+    else {
+      console.warn('Unknown service_type:', pending.service_type, pending);
+    }
   }
+
+  console.log('=== Promote Cart End ===');
 }
