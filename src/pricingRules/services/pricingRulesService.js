@@ -1,7 +1,7 @@
 // -- Core CRUD --
 export async function listPricingRules(server, tenant_id) {
   const { data, error } = await server.supabase
-    .from('boarding_pricing_rules') // Use generic rules table for all services
+    .from('pricing_rules') // Use generic rules table for all services
     .select('*')
     .eq('tenant_id', tenant_id)
     .order('priority', { ascending: true });
@@ -11,7 +11,7 @@ export async function listPricingRules(server, tenant_id) {
 
 export async function createPricingRule(server, rule) {
   const { data, error } = await server.supabase
-    .from('boarding_pricing_rules')
+    .from('pricing_rules')
     .insert([rule])
     .select('*')
     .single();
@@ -22,7 +22,7 @@ export async function createPricingRule(server, rule) {
 export async function updatePricingRule(server, id, updates) {
   updates.updated_at = new Date().toISOString();
   const { data, error } = await server.supabase
-    .from('boarding_pricing_rules')
+    .from('pricing_rules')
     .update(updates)
     .eq('id', id)
     .select('*')
@@ -33,7 +33,7 @@ export async function updatePricingRule(server, id, updates) {
 
 export async function deletePricingRule(server, id) {
   const { error } = await server.supabase
-    .from('boarding_pricing_rules')
+    .from('pricing_rules')
     .delete()
     .eq('id', id);
   if (error) throw error;
