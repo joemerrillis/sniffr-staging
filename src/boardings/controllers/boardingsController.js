@@ -81,9 +81,6 @@ function validateBlockTimeFields(tenant, body) {
  * Request body should contain an array of dog_ids as `dogs`.
  * If not provided, all user's dogs (from dog_owners) are used.
  */
-import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
-// ...other imports
-
 export async function create(request, reply) {
   const userId = getUserId(request);
   let {
@@ -94,7 +91,7 @@ export async function create(request, reply) {
     pick_up_day,
     pick_up_block,
     pick_up_time,
-    price, // This may be omitted by client, we’ll calculate if missing
+    price, // May be omitted by client, we’ll calculate if missing
     notes,
     proposed_drop_off_time,
     proposed_pick_up_time,
@@ -130,6 +127,7 @@ export async function create(request, reply) {
   // ==== New logic: Pricing engine integration ====
   let pricingResult = null;
   let reasons = [];
+  let breakdown = [];
   if (!price || isNaN(Number(price))) {
     // Try to compute price using pricingRules engine
     try {
@@ -140,10 +138,11 @@ export async function create(request, reply) {
         dog_ids: dogs
       });
       if (pricingResult.error) {
-        return reply.code(400).send({ error: pricingResult.error, reasons: pricingResult.reasons || [] });
+        return reply.code(400).send({ error: pricingResult.error, reasons: pricingResult.breakdown || [] });
       }
       price = pricingResult.price;
-      reasons = pricingResult.reasons || [];
+      breakdown = pricingResult.breakdown || [];
+      reasons = breakdown;
     } catch (err) {
       return reply.code(400).send({ error: 'Failed to compute price', details: err.message });
     }
@@ -172,7 +171,6 @@ export async function create(request, reply) {
 
   try {
     const { boarding, service_dogs } = await createBoarding(request.server, payload);
-    // Return reasons in the response if present (but do NOT store them in DB unless you want to)
     reply.code(201).send({ boarding, service_dogs, reasons });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
@@ -226,7 +224,7 @@ export async function modify(request, reply) {
   }
   payload.dogs = dogs;
 
-  // Only recalculate price if any date/dog field changes
+  let reasons = [];
   try {
     // Use either incoming or existing values as context
     const currentBoarding = await getBoarding(request.server, id);
@@ -249,7 +247,7 @@ export async function modify(request, reply) {
       return reply.code(400).send({ error: priceResult.error, missing_fields: priceResult.missing_fields });
     }
     payload.price = priceResult.price;
-    // Optionally: payload.price_breakdown = priceResult.breakdown;
+    reasons = priceResult.breakdown || [];
   } catch (err) {
     request.log.error({ err }, '[Boardings] Exception during price calculation (modify)');
     return reply.code(500).send({ error: 'Error calculating price.' });
@@ -258,7 +256,7 @@ export async function modify(request, reply) {
   try {
     const { boarding, service_dogs } = await updateBoarding(request.server, id, payload);
     if (!boarding) return reply.code(404).send({ error: 'Boarding not found' });
-    reply.send({ boarding, service_dogs });
+    reply.send({ boarding, service_dogs, reasons });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
