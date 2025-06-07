@@ -37,9 +37,46 @@ export const boardingSchemas = {
     required: [
       'id','tenant_id','drop_off_day',
       'pick_up_day','status','created_at','user_id'
-      // 'price' is NOT required here for CreateBoarding; it's just a property
     ]
   },
+
+  // This is the new part for response envelopes
+  BoardingResponseEnvelope: {
+    $id: 'BoardingResponseEnvelope',
+    type: 'object',
+    properties: {
+      boarding: { $ref: 'Boarding#' },
+      service_dogs: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id:         { type: 'string', format: 'uuid' },
+            service_type: { type: 'string' },
+            service_id:   { type: 'string', format: 'uuid' },
+            dog_id:       { type: 'string', format: 'uuid' }
+          }
+        }
+      },
+      breakdown: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            rule_type: { type: 'string' },
+            description: { type: ['string', 'null'] },
+            adjustment: { type: 'number' },
+            price_so_far: { type: 'number' }
+          }
+        }
+      }
+    }
+  },
+
+  // ... (the rest of your schemas remain as before)
+
   CreateBoarding: {
     $id: 'CreateBoarding',
     type: 'object',
@@ -51,7 +88,6 @@ export const boardingSchemas = {
       pick_up_day:    { type: 'string', format: 'date' },
       pick_up_block:  { type: ['string', 'null'] },
       pick_up_time:   { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
-      // price:          { type: 'number' }, // NOT required, can be omitted by client
       notes:          { type: ['string', 'null'] },
       proposed_drop_off_time: { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
       proposed_pick_up_time:  { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
@@ -67,7 +103,6 @@ export const boardingSchemas = {
     },
     required: [
       'tenant_id','drop_off_day','pick_up_day'
-      // 'price' REMOVED from required
     ]
   },
   UpdateBoarding: {
@@ -80,7 +115,7 @@ export const boardingSchemas = {
       pick_up_day:    { type: 'string', format: 'date' },
       pick_up_block:  { type: ['string', 'null'] },
       pick_up_time:   { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
-      price:          { type: 'number' }, // PATCH may include price, but not required
+      price:          { type: 'number' },
       status:         { type: 'string', enum: [
         'draft', 'approved', 'booked', 'purchased', 'scheduled', 'completed', 'canceled'
       ] },
@@ -99,6 +134,6 @@ export const boardingSchemas = {
         description: "Dog IDs to associate with this boarding. If omitted, all dogs owned by the user will be included."
       }
     }
-    // No required array here—PATCH is partial by nature
+    // PATCH = partial, no required array
   }
 };
