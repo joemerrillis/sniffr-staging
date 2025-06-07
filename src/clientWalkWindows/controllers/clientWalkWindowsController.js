@@ -8,17 +8,19 @@ import {
   seedPendingWalksForWeek
 } from '../services/clientWalkWindowsService.js';
 
-import { previewPrice } from '../../pricingRules/services/pricingEngine.js'; // ADDED
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
 /**
  * Helper to extract the authenticated user's ID from the JWT.
  */
 function getUserId(request) {
-  return request.user.id ?? request.user.sub;
+  return request.user?.id ?? request.user?.sub ?? null;
 }
 
 async function listWindows(request, reply) {
   const userId = getUserId(request);
+  console.log('[DEBUG:listWindows] request.user:', request.user, '| derived userId:', userId);
+
   const { week_start } = request.query;
 
   let windows;
@@ -35,7 +37,6 @@ async function listClientWindowsForTenant(request, reply) {
   const { tenant_id, client_id } = request.params;
   const { week_start } = request.query;
 
-  // Security: check that tenant_id has access to client_id
   const { data: tenantClient, error } = await request.server.supabase
     .from('tenant_clients')
     .select('id')
@@ -60,11 +61,12 @@ async function listClientWindowsForTenant(request, reply) {
 
 async function getWindow(request, reply) {
   const userId = getUserId(request);
+  console.log('[DEBUG:getWindow] request.user:', request.user, '| derived userId:', userId);
+
   const { id } = request.params;
   const window = await getClientWalkWindow(request.server, userId, id);
   if (!window) return reply.code(404).send({ error: 'Window not found' });
 
-  // Add price preview to GET window
   let price_preview = null;
   if (window && window.tenant_id) {
     price_preview = await previewPrice(request.server, 'walk_window', {
@@ -77,16 +79,21 @@ async function getWindow(request, reply) {
   reply.send({ window, price_preview });
 }
 
-// --- CHANGED: createWindow now also returns price_preview ---
 async function createWindow(request, reply) {
+  // Robust debug logging
+  console.log('[DEBUG:createWindow] request.user:', request.user);
+  console.log('[DEBUG:createWindow] request.body:', request.body);
+
   const userId = getUserId(request);
+  console.log('[DEBUG:createWindow] derived userId:', userId);
+
   const {
     day_of_week,
     window_start,
     window_end,
     effective_start,
     effective_end,
-    dog_ids // <-- ADDED: now support multi-dog creation
+    dog_ids
   } = request.body;
 
   if (
@@ -100,12 +107,14 @@ async function createWindow(request, reply) {
       .send({ error: 'day_of_week must be an integer 0 (Sunday) through 6 (Saturday)' });
   }
 
-  // -- ADDED: Resolve tenant_id just like in requests controller --
+  // ADDED: tenant_id debug path
   let tenant_id = null;
   const userRole = request.user?.role;
+  console.log('[DEBUG:createWindow] userRole:', userRole);
 
   if (userRole === 'tenant_admin' || userRole === 'tenant') {
     tenant_id = request.user.tenant_id;
+    console.log('[DEBUG:createWindow] tenant_id from user object:', tenant_id);
   } else {
     const { data: tenantClient, error } = await request.server.supabase
       .from('tenant_clients')
@@ -114,23 +123,29 @@ async function createWindow(request, reply) {
       .eq('accepted', true)
       .maybeSingle();
     tenant_id = tenantClient?.tenant_id || null;
+    console.log('[DEBUG:createWindow] tenant_id from tenant_clients:', tenant_id, '| error:', error);
+  }
+
+  // Final check: error if userId is missing
+  if (!userId) {
+    console.error('[ERROR:createWindow] No userId found! request.user:', request.user, '| request.body:', request.body);
+    return reply.code(400).send({ error: 'No user_id could be determined from your login session. Are you logged in?' });
   }
 
   const payload = {
     user_id:        userId,
-    tenant_id,      // ADDED
+    tenant_id,
     day_of_week,
     window_start,
     window_end,
     effective_start,
     effective_end,
-    dog_ids        // ADDED
+    dog_ids
   };
 
   try {
     const { walk_window, service_dogs } = await createClientWalkWindow(request.server, payload);
 
-    // --- NEW: Preview price for this window and return it ---
     let price_preview = null;
     if (walk_window && tenant_id) {
       price_preview = await previewPrice(request.server, 'walk_window', {
@@ -143,13 +158,15 @@ async function createWindow(request, reply) {
 
     reply.code(201).send({ walk_window, service_dogs, price_preview });
   } catch (e) {
+    console.error('[ERROR:createWindow] exception thrown:', e);
     reply.code(400).send({ error: e.message || e });
   }
 }
 
-// --- CHANGED: updateWindow supports updating dog_ids, and returns price_preview ---
 async function updateWindow(request, reply) {
   const userId = getUserId(request);
+  console.log('[DEBUG:updateWindow] request.user:', request.user, '| derived userId:', userId);
+
   const { id } = request.params;
   const {
     day_of_week,
@@ -157,7 +174,7 @@ async function updateWindow(request, reply) {
     window_end,
     effective_start,
     effective_end,
-    dog_ids // ADDED
+    dog_ids
   } = request.body;
 
   const payload = {};
@@ -178,13 +195,12 @@ async function updateWindow(request, reply) {
   if (window_end      !== undefined) payload.window_end      = window_end;
   if (effective_start !== undefined) payload.effective_start = effective_start;
   if (effective_end   !== undefined) payload.effective_end   = effective_end;
-  if (dog_ids         !== undefined) payload.dog_ids         = dog_ids; // ADDED
+  if (dog_ids         !== undefined) payload.dog_ids         = dog_ids;
 
   try {
     const { walk_window, service_dogs } = await updateClientWalkWindow(request.server, userId, id, payload);
     if (!walk_window) return reply.code(404).send({ error: 'Window not found' });
 
-    // --- NEW: Preview price for this window and return it ---
     let price_preview = null;
     if (walk_window && walk_window.tenant_id) {
       price_preview = await previewPrice(request.server, 'walk_window', {
@@ -197,19 +213,21 @@ async function updateWindow(request, reply) {
 
     reply.send({ walk_window, service_dogs, price_preview });
   } catch (e) {
+    console.error('[ERROR:updateWindow] exception thrown:', e);
     reply.code(400).send({ error: e.message || e });
   }
 }
 
 async function deleteWindow(request, reply) {
   const userId = getUserId(request);
-  const { id } = request.params;
   await deleteClientWalkWindow(request.server, userId, id);
   reply.code(204).send();
 }
 
 async function seedWalksForCurrentWeek(request, reply) {
-  const userId = request.body.user_id || request.user.id || request.user.sub;
+  const userId = request.body.user_id || request.user?.id || request.user?.sub;
+  console.log('[DEBUG:seedWalksForCurrentWeek] userId:', userId, '| request.user:', request.user);
+
   const today = new Date();
   const endOfWeek = new Date(today);
   endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
