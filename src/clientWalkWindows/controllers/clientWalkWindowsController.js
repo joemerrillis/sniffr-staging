@@ -30,7 +30,7 @@ async function listWindows(request, reply) {
     windows = await listClientWalkWindows(request.server, userId);
   }
 
-  // Attach price_preview to each window
+  // Attach price_preview to each window, passing walk_length_minutes from the window object
   const windowsWithPrice = await Promise.all(
     windows.map(async (w) => {
       let price_preview = null;
@@ -39,7 +39,8 @@ async function listWindows(request, reply) {
           ...w,
           tenant_id: w.tenant_id,
           user_id: w.user_id,
-          dog_ids: w.dog_ids || []
+          dog_ids: w.dog_ids || [],
+          walk_length_minutes: w.walk_length_minutes // <-- ensure it is present
         });
       }
       return { ...w, price_preview };
@@ -72,7 +73,7 @@ async function listClientWindowsForTenant(request, reply) {
     windows = await listClientWalkWindows(request.server, client_id);
   }
 
-  // Attach price_preview to each window
+  // Attach price_preview to each window, passing walk_length_minutes from the window object
   const windowsWithPrice = await Promise.all(
     windows.map(async (w) => {
       let price_preview = null;
@@ -81,7 +82,8 @@ async function listClientWindowsForTenant(request, reply) {
           ...w,
           tenant_id: w.tenant_id,
           user_id: w.user_id,
-          dog_ids: w.dog_ids || []
+          dog_ids: w.dog_ids || [],
+          walk_length_minutes: w.walk_length_minutes // <-- ensure it is present
         });
       }
       return { ...w, price_preview };
@@ -105,7 +107,8 @@ async function getWindow(request, reply) {
       ...window,
       tenant_id: window.tenant_id,
       user_id: window.user_id,
-      dog_ids: window.dog_ids || []
+      dog_ids: window.dog_ids || [],
+      walk_length_minutes: window.walk_length_minutes // <-- ensure it is present
     });
   }
 
@@ -127,7 +130,8 @@ async function createWindow(request, reply) {
     window_end,
     effective_start,
     effective_end,
-    dog_ids
+    dog_ids,
+    walk_length_minutes // <-- now explicitly required
   } = request.body;
 
   if (
@@ -139,6 +143,12 @@ async function createWindow(request, reply) {
     return reply
       .code(400)
       .send({ error: 'day_of_week must be an integer 0 (Sunday) through 6 (Saturday)' });
+  }
+
+  if (typeof walk_length_minutes !== 'number' || walk_length_minutes < 1) {
+    return reply
+      .code(400)
+      .send({ error: 'walk_length_minutes is required and must be a positive integer.' });
   }
 
   // ADDED: tenant_id debug path
@@ -174,7 +184,8 @@ async function createWindow(request, reply) {
     window_end,
     effective_start,
     effective_end,
-    dog_ids
+    dog_ids,
+    walk_length_minutes // <-- explicitly pass this into the service
   };
 
   try {
@@ -186,7 +197,8 @@ async function createWindow(request, reply) {
         ...walk_window,
         tenant_id,
         user_id: userId,
-        dog_ids: walk_window.dog_ids || []
+        dog_ids: walk_window.dog_ids || [],
+        walk_length_minutes: walk_window.walk_length_minutes // <-- ensure it is present
       });
     }
 
@@ -211,7 +223,8 @@ async function updateWindow(request, reply) {
     window_end,
     effective_start,
     effective_end,
-    dog_ids
+    dog_ids,
+    walk_length_minutes // <-- now allowed to be patched
   } = request.body;
 
   const payload = {};
@@ -233,6 +246,7 @@ async function updateWindow(request, reply) {
   if (effective_start !== undefined) payload.effective_start = effective_start;
   if (effective_end   !== undefined) payload.effective_end   = effective_end;
   if (dog_ids         !== undefined) payload.dog_ids         = dog_ids;
+  if (walk_length_minutes !== undefined) payload.walk_length_minutes = walk_length_minutes;
 
   try {
     const { walk_window, service_dogs } = await updateClientWalkWindow(request.server, userId, id, payload);
@@ -244,7 +258,8 @@ async function updateWindow(request, reply) {
         ...walk_window,
         tenant_id: walk_window.tenant_id,
         user_id: walk_window.user_id,
-        dog_ids: walk_window.dog_ids || []
+        dog_ids: walk_window.dog_ids || [],
+        walk_length_minutes: walk_window.walk_length_minutes // <-- ensure it is present
       });
     }
 
