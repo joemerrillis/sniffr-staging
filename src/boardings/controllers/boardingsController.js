@@ -81,6 +81,9 @@ function validateBlockTimeFields(tenant, body) {
  * Request body should contain an array of dog_ids as `dogs`.
  * If not provided, all user's dogs (from dog_owners) are used.
  */
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
+// ...other imports
+
 export async function create(request, reply) {
   const userId = getUserId(request);
   let {
@@ -91,6 +94,7 @@ export async function create(request, reply) {
     pick_up_day,
     pick_up_block,
     pick_up_time,
+    price, // This may be omitted by client, we’ll calculate if missing
     notes,
     proposed_drop_off_time,
     proposed_pick_up_time,
@@ -123,30 +127,29 @@ export async function create(request, reply) {
     dogs = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
   }
 
-  // ---- PRICING ENGINE: Calculate price before insert ----
-  let price = 0;
-  try {
-    const priceResult = await previewPrice(
-      request.server,
-      'boarding',
-      {
+  // ==== New logic: Pricing engine integration ====
+  let pricingResult = null;
+  let reasons = [];
+  if (!price || isNaN(Number(price))) {
+    // Try to compute price using pricingRules engine
+    try {
+      pricingResult = await previewPrice(request.server, 'boarding', {
         tenant_id,
         drop_off_day,
         pick_up_day,
         dog_ids: dogs
+      });
+      if (pricingResult.error) {
+        return reply.code(400).send({ error: pricingResult.error, reasons: pricingResult.reasons || [] });
       }
-    );
-    if (priceResult.error) {
-      request.log.error({ priceResult }, '[Boardings] Pricing engine error');
-      return reply.code(400).send({ error: priceResult.error, missing_fields: priceResult.missing_fields });
+      price = pricingResult.price;
+      reasons = pricingResult.reasons || [];
+    } catch (err) {
+      return reply.code(400).send({ error: 'Failed to compute price', details: err.message });
     }
-    price = priceResult.price;
-    // You can attach priceResult.breakdown for admin/debug UI if desired
-  } catch (err) {
-    request.log.error({ err }, '[Boardings] Exception during price calculation');
-    return reply.code(500).send({ error: 'Error calculating price.' });
   }
 
+  // Build the payload
   const payload = {
     tenant_id,
     user_id: userId,
@@ -156,7 +159,7 @@ export async function create(request, reply) {
     pick_up_day,
     pick_up_block,
     pick_up_time,
-    price, // always use backend-calculated price
+    price,
     notes,
     proposed_drop_off_time,
     proposed_pick_up_time,
@@ -169,7 +172,8 @@ export async function create(request, reply) {
 
   try {
     const { boarding, service_dogs } = await createBoarding(request.server, payload);
-    reply.code(201).send({ boarding, service_dogs });
+    // Return reasons in the response if present (but do NOT store them in DB unless you want to)
+    reply.code(201).send({ boarding, service_dogs, reasons });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
