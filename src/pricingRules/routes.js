@@ -14,7 +14,7 @@ export default async function pricingRulesRoutes(fastify, opts) {
   fastify.addSchema(pricingRuleSchemas.CreatePricingRule);
 
   // CRUD routes
-  fastify.get('/pricing-rules', {
+  fastify.get('/', {
     schema: {
       tags: ['PricingRules'],
       querystring: { type: 'object', properties: { tenant_id: { type: 'string', format: 'uuid' } }, required: ['tenant_id'] },
@@ -22,7 +22,7 @@ export default async function pricingRulesRoutes(fastify, opts) {
     }
   }, getRules);
 
-  fastify.post('/pricing-rules', {
+  fastify.post('/', {
     schema: {
       tags: ['PricingRules'],
       body: pricingRuleSchemas.CreatePricingRule,
@@ -30,7 +30,7 @@ export default async function pricingRulesRoutes(fastify, opts) {
     }
   }, postRule);
 
-  fastify.patch('/pricing-rules/:id', {
+  fastify.patch('/:id', {
     schema: {
       tags: ['PricingRules'],
       params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } }, required: ['id'] },
@@ -39,7 +39,7 @@ export default async function pricingRulesRoutes(fastify, opts) {
     }
   }, patchRule);
 
-  fastify.delete('/pricing-rules/:id', {
+  fastify.delete('/:id', {
     schema: {
       tags: ['PricingRules'],
       params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } }, required: ['id'] },
