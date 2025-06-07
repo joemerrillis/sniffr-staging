@@ -3,7 +3,8 @@ import {
   CreateClientWalkWindow,
   UpdateClientWalkWindow,
   WindowsEnvelope,
-  WindowEnvelope
+  WindowEnvelope,
+  PricePreview
 } from './schemas/clientWalkWindowsSchemas.js';
 
 import {
@@ -13,7 +14,7 @@ import {
   updateWindow,
   deleteWindow,
   listClientWindowsForTenant,
-  seedWalksForCurrentWeek // <-- NEW
+  seedWalksForCurrentWeek
 } from './controllers/clientWalkWindowsController.js';
 
 export default async function routes(fastify, opts) {
@@ -80,84 +81,91 @@ export default async function routes(fastify, opts) {
           required: ['id']
         },
         response: {
-          200: WindowEnvelope
+          200: {
+            type: 'object',
+            properties: {
+              window: ClientWalkWindow,
+              price_preview: PricePreview // Explicit in top-level response
+            }
+          }
         }
       }
     },
     getWindow
   );
 
- // 4) CREATE A NEW CLIENT WALK WINDOW
-fastify.post(
-  '/',
-  {
-    schema: {
-      description: 'Create a new client walk window.',
-      tags: ['ClientWalkWindows'],
-      body: CreateClientWalkWindow,
-      response: {
-        201: {
-          type: 'object',
-          properties: {
-            walk_window: ClientWalkWindow,
-            service_dogs: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  service_type: { type: 'string' },
-                  service_id: { type: 'string', format: 'uuid' },
-                  dog_id: { type: 'string', format: 'uuid' }
+  // 4) CREATE A NEW CLIENT WALK WINDOW
+  fastify.post(
+    '/',
+    {
+      schema: {
+        description: 'Create a new client walk window.',
+        tags: ['ClientWalkWindows'],
+        body: CreateClientWalkWindow,
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              walk_window: ClientWalkWindow,
+              service_dogs: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    service_type: { type: 'string' },
+                    service_id: { type: 'string', format: 'uuid' },
+                    dog_id: { type: 'string', format: 'uuid' }
+                  }
                 }
-              }
+              },
+              price_preview: PricePreview // Explicit in top-level response
             }
           }
         }
       }
-    }
-  },
-  createWindow
-);
+    },
+    createWindow
+  );
 
-// 5) UPDATE AN EXISTING CLIENT WALK WINDOW
-fastify.patch(
-  '/:id',
-  {
-    schema: {
-      description: 'Update a client walk window.',
-      tags: ['ClientWalkWindows'],
-      params: {
-        type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
-      },
-      body: UpdateClientWalkWindow,
-      response: {
-        200: {
+  // 5) UPDATE AN EXISTING CLIENT WALK WINDOW
+  fastify.patch(
+    '/:id',
+    {
+      schema: {
+        description: 'Update a client walk window.',
+        tags: ['ClientWalkWindows'],
+        params: {
           type: 'object',
-          properties: {
-            walk_window: ClientWalkWindow,
-            service_dogs: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  service_type: { type: 'string' },
-                  service_id: { type: 'string', format: 'uuid' },
-                  dog_id: { type: 'string', format: 'uuid' }
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        body: UpdateClientWalkWindow,
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              walk_window: ClientWalkWindow,
+              service_dogs: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    service_type: { type: 'string' },
+                    service_id: { type: 'string', format: 'uuid' },
+                    dog_id: { type: 'string', format: 'uuid' }
+                  }
                 }
-              }
+              },
+              price_preview: PricePreview // Explicit in top-level response
             }
           }
         }
       }
-    }
-  },
-  updateWindow
-);
-
+    },
+    updateWindow
+  );
 
   // 6) DELETE A CLIENT WALK WINDOW
   fastify.delete(
@@ -183,18 +191,18 @@ fastify.patch(
     {
       schema: {
         description: 'Seed pending walks for the remainder of this week based on current walk windows.',
-        tags: ['ClientWalkWindows'], // <-- Add this line
+        tags: ['ClientWalkWindows'],
         body: {
           type: 'object',
           properties: {
-            user_id: { type: 'string', format: 'uuid' } // Optional: fallback to auth if omitted
+            user_id: { type: 'string', format: 'uuid' }
           }
         },
         response: {
           200: {
             type: 'object',
             properties: {
-              seeded: { type: 'integer' } // How many were created
+              seeded: { type: 'integer' }
             }
           }
         }
