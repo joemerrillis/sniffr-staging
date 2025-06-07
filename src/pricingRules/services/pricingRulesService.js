@@ -65,29 +65,43 @@ async function fetchServiceData(server, { service_type, service_id }) {
   throw new Error(`Unsupported service_type: ${service_type}`);
 }
 
-export async function previewServicePrice(server, { tenant_id, service_type, service_id, ...rest }) {
+export async function previewServicePrice(server, { tenant_id, service_type, service_id, ...context }) {
   // Get the service instance (boarding, daycare, etc)
   const serviceData = await fetchServiceData(server, { service_type, service_id });
   // Fetch rules for tenant
   const rules = await listPricingRules(server, tenant_id);
 
-  let basePrice = 0;
-  let breakdown = [];
   let priceSoFar = 0;
+  let breakdown = [];
+
   for (const rule of rules.filter(r => r.enabled)) {
-    // TODO: Rule evaluation engine. For now: just sum all fixed adjustments as demo
+    // -- NEW: Only apply the rule if all rule_data keys match context --
+    let matches = true;
+    if (rule.rule_data && typeof rule.rule_data === 'object') {
+      for (const [k, v] of Object.entries(rule.rule_data)) {
+        // Use loose equality so 30 == "30"
+        if (context[k] == null || context[k] != v) {
+          matches = false;
+          break;
+        }
+      }
+    }
+    if (!matches) continue;
+
+    // Now apply price logic
     let adjustment = 0;
-    if (rule.price_adjustment_type === 'fixed') {
+    if (rule.price_adjustment_type === 'set') {
       adjustment = rule.price_adjustment_value;
-    }
-    if (rule.price_adjustment_type === 'percent') {
+      priceSoFar = adjustment;
+    } else if (rule.price_adjustment_type === 'fixed') {
+      adjustment = rule.price_adjustment_value;
+      priceSoFar += adjustment;
+    } else if (rule.price_adjustment_type === 'percent') {
       adjustment = priceSoFar * (rule.price_adjustment_value / 100);
-    }
-    if (rule.price_adjustment_type === 'override') {
+      priceSoFar += adjustment;
+    } else if (rule.price_adjustment_type === 'override') {
       priceSoFar = rule.price_adjustment_value;
       adjustment = 0;
-    } else {
-      priceSoFar += adjustment;
     }
     breakdown.push({
       id: rule.id,
@@ -97,6 +111,16 @@ export async function previewServicePrice(server, { tenant_id, service_type, ser
       adjustment,
       price_so_far: priceSoFar
     });
+  }
+
+  // If nothing matched, return a clear error in the breakdown.
+  if (breakdown.length === 0) {
+    return {
+      price: 0,
+      breakdown: [],
+      serviceData,
+      error: 'No pricing rule matched.'
+    };
   }
 
   return { price: priceSoFar, breakdown, serviceData };
