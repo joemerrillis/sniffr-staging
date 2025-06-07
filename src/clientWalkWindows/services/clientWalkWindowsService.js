@@ -22,7 +22,7 @@ async function getDogIdsForWindows(server, windowIds) {
 export async function listClientWalkWindows(server, userId) {
   const { data, error } = await server.supabase
     .from(TABLE)
-    .select('*')
+    .select('id, user_id, tenant_id, day_of_week, window_start, window_end, effective_start, effective_end, created_at, updated_at, walk_length_minutes')
     .eq('user_id', userId);
   if (error) throw error;
 
@@ -39,7 +39,7 @@ export async function listClientWalkWindows(server, userId) {
 export async function getClientWalkWindow(server, userId, id) {
   const { data, error } = await server.supabase
     .from(TABLE)
-    .select('*')
+    .select('id, user_id, tenant_id, day_of_week, window_start, window_end, effective_start, effective_end, created_at, updated_at, walk_length_minutes')
     .eq('user_id', userId)
     .eq('id', id)
     .single();
@@ -70,7 +70,7 @@ export async function createClientWalkWindow(server, payload) {
       tenant_id,
       ...rest
     })
-    .select('*')
+    .select('id, user_id, tenant_id, day_of_week, window_start, window_end, effective_start, effective_end, created_at, updated_at, walk_length_minutes')
     .single();
   if (error) throw error;
 
@@ -107,7 +107,7 @@ export async function updateClientWalkWindow(server, userId, id, payload) {
   const { data, error } = await server.supabase
     .from(TABLE)
     .update(rest)
-    .select('*')
+    .select('id, user_id, tenant_id, day_of_week, window_start, window_end, effective_start, effective_end, created_at, updated_at, walk_length_minutes')
     .eq('user_id', userId)
     .eq('id', id)
     .single();
@@ -183,7 +183,7 @@ export async function listWindowsForWeek(server, userId, weekStart) {
 
   const { data: all, error } = await server.supabase
     .from(TABLE)
-    .select('*')
+    .select('id, user_id, tenant_id, day_of_week, window_start, window_end, effective_start, effective_end, created_at, updated_at, walk_length_minutes')
     .eq('user_id', userId);
   if (error) throw error;
 
@@ -209,7 +209,7 @@ export async function seedPendingWalksForWeek(server, userId, startDate, endDate
   // 1. Get user’s windows (with tenant, etc)
   const { data: windows, error } = await server.supabase
     .from(TABLE)
-    .select('*')
+    .select('id, user_id, tenant_id, day_of_week, window_start, window_end, effective_start, effective_end, created_at, updated_at, walk_length_minutes')
     .eq('user_id', userId);
   if (error) throw error;
 
@@ -256,7 +256,7 @@ export async function seedPendingWalksForWeek(server, userId, startDate, endDate
             .from('pending_services')
             .insert([{
               user_id: userId,
-              tenant_id: w.tenant_id, // Pass through for full context!
+              tenant_id: w.tenant_id,
               service_date: dayStr,
               service_type: 'walk_window',
               walk_window_id: w.id,
@@ -264,7 +264,8 @@ export async function seedPendingWalksForWeek(server, userId, startDate, endDate
               details: {
                 dow: w.day_of_week,
                 start: w.window_start,
-                end: w.window_end
+                end: w.window_end,
+                walk_length_minutes: w.walk_length_minutes // Add for full context!
               },
               is_confirmed: false,
               created_at: new Date().toISOString()
