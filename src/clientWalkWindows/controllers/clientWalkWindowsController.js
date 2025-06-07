@@ -8,6 +8,8 @@ import {
   seedPendingWalksForWeek
 } from '../services/clientWalkWindowsService.js';
 
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js'; // ADDED
+
 /**
  * Helper to extract the authenticated user's ID from the JWT.
  */
@@ -61,10 +63,21 @@ async function getWindow(request, reply) {
   const { id } = request.params;
   const window = await getClientWalkWindow(request.server, userId, id);
   if (!window) return reply.code(404).send({ error: 'Window not found' });
-  reply.send({ window });
+
+  // Add price preview to GET window
+  let price_preview = null;
+  if (window && window.tenant_id) {
+    price_preview = await previewPrice(request.server, 'walk_window', {
+      ...window,
+      tenant_id: window.tenant_id,
+      user_id: window.user_id,
+      dog_ids: window.dog_ids || []
+    });
+  }
+  reply.send({ window, price_preview });
 }
 
-// --- CHANGED: createWindow now accepts dog_ids, resolves tenant_id, writes service_dogs ---
+// --- CHANGED: createWindow now also returns price_preview ---
 async function createWindow(request, reply) {
   const userId = getUserId(request);
   const {
@@ -114,16 +127,27 @@ async function createWindow(request, reply) {
     dog_ids        // ADDED
   };
 
-  // -- ADDED: Service now creates the window, writes service_dogs, and returns both --
   try {
     const { walk_window, service_dogs } = await createClientWalkWindow(request.server, payload);
-    reply.code(201).send({ walk_window, service_dogs });
+
+    // --- NEW: Preview price for this window and return it ---
+    let price_preview = null;
+    if (walk_window && tenant_id) {
+      price_preview = await previewPrice(request.server, 'walk_window', {
+        ...walk_window,
+        tenant_id,
+        user_id,
+        dog_ids: walk_window.dog_ids || []
+      });
+    }
+
+    reply.code(201).send({ walk_window, service_dogs, price_preview });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
 }
 
-// --- CHANGED: updateWindow supports updating dog_ids, keeps tenant_id logic ---
+// --- CHANGED: updateWindow supports updating dog_ids, and returns price_preview ---
 async function updateWindow(request, reply) {
   const userId = getUserId(request);
   const { id } = request.params;
@@ -156,11 +180,22 @@ async function updateWindow(request, reply) {
   if (effective_end   !== undefined) payload.effective_end   = effective_end;
   if (dog_ids         !== undefined) payload.dog_ids         = dog_ids; // ADDED
 
-  // -- ADDED: update service_dogs to match any new dog_ids array --
   try {
     const { walk_window, service_dogs } = await updateClientWalkWindow(request.server, userId, id, payload);
     if (!walk_window) return reply.code(404).send({ error: 'Window not found' });
-    reply.send({ walk_window, service_dogs });
+
+    // --- NEW: Preview price for this window and return it ---
+    let price_preview = null;
+    if (walk_window && walk_window.tenant_id) {
+      price_preview = await previewPrice(request.server, 'walk_window', {
+        ...walk_window,
+        tenant_id: walk_window.tenant_id,
+        user_id: walk_window.user_id,
+        dog_ids: walk_window.dog_ids || []
+      });
+    }
+
+    reply.send({ walk_window, service_dogs, price_preview });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
@@ -173,7 +208,6 @@ async function deleteWindow(request, reply) {
   reply.code(204).send();
 }
 
-// No change: seeding is still allowed, but will now always read up-to-date window/dog associations
 async function seedWalksForCurrentWeek(request, reply) {
   const userId = request.body.user_id || request.user.id || request.user.sub;
   const today = new Date();
