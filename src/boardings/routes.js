@@ -66,7 +66,7 @@ export default async function boardingsRoutes(fastify, opts) {
     retrieve
   );
 
-  // 3) CREATE BOARDING (accepts dogs array, returns service_dogs)
+  // 3) CREATE BOARDING (accepts dogs array, returns service_dogs & breakdown)
   fastify.post(
     '/',
     {
@@ -75,32 +75,14 @@ export default async function boardingsRoutes(fastify, opts) {
         tags: ['Boardings'],
         body: boardingSchemas.CreateBoarding,
         response: {
-          201: {
-            type: 'object',
-            properties: {
-              boarding: boardingSchemas.Boarding,
-              service_dogs: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    service_type: { type: 'string' },
-                    service_id: { type: 'string', format: 'uuid' },
-                    dog_id: { type: 'string', format: 'uuid' }
-                  }
-                }
-              }
-            },
-            required: ['boarding']
-          }
+          201: boardingSchemas.BoardingResponseEnvelope
         }
       }
     },
     create
   );
 
-  // 4) UPDATE BOARDING (accepts dogs array, returns service_dogs)
+  // 4) UPDATE BOARDING (accepts dogs array, returns service_dogs & breakdown)
   fastify.patch(
     '/:id',
     {
@@ -114,25 +96,7 @@ export default async function boardingsRoutes(fastify, opts) {
         },
         body: boardingSchemas.UpdateBoarding,
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              boarding: boardingSchemas.Boarding,
-              service_dogs: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    service_type: { type: 'string' },
-                    service_id: { type: 'string', format: 'uuid' },
-                    dog_id: { type: 'string', format: 'uuid' }
-                  }
-                }
-              }
-            },
-            required: ['boarding']
-          }
+          200: boardingSchemas.BoardingResponseEnvelope
         }
       }
     },
