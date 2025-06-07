@@ -8,6 +8,8 @@ import {
   deleteBoarding
 } from '../services/boardingsService.js';
 
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
+
 /**
  * Helper to extract the authenticated user's ID from the JWT.
  */
@@ -89,7 +91,6 @@ export async function create(request, reply) {
     pick_up_day,
     pick_up_block,
     pick_up_time,
-    price,
     notes,
     proposed_drop_off_time,
     proposed_pick_up_time,
@@ -112,20 +113,6 @@ export async function create(request, reply) {
     return reply.code(400).send({ error: blockTimeErr });
   }
 
-  const { data: ownedDogs, error: dogErr } = await request.server.supabase
-  .from('dog_owners')
-  .select('dog_id')
-  .eq('user_id', userId);
-
-// Add logging right after the Supabase call:
-request.log.info({
-  userId,
-  ownedDogs,
-  dogErr,
-  source: 'auto-dog-assignment'
-}, 'Boarding dog auto-assignment debug info');
-
-
   // If no dogs provided, fetch all the user's dogs from dog_owners table
   if (!Array.isArray(dogs) || !dogs.length) {
     const { data: ownedDogs, error: dogErr } = await request.server.supabase
@@ -134,6 +121,30 @@ request.log.info({
       .eq('user_id', userId);
     if (dogErr) return reply.code(400).send({ error: 'Could not fetch user dogs.' });
     dogs = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
+  }
+
+  // ---- PRICING ENGINE: Calculate price before insert ----
+  let price = 0;
+  try {
+    const priceResult = await previewPrice(
+      request.server,
+      'boarding',
+      {
+        tenant_id,
+        drop_off_day,
+        pick_up_day,
+        dog_ids: dogs
+      }
+    );
+    if (priceResult.error) {
+      request.log.error({ priceResult }, '[Boardings] Pricing engine error');
+      return reply.code(400).send({ error: priceResult.error, missing_fields: priceResult.missing_fields });
+    }
+    price = priceResult.price;
+    // You can attach priceResult.breakdown for admin/debug UI if desired
+  } catch (err) {
+    request.log.error({ err }, '[Boardings] Exception during price calculation');
+    return reply.code(500).send({ error: 'Error calculating price.' });
   }
 
   const payload = {
@@ -145,7 +156,7 @@ request.log.info({
     pick_up_day,
     pick_up_block,
     pick_up_time,
-    price,
+    price, // always use backend-calculated price
     notes,
     proposed_drop_off_time,
     proposed_pick_up_time,
@@ -187,18 +198,6 @@ export async function modify(request, reply) {
       return reply.code(400).send({ error: blockTimeErr });
     }
   }
-const { data: ownedDogs, error: dogErr } = await request.server.supabase
-  .from('dog_owners')
-  .select('dog_id')
-  .eq('user_id', userId);
-
-// Add logging right after the Supabase call:
-request.log.info({
-  userId,
-  ownedDogs,
-  dogErr,
-  source: 'auto-dog-assignment'
-}, 'Boarding dog auto-assignment debug info');
 
   // Prepare dogs array: If omitted, fetch from dog_owners
   let { dogs } = request.body;
@@ -211,17 +210,46 @@ request.log.info({
     dogs = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
   }
 
-  // Build payload as before
+  // Build payload as before, but recalculate price
   const fields = [
     'drop_off_day', 'drop_off_block', 'drop_off_time', 'pick_up_day', 'pick_up_block', 'pick_up_time',
-    'price', 'status', 'notes', 'proposed_drop_off_time', 'proposed_pick_up_time',
+    'status', 'notes', 'proposed_drop_off_time', 'proposed_pick_up_time',
     'proposed_changes', 'booking_id', 'is_draft', 'approved_by', 'approved_at', 'final_price'
   ];
   const payload = {};
   for (const key of fields) {
     if (request.body[key] !== undefined) payload[key] = request.body[key];
   }
-  payload.dogs = dogs; // always set
+  payload.dogs = dogs;
+
+  // Only recalculate price if any date/dog field changes
+  try {
+    // Use either incoming or existing values as context
+    const currentBoarding = await getBoarding(request.server, id);
+    const newDropOff = payload.drop_off_day || currentBoarding.drop_off_day;
+    const newPickUp = payload.pick_up_day || currentBoarding.pick_up_day;
+    const newDogs = payload.dogs || currentBoarding.dogs;
+
+    const priceResult = await previewPrice(
+      request.server,
+      'boarding',
+      {
+        tenant_id: tenant_id || currentBoarding.tenant_id,
+        drop_off_day: newDropOff,
+        pick_up_day: newPickUp,
+        dog_ids: newDogs
+      }
+    );
+    if (priceResult.error) {
+      request.log.error({ priceResult }, '[Boardings] Pricing engine error (modify)');
+      return reply.code(400).send({ error: priceResult.error, missing_fields: priceResult.missing_fields });
+    }
+    payload.price = priceResult.price;
+    // Optionally: payload.price_breakdown = priceResult.breakdown;
+  } catch (err) {
+    request.log.error({ err }, '[Boardings] Exception during price calculation (modify)');
+    return reply.code(500).send({ error: 'Error calculating price.' });
+  }
 
   try {
     const { boarding, service_dogs } = await updateBoarding(request.server, id, payload);
