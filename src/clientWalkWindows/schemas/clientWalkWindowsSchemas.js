@@ -45,7 +45,7 @@ export const ClientWalkWindow = {
       type: 'array',
       items: { type: 'string', format: 'uuid' }
     },
-    price_preview: { $ref: 'PricePreview#' } // ADDED: Each window can include a price preview
+    price_preview: { $ref: 'PricePreview#' }
   },
   required: [
     'id',
@@ -91,14 +91,16 @@ export const CreateClientWalkWindow = {
     dog_ids: {
       type: 'array',
       items: { type: 'string', format: 'uuid' }
-    }
+    },
+    walk_length_minutes: { type: 'integer', minimum: 1 } // <-- Added here
   },
   required: [
     'day_of_week',
     'window_start',
     'window_end',
     'effective_start',
-    'dog_ids'
+    'dog_ids',
+    'walk_length_minutes' // <-- Required
   ]
 };
 
@@ -114,7 +116,8 @@ export const UpdateClientWalkWindow = {
     dog_ids: {
       type: 'array',
       items: { type: 'string', format: 'uuid' }
-    }
+    },
+    walk_length_minutes: { type: 'integer', minimum: 1 } // <-- Added here
   }
 };
 
