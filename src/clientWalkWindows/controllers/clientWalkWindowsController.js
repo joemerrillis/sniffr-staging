@@ -151,7 +151,7 @@ async function createWindow(request, reply) {
       price_preview = await previewPrice(request.server, 'walk_window', {
         ...walk_window,
         tenant_id,
-        user_id,
+        user_id: userId,
         dog_ids: walk_window.dog_ids || []
       });
     }
