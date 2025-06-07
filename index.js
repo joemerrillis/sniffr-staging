@@ -28,7 +28,6 @@ import daycareSessionsPlugin from './src/daycare_sessions/index.js';
 import purchasesPlugin from './src/purchases/index.js';
 import pricingRulesPlugin from './src/pricingRules/index.js';
 
-
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
@@ -95,6 +94,25 @@ await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
 await fastify.register(purchasesPlugin, { prefix: '/purchases' });
 await fastify.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
 
+// --- GLOBAL ERROR HANDLER ---
+fastify.setErrorHandler((error, request, reply) => {
+  request.log.error({ err: error }, '[GLOBAL ERROR HANDLER]');
+  if (error.validation) {
+    reply.code(400).send({
+      error: error.message || 'Validation error',
+      details: error.validation,
+      statusCode: 400
+    });
+  } else {
+    reply
+      .code(error.statusCode || 500)
+      .send({
+        error: error.message || error.toString(),
+        statusCode: error.statusCode || 500,
+        stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
+      });
+  }
+});
 
 const start = async () => {
   try {
