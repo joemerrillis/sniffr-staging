@@ -1,10 +1,33 @@
+export const PricePreview = {
+  $id: 'PricePreview',
+  type: 'object',
+  properties: {
+    price: { type: 'number' },
+    breakdown: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          rule_type: { type: 'string' },
+          description: { type: 'string' },
+          adjustment: { type: 'number' },
+          price_so_far: { type: 'number' }
+        }
+      }
+    },
+    error: { type: 'string' }
+  }
+};
+
 export const ClientWalkWindow = {
   $id: 'ClientWalkWindow',
   type: 'object',
   properties: {
     id:               { type: 'string', format: 'uuid' },
     user_id:          { type: 'string', format: 'uuid' },
-    tenant_id:        { type: 'string', format: 'uuid' }, // ADDED
+    tenant_id:        { type: 'string', format: 'uuid' },
     day_of_week:      { type: 'integer', minimum: 0, maximum: 6 },
     window_start: {
       type: 'string',
@@ -21,7 +44,8 @@ export const ClientWalkWindow = {
     dog_ids: {
       type: 'array',
       items: { type: 'string', format: 'uuid' }
-    } // ADDED
+    },
+    price_preview: { $ref: 'PricePreview#' } // ADDED: Each window can include a price preview
   },
   required: [
     'id',
@@ -31,7 +55,8 @@ export const ClientWalkWindow = {
     'window_start',
     'window_end',
     'effective_start',
-    'created_at'
+    'created_at',
+    'price_preview'
   ]
 };
 
@@ -62,11 +87,11 @@ export const CreateClientWalkWindow = {
     window_end:      { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     effective_start: { type: 'string', format: 'date' },
     effective_end:   { type: ['string', 'null'], format: 'date' },
-    tenant_id:       { type: 'string', format: 'uuid' }, // ADDED (can be omitted if always inferred in controller)
+    tenant_id:       { type: 'string', format: 'uuid' },
     dog_ids: {
       type: 'array',
       items: { type: 'string', format: 'uuid' }
-    } // ADDED
+    }
   },
   required: [
     'day_of_week',
@@ -85,11 +110,11 @@ export const UpdateClientWalkWindow = {
     window_end:      { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     effective_start: { type: 'string', format: 'date' },
     effective_end:   { type: ['string', 'null'], format: 'date' },
-    tenant_id:       { type: 'string', format: 'uuid' }, // ADDED (if you want PATCH support)
+    tenant_id:       { type: 'string', format: 'uuid' },
     dog_ids: {
       type: 'array',
       items: { type: 'string', format: 'uuid' }
-    } // ADDED
+    }
   }
 };
 
