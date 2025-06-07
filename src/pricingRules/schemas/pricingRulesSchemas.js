@@ -9,7 +9,7 @@ export const pricingRuleSchemas = {
       priority: { type: 'integer' },
       rule_type: { type: 'string' },
       rule_data: { type: 'object' },
-      price_adjustment_type: { type: 'string', enum: ['fixed', 'percent', 'override'] },
+      price_adjustment_type: { type: 'string', enum: ['add', 'percent', 'set'] },
       price_adjustment_value: { type: 'number' },
       enabled: { type: 'boolean' },
       description: { type: ['string', 'null'] },
@@ -28,7 +28,7 @@ export const pricingRuleSchemas = {
       priority: { type: 'integer' },
       rule_type: { type: 'string' },
       rule_data: { type: 'object' },
-      price_adjustment_type: { type: 'string', enum: ['fixed', 'percent', 'override'] },
+      price_adjustment_type: { type: 'string', enum: ['add', 'percent', 'set'] },
       price_adjustment_value: { type: 'number' },
       enabled: { type: 'boolean' },
       description: { type: ['string', 'null'] }
