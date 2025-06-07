@@ -6,6 +6,8 @@ import {
   previewPrice
 } from './controllers/pricingRulesController.js';
 
+import { previewPriceHandler } from './controllers/previewPriceController.js';
+
 import { pricingRuleSchemas } from './schemas/pricingRulesSchemas.js';
 
 export default async function pricingRulesRoutes(fastify, opts) {
@@ -51,21 +53,26 @@ export default async function pricingRulesRoutes(fastify, opts) {
   fastify.post('/preview-price', {
     schema: {
       tags: ['PricingRules'],
-      description: "Preview service price by rules for any supported service type.",
       body: {
         type: 'object',
-        required: ['tenant_id', 'service_type', 'service_id'],
+        required: ['tenant_id', 'service_type'],
         properties: {
           tenant_id: { type: 'string', format: 'uuid' },
-          service_type: { type: 'string' }, // e.g. 'boarding', 'daycare'
-          service_id: { type: 'string', format: 'uuid' },
+          service_type: { type: 'string', enum: ['boarding', 'walk', 'daycare'] },
+          drop_off_day: { type: 'string', format: 'date' },
+          pick_up_day: { type: 'string', format: 'date' },
+          dog_ids: { type: 'array', items: { type: 'string', format: 'uuid' } },
+          walk_date: { type: 'string', format: 'date' },
+          walk_length_minutes: { type: 'integer' },
+          session_date: { type: 'string', format: 'date' }
+          // add more fields as you add more service types
         }
       },
       response: {
         200: {
           type: 'object',
           properties: {
-            price: { type: 'number' },
+            suggested_price: { type: 'number' },
             breakdown: {
               type: 'array',
               items: {
@@ -81,8 +88,18 @@ export default async function pricingRulesRoutes(fastify, opts) {
               }
             }
           }
+        },
+        400: {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+            missing_fields: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          }
         }
       }
     }
-  }, previewPrice);
+  }, previewPriceHandler);
 }
