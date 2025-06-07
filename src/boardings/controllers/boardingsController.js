@@ -91,7 +91,7 @@ export async function create(request, reply) {
     pick_up_day,
     pick_up_block,
     pick_up_time,
-    price, // May be omitted by client, we’ll calculate if missing
+    price, // May be omitted by client
     notes,
     proposed_drop_off_time,
     proposed_pick_up_time,
@@ -126,7 +126,6 @@ export async function create(request, reply) {
 
   // ==== New logic: Pricing engine integration ====
   let pricingResult = null;
-  let reasons = [];
   let breakdown = [];
   if (!price || isNaN(Number(price))) {
     // Try to compute price using pricingRules engine
@@ -138,11 +137,10 @@ export async function create(request, reply) {
         dog_ids: dogs
       });
       if (pricingResult.error) {
-        return reply.code(400).send({ error: pricingResult.error, reasons: pricingResult.breakdown || [] });
+        return reply.code(400).send({ error: pricingResult.error, breakdown: pricingResult.breakdown || [] });
       }
       price = pricingResult.price;
       breakdown = pricingResult.breakdown || [];
-      reasons = breakdown;
     } catch (err) {
       return reply.code(400).send({ error: 'Failed to compute price', details: err.message });
     }
@@ -171,7 +169,8 @@ export async function create(request, reply) {
 
   try {
     const { boarding, service_dogs } = await createBoarding(request.server, payload);
-    reply.code(201).send({ boarding, service_dogs, reasons });
+    // Return breakdown in the response if present (but do NOT store them in DB unless you want to)
+    reply.code(201).send({ boarding, service_dogs, breakdown });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
@@ -224,7 +223,8 @@ export async function modify(request, reply) {
   }
   payload.dogs = dogs;
 
-  let reasons = [];
+  // Only recalculate price if any date/dog field changes
+  let breakdown = [];
   try {
     // Use either incoming or existing values as context
     const currentBoarding = await getBoarding(request.server, id);
@@ -244,10 +244,10 @@ export async function modify(request, reply) {
     );
     if (priceResult.error) {
       request.log.error({ priceResult }, '[Boardings] Pricing engine error (modify)');
-      return reply.code(400).send({ error: priceResult.error, missing_fields: priceResult.missing_fields });
+      return reply.code(400).send({ error: priceResult.error, missing_fields: priceResult.missing_fields, breakdown: priceResult.breakdown || [] });
     }
     payload.price = priceResult.price;
-    reasons = priceResult.breakdown || [];
+    breakdown = priceResult.breakdown || [];
   } catch (err) {
     request.log.error({ err }, '[Boardings] Exception during price calculation (modify)');
     return reply.code(500).send({ error: 'Error calculating price.' });
@@ -256,7 +256,7 @@ export async function modify(request, reply) {
   try {
     const { boarding, service_dogs } = await updateBoarding(request.server, id, payload);
     if (!boarding) return reply.code(404).send({ error: 'Boarding not found' });
-    reply.send({ boarding, service_dogs, reasons });
+    reply.send({ boarding, service_dogs, breakdown });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
