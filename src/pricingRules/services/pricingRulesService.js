@@ -73,20 +73,26 @@ export async function previewServicePrice(server, { tenant_id, service_type, ser
 
   let priceSoFar = 0;
   let breakdown = [];
+  let matched = false;
 
   for (const rule of rules.filter(r => r.enabled)) {
-    // -- NEW: Only apply the rule if all rule_data keys match context --
+    // -- NEW: Only apply the rule if all rule_data keys match context (with normalization) --
     let matches = true;
     if (rule.rule_data && typeof rule.rule_data === 'object') {
       for (const [k, v] of Object.entries(rule.rule_data)) {
-        // Use loose equality so 30 == "30"
-        if (context[k] == null || context[k] != v) {
+        // Log both values and their types for easy debugging
+        console.log(`[DEBUG:rule-match] key: ${k} | rule:`, v, typeof v, '| context:', context[k], typeof context[k]);
+        if (
+          context[k] == null ||
+          String(context[k]) !== String(v)
+        ) {
           matches = false;
           break;
         }
       }
     }
     if (!matches) continue;
+    matched = true;
 
     // Now apply price logic
     let adjustment = 0;
@@ -114,7 +120,7 @@ export async function previewServicePrice(server, { tenant_id, service_type, ser
   }
 
   // If nothing matched, return a clear error in the breakdown.
-  if (breakdown.length === 0) {
+  if (!matched) {
     return {
       price: 0,
       breakdown: [],
