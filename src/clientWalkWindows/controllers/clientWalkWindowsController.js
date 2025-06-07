@@ -30,7 +30,23 @@ async function listWindows(request, reply) {
     windows = await listClientWalkWindows(request.server, userId);
   }
 
-  reply.send({ windows });
+  // Attach price_preview to each window
+  const windowsWithPrice = await Promise.all(
+    windows.map(async (w) => {
+      let price_preview = null;
+      if (w && w.tenant_id) {
+        price_preview = await previewPrice(request.server, 'walk_window', {
+          ...w,
+          tenant_id: w.tenant_id,
+          user_id: w.user_id,
+          dog_ids: w.dog_ids || []
+        });
+      }
+      return { ...w, price_preview };
+    })
+  );
+
+  reply.send({ windows: windowsWithPrice });
 }
 
 async function listClientWindowsForTenant(request, reply) {
@@ -56,7 +72,23 @@ async function listClientWindowsForTenant(request, reply) {
     windows = await listClientWalkWindows(request.server, client_id);
   }
 
-  reply.send({ windows });
+  // Attach price_preview to each window
+  const windowsWithPrice = await Promise.all(
+    windows.map(async (w) => {
+      let price_preview = null;
+      if (w && w.tenant_id) {
+        price_preview = await previewPrice(request.server, 'walk_window', {
+          ...w,
+          tenant_id: w.tenant_id,
+          user_id: w.user_id,
+          dog_ids: w.dog_ids || []
+        });
+      }
+      return { ...w, price_preview };
+    })
+  );
+
+  reply.send({ windows: windowsWithPrice });
 }
 
 async function getWindow(request, reply) {
@@ -76,7 +108,9 @@ async function getWindow(request, reply) {
       dog_ids: window.dog_ids || []
     });
   }
-  reply.send({ window, price_preview });
+
+  // Return window with price_preview inside, matching schema
+  reply.send({ window: { ...window, price_preview } });
 }
 
 async function createWindow(request, reply) {
@@ -156,7 +190,10 @@ async function createWindow(request, reply) {
       });
     }
 
-    reply.code(201).send({ walk_window, service_dogs, price_preview });
+    // Attach price_preview directly to walk_window to match schema
+    const walkWindowWithPrice = { ...walk_window, price_preview };
+
+    reply.code(201).send({ walk_window: walkWindowWithPrice, service_dogs });
   } catch (e) {
     console.error('[ERROR:createWindow] exception thrown:', e);
     reply.code(400).send({ error: e.message || e });
@@ -211,7 +248,10 @@ async function updateWindow(request, reply) {
       });
     }
 
-    reply.send({ walk_window, service_dogs, price_preview });
+    // Attach price_preview directly to walk_window to match schema
+    const walkWindowWithPrice = { ...walk_window, price_preview };
+
+    reply.send({ walk_window: walkWindowWithPrice, service_dogs });
   } catch (e) {
     console.error('[ERROR:updateWindow] exception thrown:', e);
     reply.code(400).send({ error: e.message || e });
