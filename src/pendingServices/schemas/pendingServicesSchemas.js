@@ -1,12 +1,35 @@
 // src/pendingServices/schemas/pendingServicesSchemas.js
 
+export const PricePreview = {
+  $id: 'PricePreview',
+  type: 'object',
+  properties: {
+    price: { type: 'number' },
+    breakdown: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          rule_type: { type: 'string' },
+          description: { type: 'string' },
+          adjustment: { type: 'number' },
+          price_so_far: { type: 'number' }
+        }
+      }
+    },
+    error: { type: 'string' }
+  }
+};
+
 export const PendingService = {
   $id: 'PendingService',
   type: 'object',
   properties: {
     id:                   { type: 'string', format: 'uuid' },
     user_id:              { type: 'string', format: 'uuid' },
-    dog_id:               { type: ['string', 'null'], format: 'uuid' }, // LEGACY: allow null for backwards compatibility
+    dog_id:               { type: ['string', 'null'], format: 'uuid' }, // LEGACY support for old rows
     dog_ids: {
       type: 'array',
       items: { type: 'string', format: 'uuid' }
@@ -19,11 +42,13 @@ export const PendingService = {
     details:              { type: ['object', 'null'] }, // JSONB
     is_confirmed:         { type: 'boolean' },
     created_at:           { type: 'string', format: 'date-time' },
-    request_id:           { type: ['string', 'null'], format: 'uuid' }
+    request_id:           { type: ['string', 'null'], format: 'uuid' },
+    price_preview:        { $ref: 'PricePreview#' } // NEW!
   },
   required: [
     'id', 'user_id', 'service_date',
     'service_type', 'is_confirmed', 'created_at'
+    // price_preview is *not* required for old/legacy rows
   ]
 };
 
