@@ -60,9 +60,47 @@ export async function previewPrice(server, service_type, context) {
 
     for (const rule of rules) {
       try {
-        // Boarding logic: example
+        // Debug: Print the actual rule and its rule_data type/shape
+        console.log('[pricingEngine][DEBUG] Full rule object:', JSON.stringify(rule, null, 2));
+        console.log('[pricingEngine][DEBUG] Rule rule_data:', JSON.stringify(rule.rule_data), '| typeof:', typeof rule.rule_data);
+
+        // --- Walk Window logic ---
+        if (service_type === 'walk_window' && rule.rule_data?.walk_length_minutes) {
+          // Deep log the match comparison!
+          for (const [k, v] of Object.entries(rule.rule_data || {})) {
+            console.log(`[pricingEngine][DEBUG] Compare: context[${k}]=`, context[k], typeof context[k], '| rule:', v, typeof v);
+            if (
+              context[k] == null ||
+              String(context[k]) !== String(v)
+            ) {
+              console.log('[pricingEngine][DEBUG] FAIL:', k, context[k], v);
+              matched = false;
+              break;
+            }
+            matched = true;
+          }
+
+          if (matched) {
+            if (rule.price_adjustment_type === 'set') price = rule.price_adjustment_value;
+            else if (rule.price_adjustment_type === 'add') price += rule.price_adjustment_value;
+            else if (rule.price_adjustment_type === 'percent') price += price * (rule.price_adjustment_value / 100);
+            else {
+              console.warn('[pricingEngine] Unknown price_adjustment_type', rule.price_adjustment_type, rule);
+            }
+            breakdown.push({
+              id: rule.id,
+              name: rule.name,
+              rule_type: rule.rule_type,
+              description: rule.description,
+              adjustment: rule.price_adjustment_value,
+              price_so_far: price
+            });
+            continue;
+          }
+        }
+
+        // Boarding logic: example (unchanged)
         if (rule.rule_data?.nights && service_type === 'boarding') {
-          // Calculate number of nights
           const start = safeDate(context.drop_off_day);
           const end = safeDate(context.pick_up_day);
           if (!start || !end) {
@@ -90,6 +128,7 @@ export async function previewPrice(server, service_type, context) {
             continue;
           }
         }
+
         // --- Add more service-specific and generic rule matching logic here! ---
       } catch (e) {
         console.error('[pricingEngine] Exception in rule engine loop:', e, { context, rule });
