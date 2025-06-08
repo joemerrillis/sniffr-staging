@@ -18,6 +18,17 @@ function getUserId(request) {
 }
 
 /**
+ * Normalize dog IDs from legacy and modern structures.
+ */
+function normalizeDogIds(row) {
+  if (Array.isArray(row.dog_ids)) return row.dog_ids;
+  if (row.dog_id) return [row.dog_id];
+  if (Array.isArray(row.details?.dog_ids)) return row.details.dog_ids;
+  if (row.details?.dog_id) return [row.details.dog_id];
+  return [];
+}
+
+/**
  * Helper: For a pending_service row, construct the correct context object for price preview.
  */
 function buildWalkPreviewContext(row) {
@@ -34,14 +45,12 @@ function buildWalkPreviewContext(row) {
   return {
     tenant_id: row.tenant_id,
     user_id: row.user_id,
-    dog_ids: row.dog_ids || [],
+    dog_ids: normalizeDogIds(row),
     walk_length_minutes: row.walk_length_minutes || row.details?.walk_length_minutes,
     day_of_week,
     window_start,
     service_date: row.service_date,
-    // Pass *everything* for maximum match potential
     ...row.details,
-    // The actual row is also available as context for future-proofing
     __raw: row
   };
 }
