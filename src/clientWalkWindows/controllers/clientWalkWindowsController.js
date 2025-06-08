@@ -30,17 +30,15 @@ async function listWindows(request, reply) {
     windows = await listClientWalkWindows(request.server, userId);
   }
 
-  // Attach price_preview to each window, passing walk_length_minutes from the window object
+  // Only pass fields needed by the rule!
   const windowsWithPrice = await Promise.all(
     windows.map(async (w) => {
       let price_preview = null;
       if (w && w.tenant_id) {
         price_preview = await previewPrice(request.server, 'walk_window', {
-          ...w,
           tenant_id: w.tenant_id,
-          user_id: w.user_id,
-          dog_ids: w.dog_ids || [],
-          walk_length_minutes: w.walk_length_minutes // <-- ensure it is present
+          walk_length_minutes: w.walk_length_minutes,
+          dog_ids: w.dog_ids || []
         });
       }
       return { ...w, price_preview };
@@ -73,17 +71,14 @@ async function listClientWindowsForTenant(request, reply) {
     windows = await listClientWalkWindows(request.server, client_id);
   }
 
-  // Attach price_preview to each window, passing walk_length_minutes from the window object
   const windowsWithPrice = await Promise.all(
     windows.map(async (w) => {
       let price_preview = null;
       if (w && w.tenant_id) {
         price_preview = await previewPrice(request.server, 'walk_window', {
-          ...w,
           tenant_id: w.tenant_id,
-          user_id: w.user_id,
-          dog_ids: w.dog_ids || [],
-          walk_length_minutes: w.walk_length_minutes // <-- ensure it is present
+          walk_length_minutes: w.walk_length_minutes,
+          dog_ids: w.dog_ids || []
         });
       }
       return { ...w, price_preview };
@@ -104,11 +99,9 @@ async function getWindow(request, reply) {
   let price_preview = null;
   if (window && window.tenant_id) {
     price_preview = await previewPrice(request.server, 'walk_window', {
-      ...window,
       tenant_id: window.tenant_id,
-      user_id: window.user_id,
-      dog_ids: window.dog_ids || [],
-      walk_length_minutes: window.walk_length_minutes // <-- ensure it is present
+      walk_length_minutes: window.walk_length_minutes,
+      dog_ids: window.dog_ids || []
     });
   }
 
@@ -131,7 +124,7 @@ async function createWindow(request, reply) {
     effective_start,
     effective_end,
     dog_ids,
-    walk_length_minutes // <-- now explicitly required
+    walk_length_minutes
   } = request.body;
 
   if (
@@ -151,7 +144,6 @@ async function createWindow(request, reply) {
       .send({ error: 'walk_length_minutes is required and must be a positive integer.' });
   }
 
-  // ADDED: tenant_id debug path
   let tenant_id = null;
   const userRole = request.user?.role;
   console.log('[DEBUG:createWindow] userRole:', userRole);
@@ -185,7 +177,7 @@ async function createWindow(request, reply) {
     effective_start,
     effective_end,
     dog_ids,
-    walk_length_minutes // <-- explicitly pass this into the service
+    walk_length_minutes
   };
 
   try {
@@ -194,15 +186,12 @@ async function createWindow(request, reply) {
     let price_preview = null;
     if (walk_window && tenant_id) {
       price_preview = await previewPrice(request.server, 'walk_window', {
-        ...walk_window,
         tenant_id,
-        user_id: userId,
-        dog_ids: walk_window.dog_ids || [],
-        walk_length_minutes: walk_window.walk_length_minutes // <-- ensure it is present
+        walk_length_minutes: walk_window.walk_length_minutes,
+        dog_ids: walk_window.dog_ids || []
       });
     }
 
-    // Attach price_preview directly to walk_window to match schema
     const walkWindowWithPrice = { ...walk_window, price_preview };
 
     reply.code(201).send({ walk_window: walkWindowWithPrice, service_dogs });
@@ -224,7 +213,7 @@ async function updateWindow(request, reply) {
     effective_start,
     effective_end,
     dog_ids,
-    walk_length_minutes // <-- now allowed to be patched
+    walk_length_minutes
   } = request.body;
 
   const payload = {};
@@ -255,15 +244,12 @@ async function updateWindow(request, reply) {
     let price_preview = null;
     if (walk_window && walk_window.tenant_id) {
       price_preview = await previewPrice(request.server, 'walk_window', {
-        ...walk_window,
         tenant_id: walk_window.tenant_id,
-        user_id: walk_window.user_id,
-        dog_ids: walk_window.dog_ids || [],
-        walk_length_minutes: walk_window.walk_length_minutes // <-- ensure it is present
+        walk_length_minutes: walk_window.walk_length_minutes,
+        dog_ids: walk_window.dog_ids || []
       });
     }
 
-    // Attach price_preview directly to walk_window to match schema
     const walkWindowWithPrice = { ...walk_window, price_preview };
 
     reply.send({ walk_window: walkWindowWithPrice, service_dogs });
@@ -275,6 +261,7 @@ async function updateWindow(request, reply) {
 
 async function deleteWindow(request, reply) {
   const userId = getUserId(request);
+  const { id } = request.params;
   await deleteClientWalkWindow(request.server, userId, id);
   reply.code(204).send();
 }
