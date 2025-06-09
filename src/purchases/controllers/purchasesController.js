@@ -1,3 +1,5 @@
+// src/purchases/controllers/purchasesController.js
+
 import {
   createPurchase,
   listPurchases,
@@ -13,9 +15,7 @@ function logPurchasesCtrl(...args) {
   console.log('[PurchasesController]', ...args);
 }
 
-/**
- * Fetch all pending_services rows for a cart, and return as enriched array.
- */
+// Fetch all pending_services rows for a cart
 async function fetchCartServices(server, cart) {
   logPurchasesCtrl('Fetching pending_services for cart:', cart);
   const { data, error } = await server.supabase
@@ -27,9 +27,7 @@ async function fetchCartServices(server, cart) {
   return data;
 }
 
-/**
- * Build the full context object for price preview (matches pendingServices logic).
- */
+// Build the full context object for price preview
 function buildPriceContext(serviceRow) {
   let day_of_week = serviceRow.day_of_week;
   if (!day_of_week && serviceRow.service_date) {
@@ -52,25 +50,23 @@ function buildPriceContext(serviceRow) {
   return context;
 }
 
-/**
- * For a cart, enrich all services with live price preview & breakdown, sum total.
- * Returns: { enrichedCart, total, breakdown, tenant_ids, type }
- */
-async function enrichCartAndCalculate(server, cart) {
-  logPurchasesCtrl('enrichCartAndCalculate called for cart:', cart);
-  const services = await fetchCartServices(server, cart);
-  if (!services?.length) throw new Error('Cart is empty or invalid IDs');
+// Group services by both tenant_id and service_type
+function groupCartServices(services) {
+  const grouped = {};
+  for (const s of services) {
+    const key = `${s.tenant_id}::${s.service_type}`;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(s);
+  }
+  return grouped;
+}
 
-  const tenantIds = [...new Set(services.map(s => s.tenant_id))];
-  const uniqueTypes = [...new Set(services.map(s => s.service_type))];
-  const type = uniqueTypes.length === 1 ? uniqueTypes[0] : 'mixed';
-
-  logPurchasesCtrl('Unique tenantIds:', tenantIds, '| Unique types:', uniqueTypes);
-
+// Enrich a group of cart services with price previews, breakdown, etc.
+async function enrichCartGroup(server, group) {
   let total = 0;
   let allBreakdown = [];
   const enrichedCart = await Promise.all(
-    services.map(async (row) => {
+    group.map(async (row) => {
       logPurchasesCtrl('Processing cart item:', row.id, row);
       const context = buildPriceContext(row);
       let service_type = row.service_type || context.service_type || 'walk_window';
@@ -90,13 +86,14 @@ async function enrichCartAndCalculate(server, cart) {
       };
     })
   );
-  logPurchasesCtrl('Total price:', total, '| Breakdown:', allBreakdown);
-
+  // Assumes all in group have same type/tenant
+  const tenant_id = group[0].tenant_id;
+  const type = group[0].service_type;
   return {
     enrichedCart,
     total,
     breakdown: allBreakdown,
-    tenantIds,
+    tenant_id,
     type,
   };
 }
@@ -119,54 +116,65 @@ export async function checkout(request, reply) {
 
     logPurchasesCtrl('Normalized cart:', cart, '| payment_method:', payment_method);
 
-    // Price, breakdown, details
-    const { enrichedCart, total, breakdown, tenantIds, type } =
-      await enrichCartAndCalculate(server, cart);
-
-    logPurchasesCtrl('Cart enrichment result:', {
-      enrichedCart, total, breakdown, tenantIds, type
-    });
-
-    if (tenantIds.length > 1) {
-      logPurchasesCtrl('[ERROR] Multi-tenant purchase attempt:', tenantIds);
-      return reply.code(400).send({ error: 'Multi-tenant cart purchases are not yet supported.' });
+    // Fetch all cart services
+    const services = await fetchCartServices(server, cart);
+    if (!services?.length) {
+      logPurchasesCtrl('[ERROR] No valid pending_service IDs found in cart');
+      return reply.code(400).send({ error: "Cart items not found" });
     }
-    const tenant_id = tenantIds[0];
 
-    // Compose and create purchase row (store only IDs for cart as before)
-    const now = new Date().toISOString();
-    logPurchasesCtrl('Creating purchase row...');
-    // Only store array of IDs in the DB
-    const purchase = await createPurchase(server, {
-      tenant_id,
-      user_id,
-      cart: enrichedCart.map(item => item.id), // <-- Ensure array of IDs
-      payment_method,
-      type,
-      amount: total,
-      reference_id: `mock-${Date.now()}`,
-      status: 'paid',
-      paid_at: now,
-      price_breakdown: breakdown,
-    });
-    logPurchasesCtrl('Purchase created:', purchase);
+    // Group by both tenant_id and service_type
+    const grouped = groupCartServices(services);
+    logPurchasesCtrl('Grouped cart:', grouped);
 
-    // Hydrate the purchase.cart for API response (patch step)
-    purchase.cart = enrichedCart;
+    const purchaseResults = [];
+    for (const [groupKey, group] of Object.entries(grouped)) {
+      // Enrich, price, etc. for each group
+      const { enrichedCart, total, breakdown, tenant_id, type } = await enrichCartGroup(server, group);
 
-    // Promote cart services (fulfill, delete, etc)
-    logPurchasesCtrl('Promoting cart services...');
-    // Pass only the array of IDs to promoteCart!
-    await promoteCart(server, { ...purchase, cart: enrichedCart.map(item => item.id) });
+      const now = new Date().toISOString();
+      logPurchasesCtrl(`[${groupKey}] Creating purchase row...`);
 
-    // Final API response (with logs)
-    const response = {
-      purchase,
-      cart: enrichedCart,
-      price_breakdown: breakdown,
-      paymentUrl: null
-    };
-    logPurchasesCtrl('checkout() response:', response);
+      // Only store array of IDs in the DB
+      const purchase = await createPurchase(server, {
+        tenant_id,
+        user_id,
+        cart: enrichedCart.map(item => item.id), // array of IDs only in DB
+        payment_method,
+        type,
+        amount: total,
+        reference_id: `mock-${Date.now()}-${type}`,
+        status: 'paid',
+        paid_at: now,
+        price_breakdown: breakdown,
+      });
+
+      logPurchasesCtrl(`[${groupKey}] Purchase created:`, purchase);
+
+      // Hydrate the purchase.cart for API response (patch step)
+      purchase.cart = enrichedCart;
+
+      // Promote cart services
+      logPurchasesCtrl(`[${groupKey}] Promoting cart services...`);
+      await promoteCart(server, { ...purchase, cart: enrichedCart.map(item => item.id) });
+
+      // Add result for this purchase
+      purchaseResults.push({
+        purchase,
+        cart: enrichedCart,
+        price_breakdown: breakdown,
+        paymentUrl: null // Stripe placeholder
+      });
+      logPurchasesCtrl(`[${groupKey}] checkout() response chunk:`, purchaseResults[purchaseResults.length-1]);
+    }
+
+    // Response: array if more than one purchase, object if just one
+    const response =
+      purchaseResults.length === 1
+        ? purchaseResults[0]
+        : { purchases: purchaseResults };
+
+    logPurchasesCtrl('Final checkout() response:', response);
 
     reply.code(201).send(response);
   } catch (err) {
