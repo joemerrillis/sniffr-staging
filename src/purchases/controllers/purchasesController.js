@@ -174,8 +174,19 @@ export async function checkout(request, reply) {
         ? purchaseResults[0]
         : { purchases: purchaseResults };
 
-    logPurchasesCtrl('Final checkout() response:', response);
+    // === Key debug: log what we're about to send (fully expanded) ===
+    console.log('=== ACTUAL FINAL RESPONSE ===');
+    console.dir(response, { depth: null });
 
+    // Try JSON.stringify just to check for serializability before sending
+    try {
+      JSON.stringify(response);
+    } catch (err) {
+      logPurchasesCtrl('[ERROR] Response is not serializable:', err);
+      return reply.code(500).send({ error: "Response not serializable" });
+    }
+
+    logPurchasesCtrl('Final checkout() response (ready to send)');
     reply.code(201).send(response);
   } catch (err) {
     logPurchasesCtrl('[ERROR] checkout() failed:', err);
