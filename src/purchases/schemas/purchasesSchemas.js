@@ -82,6 +82,8 @@ export const purchasesSchemas = {
   },
 
   CheckoutRequest: {
+    
+    $id: 'CheckoutRequest',
     type: 'object',
     properties: {
       cart:           { type: 'array', items: { type: 'string', format: 'uuid' } },
@@ -91,6 +93,7 @@ export const purchasesSchemas = {
   },
 
   CheckoutResponse: {
+    $id: 'CheckoutResponse',
     type: 'object',
     properties: {
       purchase:   { $ref: 'Purchase#' },
