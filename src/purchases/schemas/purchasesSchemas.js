@@ -1,5 +1,3 @@
-// src/purchases/schemas/purchasesSchemas.js
-
 export const purchasesSchemas = {
   Purchase: {
     $id: 'Purchase',
@@ -36,14 +34,14 @@ export const purchasesSchemas = {
               items: { type: 'string', format: 'uuid' }
             },
             details:        { type: ['object', 'null'] },
-            price_preview:  { $ref: 'PricePreview#' } // <-- reference only, not re-declared
+            price_preview:  { $ref: 'PricePreview#' }
           },
           required: ['id', 'service_type', 'service_date']
         }
       },
       created_at:       { type: 'string', format: 'date-time' },
       paid_at:          { type: ['string', 'null'], format: 'date-time' },
-      delegations:      { type: ['array', 'null'], items: { $ref: 'Delegation#' } }, // reference only
+      delegations:      { type: ['array', 'null'], items: { $ref: 'Delegation#' } },
       price_breakdown:  { $ref: 'PriceBreakdown#' },
       applied_discounts: { type: ['array', 'null'], items: { $ref: 'Discount#' } },
       deposit_amount:   { type: ['number', 'null'] },
@@ -51,12 +49,10 @@ export const purchasesSchemas = {
     },
     required: [
       'id', 'tenant_id', 'user_id', 'type', 'amount', 'status',
-      'payment_method', 'cart', 'created_at'
+      'payment_method', 'created_at'
+      // 'cart',  <-- removed from required to match actual usage!
     ]
   },
-
-  // DO NOT RE-DECLARE PricePreview or Delegation here!
-  // Leave these to be registered in their original plugins
 
   PriceBreakdown: {
     $id: 'PriceBreakdown',
@@ -91,54 +87,52 @@ export const purchasesSchemas = {
     required: ['cart', 'payment_method']
   },
 
-CheckoutResponse: {
-  $id: 'CheckoutResponse',
-  type: 'object',
-  // Allow EITHER a single-purchase response OR a multi-purchase array
-  oneOf: [
-    {
-      // Single purchase
-      type: 'object',
-      properties: {
-        purchase:   { $ref: 'Purchase#' },
-        cart: {
-          type: 'array',
-          items: { type: 'object' } // (or $ref to your pending_service schema if defined)
+  CheckoutResponse: {
+    $id: 'CheckoutResponse',
+    type: 'object',
+    oneOf: [
+      // Single purchase response
+      {
+        type: 'object',
+        properties: {
+          purchase:   { $ref: 'Purchase#' },
+          cart: {
+            type: 'array',
+            items: { type: 'object' }
+          },
+          price_breakdown: { $ref: 'PriceBreakdown#' },
+          paymentUrl: { type: ['string', 'null'] }
         },
-        price_breakdown: { $ref: 'PriceBreakdown#' },
-        paymentUrl: { type: ['string', 'null'] }
+        required: ['purchase', 'cart', 'price_breakdown']
       },
-      required: ['purchase', 'cart', 'price_breakdown']
-    },
-    {
-      // Multi-purchase (e.g. multiple groups/tenants)
-      type: 'object',
-      properties: {
-        purchases: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              purchase:   { $ref: 'Purchase#' },
-              cart: {
-                type: 'array',
-                items: { type: 'object' } // or your pending_service schema
+      // Multi-purchase response
+      {
+        type: 'object',
+        properties: {
+          purchases: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                purchase:   { $ref: 'Purchase#' },
+                cart: {
+                  type: 'array',
+                  items: { type: 'object' }
+                },
+                price_breakdown: { $ref: 'PriceBreakdown#' },
+                paymentUrl: { type: ['string', 'null'] }
               },
-              price_breakdown: { $ref: 'PriceBreakdown#' },
-              paymentUrl: { type: ['string', 'null'] }
-            },
-            required: ['purchase', 'cart', 'price_breakdown']
+              required: ['purchase', 'cart', 'price_breakdown']
+            }
           }
-        }
-      },
-      required: ['purchases']
-    }
-  ]
-},
-
+        },
+        required: ['purchases']
+      }
+    ]
+  },
 
   WebhookPayload: {
-   $id: 'WebhookPayload',
+    $id: 'WebhookPayload',
     type: 'object',
     additionalProperties: true
   }
