@@ -1,7 +1,7 @@
 // src/pricingRules/schemas/pricePreviewSchemas.js
 
 export const PricePreview = {
-  $ref: 'PricePreview',
+  $id: 'PricePreview',
   type: 'object',
   properties: {
     price:      { type: 'number' },
