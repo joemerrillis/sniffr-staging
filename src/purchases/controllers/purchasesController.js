@@ -154,6 +154,11 @@ export async function checkout(request, reply) {
       // Hydrate the purchase.cart for API response (patch step)
       purchase.cart = enrichedCart;
 
+      // --- FIX: Never let price_breakdown be null (schema requires array/object)
+      if (purchase.price_breakdown == null) {
+        purchase.price_breakdown = [];
+      }
+
       // Promote cart services
       logPurchasesCtrl(`[${groupKey}] Promoting cart services...`);
       await promoteCart(server, { ...purchase, cart: enrichedCart.map(item => item.id) });
