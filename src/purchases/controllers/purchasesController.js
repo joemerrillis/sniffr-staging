@@ -135,13 +135,13 @@ export async function checkout(request, reply) {
     }
     const tenant_id = tenantIds[0];
 
-    // Compose and create purchase row
+    // Compose and create purchase row (store only IDs for cart as before)
     const now = new Date().toISOString();
     logPurchasesCtrl('Creating purchase row...');
     const purchase = await createPurchase(server, {
       tenant_id,
       user_id,
-      cart,
+      cart, // still just IDs in the DB
       payment_method,
       type,
       amount: total,
@@ -151,6 +151,9 @@ export async function checkout(request, reply) {
       price_breakdown: breakdown,
     });
     logPurchasesCtrl('Purchase created:', purchase);
+
+    // Hydrate the purchase.cart for API response (patch step)
+    purchase.cart = enrichedCart;
 
     // Promote cart services (fulfill, delete, etc)
     logPurchasesCtrl('Promoting cart services...');
