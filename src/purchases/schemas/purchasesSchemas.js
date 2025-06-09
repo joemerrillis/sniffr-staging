@@ -117,6 +117,7 @@ export const purchasesSchemas = {
   },
 
   CheckoutRequest: {
+    $id: 'CheckoutRequest',
     type: 'object',
     properties: {
       cart:           { type: 'array', items: { type: 'string', format: 'uuid' } }, // pending_service IDs
@@ -126,6 +127,7 @@ export const purchasesSchemas = {
   },
 
   CheckoutResponse: {
+    $id: 'CheckoutResponse',
     type: 'object',
     properties: {
       purchase:   { $ref: 'Purchase#' },
@@ -134,6 +136,7 @@ export const purchasesSchemas = {
   },
 
   WebhookPayload: {
+    $id: 'WebhookPayload',
     type: 'object',
     additionalProperties: true // Accept any payload (handled per provider)
   }
