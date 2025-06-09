@@ -87,6 +87,8 @@ export const purchasesSchemas = {
     required: ['cart', 'payment_method']
   },
 
+// ... other schemas ...
+
   CheckoutResponse: {
     $id: 'CheckoutResponse',
     type: 'object',
@@ -100,7 +102,10 @@ export const purchasesSchemas = {
             type: 'array',
             items: { type: 'object' }
           },
-          price_breakdown: { $ref: 'PriceBreakdown#' },
+          price_breakdown: {
+            type: 'array',
+            items: { type: 'object' }
+          },
           paymentUrl: { type: ['string', 'null'] }
         },
         required: ['purchase', 'cart', 'price_breakdown']
@@ -119,7 +124,10 @@ export const purchasesSchemas = {
                   type: 'array',
                   items: { type: 'object' }
                 },
-                price_breakdown: { $ref: 'PriceBreakdown#' },
+                price_breakdown: {
+                  type: 'array',
+                  items: { type: 'object' }
+                },
                 paymentUrl: { type: ['string', 'null'] }
               },
               required: ['purchase', 'cart', 'price_breakdown']
@@ -130,6 +138,7 @@ export const purchasesSchemas = {
       }
     ]
   },
+
 
   WebhookPayload: {
     $id: 'WebhookPayload',
