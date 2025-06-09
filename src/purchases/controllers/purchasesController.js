@@ -10,14 +10,21 @@ import {
 import { promoteCart } from '../services/promoteCartService.js';
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
+// --- Logging helper for this controller
+function logPurchasesCtrl(...args) {
+  console.log('[PurchasesController]', ...args);
+}
+
 /**
  * Fetch all pending_services rows for a cart, and return as enriched array.
  */
 async function fetchCartServices(server, cart) {
+  logPurchasesCtrl('Fetching pending_services for cart:', cart);
   const { data, error } = await server.supabase
     .from('pending_services')
     .select('*')
     .in('id', cart);
+  logPurchasesCtrl('Cart fetch result:', data, '| error:', error);
   if (error) throw new Error('DB error fetching cart items: ' + error.message);
   return data;
 }
@@ -26,15 +33,13 @@ async function fetchCartServices(server, cart) {
  * Build the full context object for price preview (matches pendingServices logic).
  */
 function buildPriceContext(serviceRow) {
-  // Derive context as in pendingServices controller
   let day_of_week = serviceRow.day_of_week;
   if (!day_of_week && serviceRow.service_date) {
     day_of_week = new Date(serviceRow.service_date).getDay();
   }
   let window_start = serviceRow.window_start;
   if (!window_start && serviceRow.details?.start) window_start = serviceRow.details.start;
-  // Compose context
-  return {
+  const context = {
     tenant_id: serviceRow.tenant_id,
     user_id: serviceRow.user_id,
     dog_ids: serviceRow.dog_ids || [],
@@ -45,6 +50,8 @@ function buildPriceContext(serviceRow) {
     ...serviceRow.details,
     __raw: serviceRow
   };
+  logPurchasesCtrl('Price context for serviceRow', serviceRow.id, ':', context);
+  return context;
 }
 
 /**
@@ -52,24 +59,27 @@ function buildPriceContext(serviceRow) {
  * Returns: { enrichedCart, total, breakdown, tenant_ids, type }
  */
 async function enrichCartAndCalculate(server, cart) {
+  logPurchasesCtrl('enrichCartAndCalculate called for cart:', cart);
   const services = await fetchCartServices(server, cart);
   if (!services?.length) throw new Error('Cart is empty or invalid IDs');
 
-  // Multi-tenant: group by tenant_id if needed in future
   const tenantIds = [...new Set(services.map(s => s.tenant_id))];
-  // Group by type
   const uniqueTypes = [...new Set(services.map(s => s.service_type))];
   const type = uniqueTypes.length === 1 ? uniqueTypes[0] : 'mixed';
 
-  // Price everything using pricingEngine
+  logPurchasesCtrl('Unique tenantIds:', tenantIds, '| Unique types:', uniqueTypes);
+
   let total = 0;
   let allBreakdown = [];
   const enrichedCart = await Promise.all(
     services.map(async (row) => {
+      logPurchasesCtrl('Processing cart item:', row.id, row);
       const context = buildPriceContext(row);
       let service_type = row.service_type || context.service_type || 'walk_window';
+      logPurchasesCtrl('Previewing price for service_type:', service_type, '| context:', context);
       const pricePreview = await previewPrice(server, service_type, context);
-      // Use preview price, fallback to 0
+      logPurchasesCtrl('Price preview result:', pricePreview);
+
       const price = pricePreview.price ?? 0;
       total += price;
       allBreakdown.push({
@@ -82,6 +92,7 @@ async function enrichCartAndCalculate(server, cart) {
       };
     })
   );
+  logPurchasesCtrl('Total price:', total, '| Breakdown:', allBreakdown);
 
   return {
     enrichedCart,
@@ -93,29 +104,40 @@ async function enrichCartAndCalculate(server, cart) {
 }
 
 export async function checkout(request, reply) {
+  logPurchasesCtrl('checkout() called');
+  logPurchasesCtrl('Request body:', request.body);
+  logPurchasesCtrl('Request user:', request.user);
+
   try {
     let { cart, payment_method } = request.body;
     const user_id = request.user?.id || request.body.user_id;
     const server = request.server;
 
-    // Normalize cart input
     if (typeof cart === 'string') cart = [cart];
     if (!Array.isArray(cart) || cart.length === 0) {
+      logPurchasesCtrl('[ERROR] Cart is empty or invalid:', cart);
       return reply.code(400).send({ error: "Cart must be a non-empty array of pending_service IDs" });
     }
 
-    // Get full pricing breakdown & details
+    logPurchasesCtrl('Normalized cart:', cart, '| payment_method:', payment_method);
+
+    // Price, breakdown, details
     const { enrichedCart, total, breakdown, tenantIds, type } =
       await enrichCartAndCalculate(server, cart);
 
-    // For now: only allow one tenant per purchase (multi-tenant expansion later)
+    logPurchasesCtrl('Cart enrichment result:', {
+      enrichedCart, total, breakdown, tenantIds, type
+    });
+
     if (tenantIds.length > 1) {
+      logPurchasesCtrl('[ERROR] Multi-tenant purchase attempt:', tenantIds);
       return reply.code(400).send({ error: 'Multi-tenant cart purchases are not yet supported.' });
     }
     const tenant_id = tenantIds[0];
 
-    // Compose purchase row
+    // Compose and create purchase row
     const now = new Date().toISOString();
+    logPurchasesCtrl('Creating purchase row...');
     const purchase = await createPurchase(server, {
       tenant_id,
       user_id,
@@ -128,39 +150,49 @@ export async function checkout(request, reply) {
       paid_at: now,
       price_breakdown: breakdown,
     });
+    logPurchasesCtrl('Purchase created:', purchase);
 
-    // Promote all services in the cart (fulfill, delete, etc)
+    // Promote cart services (fulfill, delete, etc)
+    logPurchasesCtrl('Promoting cart services...');
     await promoteCart(server, purchase);
 
-    // Respond with enriched purchase, breakdown, and full cart for transparency
-    reply.code(201).send({
+    // Final API response (with logs)
+    const response = {
       purchase,
       cart: enrichedCart,
       price_breakdown: breakdown,
-      paymentUrl: null // Placeholder for Stripe, etc.
-    });
+      paymentUrl: null
+    };
+    logPurchasesCtrl('checkout() response:', response);
+
+    reply.code(201).send(response);
   } catch (err) {
+    logPurchasesCtrl('[ERROR] checkout() failed:', err);
     reply.code(400).send({ error: err.message || err });
   }
 }
 
 export async function list(request, reply) {
+  logPurchasesCtrl('list() called. Request user:', request.user);
   const user_id = request.user?.id;
   const tenant_id = request.user?.tenant_id;
   const isAdmin = request.user?.role === 'tenant_admin' || request.user?.role === 'platform_admin';
   const server = request.server;
   const purchases = await listPurchases(server, { tenant_id, user_id, isAdmin });
+  logPurchasesCtrl('Purchases found:', purchases);
   reply.send({ purchases });
 }
 
 export async function retrieve(request, reply) {
+  logPurchasesCtrl('retrieve() called. Params:', request.params);
   const { id } = request.params;
   const server = request.server;
   const purchase = await getPurchase(server, id);
+  logPurchasesCtrl('Purchase retrieved:', purchase);
   reply.send({ purchase });
 }
 
 export async function webhook(request, reply) {
-  // For now: stub
+  logPurchasesCtrl('webhook() called. Params:', request.params, '| Body:', request.body);
   reply.code(200).send({ ok: true });
 }
