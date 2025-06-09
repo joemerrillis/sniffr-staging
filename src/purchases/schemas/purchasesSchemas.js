@@ -36,7 +36,8 @@ export const purchasesSchemas = {
             details:        { type: ['object', 'null'] },
             price_preview:  { $ref: 'PricePreview#' }
           },
-          required: ['id', 'service_type', 'service_date']
+          required: ['id', 'service_type', 'service_date'],
+          additionalProperties: true   // <-- Let the object include more fields (safety)
         }
       },
       created_at:       { type: 'string', format: 'date-time' },
@@ -87,8 +88,6 @@ export const purchasesSchemas = {
     required: ['cart', 'payment_method']
   },
 
-// ... other schemas ...
-
   CheckoutResponse: {
     $id: 'CheckoutResponse',
     type: 'object',
@@ -100,11 +99,11 @@ export const purchasesSchemas = {
           purchase:   { $ref: 'Purchase#' },
           cart: {
             type: 'array',
-            items: { type: 'object' }
+            items: { type: 'object', additionalProperties: true }
           },
           price_breakdown: {
             type: 'array',
-            items: { type: 'object' }
+            items: { type: 'object', additionalProperties: true }
           },
           paymentUrl: { type: ['string', 'null'] }
         },
@@ -122,11 +121,11 @@ export const purchasesSchemas = {
                 purchase:   { $ref: 'Purchase#' },
                 cart: {
                   type: 'array',
-                  items: { type: 'object' }
+                  items: { type: 'object', additionalProperties: true }
                 },
                 price_breakdown: {
                   type: 'array',
-                  items: { type: 'object' }
+                  items: { type: 'object', additionalProperties: true }
                 },
                 paymentUrl: { type: ['string', 'null'] }
               },
@@ -138,7 +137,6 @@ export const purchasesSchemas = {
       }
     ]
   },
-
 
   WebhookPayload: {
     $id: 'WebhookPayload',
