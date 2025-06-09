@@ -8,118 +8,88 @@ import {
 } from '../services/purchasesService.js';
 
 import { promoteCart } from '../services/promoteCartService.js';
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
 /**
- * For a walk pending_service, get price from client_walk_windows or client_walk_requests.
- * (You can expand this logic for other types if you have custom pricing rules.)
+ * Fetch all pending_services rows for a cart, and return as enriched array.
  */
-async function getWalkPrice(server, pending) {
-  // Try walk window first
-  if (pending.walk_window_id) {
-    const { data, error } = await server.supabase
-      .from('client_walk_windows')
-      .select('price')
-      .eq('id', pending.walk_window_id)
-      .single();
-    if (data && typeof data.price === 'number') return data.price;
-  }
-  // Otherwise try walk request
-  if (pending.request_id) {
-    const { data, error } = await server.supabase
-      .from('client_walk_requests')
-      .select('price')
-      .eq('id', pending.request_id)
-      .single();
-    if (data && typeof data.price === 'number') return data.price;
-  }
-  // Fallback
-  return 0;
-}
-
-/**
- * For daycare, get price from daycare_sessions.
- */
-async function getDaycarePrice(server, pending) {
-  if (pending.daycare_request_id) {
-    const { data, error } = await server.supabase
-      .from('daycare_sessions')
-      .select('price')
-      .eq('id', pending.daycare_request_id)
-      .single();
-    if (data && typeof data.price === 'number') return data.price;
-  }
-  // Fallback
-  return 0;
-}
-
-/**
- * For boardings, get price from boardings.
- */
-async function getBoardingPrice(server, pending) {
-  if (pending.boarding_request_id) {
-    const { data, error } = await server.supabase
-      .from('boardings')
-      .select('price')
-      .eq('id', pending.boarding_request_id)
-      .single();
-    if (data && typeof data.price === 'number') return data.price;
-  }
-  // Fallback
-  return 0;
-}
-
-/**
- * Calculate total and canonical type for a cart.
- * All pricing is fetched from source-of-truth tables.
- * Errors if mixed types (for now).
- */
-async function canonicalCartInfo(server, cart) {
-  // Fetch all pending_services in the cart
-  const { data: services, error } = await server.supabase
+async function fetchCartServices(server, cart) {
+  const { data, error } = await server.supabase
     .from('pending_services')
-    .select('id, tenant_id, service_type, walk_window_id, request_id, daycare_request_id, boarding_request_id')
+    .select('*')
     .in('id', cart);
+  if (error) throw new Error('DB error fetching cart items: ' + error.message);
+  return data;
+}
 
-  if (error) {
-    throw new Error('Database error fetching cart items: ' + error.message);
+/**
+ * Build the full context object for price preview (matches pendingServices logic).
+ */
+function buildPriceContext(serviceRow) {
+  // Derive context as in pendingServices controller
+  let day_of_week = serviceRow.day_of_week;
+  if (!day_of_week && serviceRow.service_date) {
+    day_of_week = new Date(serviceRow.service_date).getDay();
   }
-  if (!services || services.length === 0) {
-    throw new Error('Could not find cart items in pending_services.');
-  }
+  let window_start = serviceRow.window_start;
+  if (!window_start && serviceRow.details?.start) window_start = serviceRow.details.start;
+  // Compose context
+  return {
+    tenant_id: serviceRow.tenant_id,
+    user_id: serviceRow.user_id,
+    dog_ids: serviceRow.dog_ids || [],
+    walk_length_minutes: serviceRow.walk_length_minutes || serviceRow.details?.walk_length_minutes,
+    day_of_week,
+    window_start,
+    service_date: serviceRow.service_date,
+    ...serviceRow.details,
+    __raw: serviceRow
+  };
+}
 
-  // Ensure all cart items are the same tenant
-  const uniqueTenantIds = [...new Set(services.map(s => s.tenant_id))];
-  if (uniqueTenantIds.length > 1) {
-    throw new Error('All cart items must belong to the same tenant.');
-  }
-  const tenant_id = uniqueTenantIds[0];
+/**
+ * For a cart, enrich all services with live price preview & breakdown, sum total.
+ * Returns: { enrichedCart, total, breakdown, tenant_ids, type }
+ */
+async function enrichCartAndCalculate(server, cart) {
+  const services = await fetchCartServices(server, cart);
+  if (!services?.length) throw new Error('Cart is empty or invalid IDs');
 
-  // Ensure all items are the same service type
+  // Multi-tenant: group by tenant_id if needed in future
+  const tenantIds = [...new Set(services.map(s => s.tenant_id))];
+  // Group by type
   const uniqueTypes = [...new Set(services.map(s => s.service_type))];
-  if (uniqueTypes.length !== 1) {
-    throw new Error('All cart items must be the same service type.');
-  }
-  const type = uniqueTypes[0];
+  const type = uniqueTypes.length === 1 ? uniqueTypes[0] : 'mixed';
 
-  // Canonical total calculation
-  let amount = 0;
-  if (type === 'boarding') {
-    for (const s of services) {
-      amount += await getBoardingPrice(server, s);
-    }
-  } else if (type === 'walk') {
-    for (const s of services) {
-      amount += await getWalkPrice(server, s);
-    }
-  } else if (type === 'daycare') {
-    for (const s of services) {
-      amount += await getDaycarePrice(server, s);
-    }
-  } else {
-    throw new Error(`Unsupported service type: ${type}`);
-  }
+  // Price everything using pricingEngine
+  let total = 0;
+  let allBreakdown = [];
+  const enrichedCart = await Promise.all(
+    services.map(async (row) => {
+      const context = buildPriceContext(row);
+      let service_type = row.service_type || context.service_type || 'walk_window';
+      const pricePreview = await previewPrice(server, service_type, context);
+      // Use preview price, fallback to 0
+      const price = pricePreview.price ?? 0;
+      total += price;
+      allBreakdown.push({
+        pending_service_id: row.id,
+        ...pricePreview
+      });
+      return {
+        ...row,
+        price_preview: pricePreview
+      };
+    })
+  );
 
-  return { tenant_id, type, amount, services };
+  return {
+    enrichedCart,
+    total,
+    breakdown: allBreakdown,
+    tenantIds,
+    type,
+  };
 }
 
 export async function checkout(request, reply) {
@@ -128,16 +98,23 @@ export async function checkout(request, reply) {
     const user_id = request.user?.id || request.body.user_id;
     const server = request.server;
 
-    // Make sure cart is always an array
+    // Normalize cart input
     if (typeof cart === 'string') cart = [cart];
     if (!Array.isArray(cart) || cart.length === 0) {
       return reply.code(400).send({ error: "Cart must be a non-empty array of pending_service IDs" });
     }
 
-    // Canonical info: always correct type and amount
-    const { tenant_id, type, amount } = await canonicalCartInfo(server, cart);
+    // Get full pricing breakdown & details
+    const { enrichedCart, total, breakdown, tenantIds, type } =
+      await enrichCartAndCalculate(server, cart);
 
-    // Immediately create purchase as 'paid'
+    // For now: only allow one tenant per purchase (multi-tenant expansion later)
+    if (tenantIds.length > 1) {
+      return reply.code(400).send({ error: 'Multi-tenant cart purchases are not yet supported.' });
+    }
+    const tenant_id = tenantIds[0];
+
+    // Compose purchase row
     const now = new Date().toISOString();
     const purchase = await createPurchase(server, {
       tenant_id,
@@ -145,16 +122,23 @@ export async function checkout(request, reply) {
       cart,
       payment_method,
       type,
-      amount,
+      amount: total,
       reference_id: `mock-${Date.now()}`,
       status: 'paid',
-      paid_at: now
+      paid_at: now,
+      price_breakdown: breakdown,
     });
 
-    // Instantly promote all services
+    // Promote all services in the cart (fulfill, delete, etc)
     await promoteCart(server, purchase);
 
-    reply.code(201).send({ purchase, paymentUrl: null });
+    // Respond with enriched purchase, breakdown, and full cart for transparency
+    reply.code(201).send({
+      purchase,
+      cart: enrichedCart,
+      price_breakdown: breakdown,
+      paymentUrl: null // Placeholder for Stripe, etc.
+    });
   } catch (err) {
     reply.code(400).send({ error: err.message || err });
   }
