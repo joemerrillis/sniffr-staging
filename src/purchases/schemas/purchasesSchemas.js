@@ -91,14 +91,51 @@ export const purchasesSchemas = {
     required: ['cart', 'payment_method']
   },
 
-  CheckoutResponse: {
-    $id: 'CheckoutResponse',
-    type: 'object',
-    properties: {
-      purchase:   { $ref: 'Purchase#' },
-      paymentUrl: { type: 'string' }
+CheckoutResponse: {
+  $id: 'CheckoutResponse',
+  type: 'object',
+  // Allow EITHER a single-purchase response OR a multi-purchase array
+  oneOf: [
+    {
+      // Single purchase
+      type: 'object',
+      properties: {
+        purchase:   { $ref: 'Purchase#' },
+        cart: {
+          type: 'array',
+          items: { type: 'object' } // (or $ref to your pending_service schema if defined)
+        },
+        price_breakdown: { $ref: 'PriceBreakdown#' },
+        paymentUrl: { type: ['string', 'null'] }
+      },
+      required: ['purchase', 'cart', 'price_breakdown']
+    },
+    {
+      // Multi-purchase (e.g. multiple groups/tenants)
+      type: 'object',
+      properties: {
+        purchases: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              purchase:   { $ref: 'Purchase#' },
+              cart: {
+                type: 'array',
+                items: { type: 'object' } // or your pending_service schema
+              },
+              price_breakdown: { $ref: 'PriceBreakdown#' },
+              paymentUrl: { type: ['string', 'null'] }
+            },
+            required: ['purchase', 'cart', 'price_breakdown']
+          }
+        }
+      },
+      required: ['purchases']
     }
-  },
+  ]
+},
+
 
   WebhookPayload: {
    $id: 'WebhookPayload',
