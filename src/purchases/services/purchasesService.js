@@ -10,13 +10,34 @@ function logPurchases(...args) {
 /**
  * Create a new purchase.
  */
-export async function createPurchase(server, { tenant_id, user_id, cart, payment_method, type, amount, reference_id, status = 'pending', paid_at = null }) {
+export async function createPurchase(server, {
+  tenant_id,
+  user_id,
+  cart,
+  payment_method,
+  type,
+  amount,
+  reference_id,
+  status = 'pending',
+  paid_at = null
+}) {
   logPurchases('createPurchase called with:', {
-    tenant_id, user_id, cart, payment_method, type, amount, reference_id, status, paid_at
+    tenant_id,
+    user_id,
+    cart,
+    cart_length: Array.isArray(cart) ? cart.length : undefined,
+    payment_method,
+    type,
+    amount,
+    reference_id,
+    status,
+    paid_at
   });
 
-  // Sanity-check cart type before insert
-  logPurchases('typeof cart:', typeof cart, '| cart sample:', Array.isArray(cart) ? cart[0] : cart);
+  // Ensure only array of IDs is stored (if passed full objects, map them)
+  const idsOnly = Array.isArray(cart)
+    ? cart.map(x => (typeof x === 'object' && x.id ? x.id : x))
+    : cart;
 
   try {
     const { data, error } = await server.supabase
@@ -24,7 +45,7 @@ export async function createPurchase(server, { tenant_id, user_id, cart, payment
       .insert([{
         tenant_id,
         user_id,
-        cart,
+        cart: idsOnly,
         payment_method,
         type,
         amount,
