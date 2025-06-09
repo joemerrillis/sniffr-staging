@@ -82,7 +82,6 @@ export const purchasesSchemas = {
   },
 
   CheckoutRequest: {
-    
     $id: 'CheckoutRequest',
     type: 'object',
     properties: {
@@ -102,6 +101,7 @@ export const purchasesSchemas = {
   },
 
   WebhookPayload: {
+   $id: 'WebhookPayload',
     type: 'object',
     additionalProperties: true
   }
