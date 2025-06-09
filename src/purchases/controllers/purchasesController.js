@@ -1,5 +1,3 @@
-// src/purchases/controllers/purchasesController.js
-
 import {
   createPurchase,
   listPurchases,
@@ -138,10 +136,11 @@ export async function checkout(request, reply) {
     // Compose and create purchase row (store only IDs for cart as before)
     const now = new Date().toISOString();
     logPurchasesCtrl('Creating purchase row...');
+    // Only store array of IDs in the DB
     const purchase = await createPurchase(server, {
       tenant_id,
       user_id,
-      cart, // still just IDs in the DB
+      cart: enrichedCart.map(item => item.id), // <-- Ensure array of IDs
       payment_method,
       type,
       amount: total,
@@ -157,7 +156,8 @@ export async function checkout(request, reply) {
 
     // Promote cart services (fulfill, delete, etc)
     logPurchasesCtrl('Promoting cart services...');
-    await promoteCart(server, purchase);
+    // Pass only the array of IDs to promoteCart!
+    await promoteCart(server, { ...purchase, cart: enrichedCart.map(item => item.id) });
 
     // Final API response (with logs)
     const response = {
