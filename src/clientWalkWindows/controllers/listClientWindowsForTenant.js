@@ -1,5 +1,5 @@
-import {{ previewPrice }} from '../../pricingRules/services/pricingEngine.js';
-import {{
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
+import {
   listClientWalkWindows,
   getClientWalkWindow,
   createClientWalkWindow,
@@ -7,7 +7,7 @@ import {{
   deleteClientWalkWindow,
   listWindowsForWeek,
   seedPendingWalksForWeek
-}} from '../services/clientWalkWindowsService.js';
+} from '../services/index.js';
 export default async function listClientWindowsForTenant(request, reply) {
   const { tenant_id, client_id } = request.params;
   const { week_start } = request.query;
