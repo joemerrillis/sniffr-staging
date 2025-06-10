@@ -7,7 +7,7 @@ import {
   deleteClientWalkWindow,
   listWindowsForWeek,
   seedPendingWalksForWeek
-} from '../services/clientWalkWindowsService.js';
+} from '../services/index.js';
 function getUserId(request) {
   return request.user?.id ?? request.user?.sub ?? null;
 }
