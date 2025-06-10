@@ -1,4 +1,4 @@
-import {{ previewPrice }} from '../../pricingRules/services/pricingEngine.js';
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 import {{
   listClientWalkWindows,
   getClientWalkWindow,
