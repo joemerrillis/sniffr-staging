@@ -36,8 +36,8 @@ const fastify = Fastify({ logger: true });
 await fastify.register(fastifySwagger, {
   openapi: {
     info: {
-      title: 'Sniffr API',
-      description: 'API documentation for dog walking SaaS + social layer',
+      title: 'Sniffr API TEST',
+      description: 'API documentation for dog walking SaaS + social layer - Test Environment',
       version: '1.0.0'
     },
     components: {
