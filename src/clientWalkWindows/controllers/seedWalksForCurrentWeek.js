@@ -1,5 +1,5 @@
-import {{ previewPrice }} from '../../pricingRules/services/pricingEngine.js';
-import {{
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
+import {
   listClientWalkWindows,
   getClientWalkWindow,
   createClientWalkWindow,
@@ -7,7 +7,7 @@ import {{
   deleteClientWalkWindow,
   listWindowsForWeek,
   seedPendingWalksForWeek
-}} from '../services/clientWalkWindowsService.js';
+} from '../services/index.js';
 export default async function seedWalksForCurrentWeek(request, reply) {
   const userId = request.body.user_id || request.user?.id || request.user?.sub;
   console.log('[DEBUG:seedWalksForCurrentWeek] userId:', userId, '| request.user:', request.user);
