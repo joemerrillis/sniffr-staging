@@ -4,3 +4,4 @@ export { getBoarding } from './getBoarding.js';
 export { createBoarding } from './createBoarding.js';
 export { updateBoarding } from './updateBoarding.js';
 export { deleteBoarding } from './deleteBoarding.js';
+export { calculateBoardingPrice } from './calculateBoardingPrice.js';
