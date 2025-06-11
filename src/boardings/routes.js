@@ -7,7 +7,7 @@ import {
   create,
   modify,
   remove
-} from './controllers/boardingsController.js';
+} from './controllers/index.js';
 
 export default async function boardingsRoutes(fastify, opts) {
   // 1) LIST ALL BOARDINGS (by tenant, client, or booking)
