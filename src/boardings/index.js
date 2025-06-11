@@ -1,7 +1,6 @@
 import fp from 'fastify-plugin';
 import boardingsRoutes from './routes.js';
 import pricingRoutes from './routes/pricingRoutes.js';
-import rulesRoutes from './routes/rulesRoutes.js';
 
 import { boardingSchemas } from './schemas/boardingsSchemas.js';
 
