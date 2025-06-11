@@ -14,5 +14,4 @@ export default fp(async function boardingsPlugin(fastify, opts) {
   // Register all routes!
   fastify.register(boardingsRoutes, opts);      // CRUD
   fastify.register(pricingRoutes, opts);        // /preview-price
-  fastify.register(rulesRoutes, opts);          // /pricing-rules, etc.
 });
