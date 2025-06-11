@@ -1,7 +1,7 @@
 import getUserId from './getUserId.js';
 import getTenantConfig from './getTenantConfig.js';
 import validateBlockTimeFields from './validateBlockTimeFields.js';
-import { createBoarding } from '../services/boardingsService.js';
+import { createBoarding } from '../services/index.js';
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
 export default async function create(request, reply) {
