@@ -3,7 +3,7 @@ import {
   createPricingRule,
   updatePricingRule,
   deletePricingRule,
-} from '../../controllers/pricingRulesController.js';
+} from '../../pricingRules/controllers/pricingRulesController.js';
 
 import {
   listBoardingPricing,
