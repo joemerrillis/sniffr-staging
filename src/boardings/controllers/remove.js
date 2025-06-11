@@ -1,4 +1,4 @@
-import { deleteBoarding } from '../services/boardingsService.js';
+import { deleteBoarding } from '../services/index.js';
 
 export default async function remove(request, reply) {
   const { id } = request.params;
