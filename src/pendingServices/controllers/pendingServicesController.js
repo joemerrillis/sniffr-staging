@@ -30,29 +30,53 @@ function normalizeDogIds(row) {
 
 /**
  * Helper: For a pending_service row, construct the correct context object for price preview.
+ * Handles both walk and boarding service types.
  */
-function buildWalkPreviewContext(row) {
-  // Try to derive day_of_week from service_date if not present
-  let day_of_week = row.day_of_week;
-  if (!day_of_week && row.service_date) {
-    day_of_week = new Date(row.service_date).getDay();
-  }
-  // Use window_start if available, fallback to details.start
-  let window_start = row.window_start;
-  if (!window_start && row.details?.start) window_start = row.details.start;
+function buildPendingServicePreviewContext(row) {
+  // Determine service type
+  const serviceType = row.service_type || row.details?.service_type || 'walk_window';
 
-  // Compose the full context
-  return {
+  // Defaults
+  let context = {
     tenant_id: row.tenant_id,
     user_id: row.user_id,
     dog_ids: normalizeDogIds(row),
-    walk_length_minutes: row.walk_length_minutes || row.details?.walk_length_minutes,
-    day_of_week,
-    window_start,
+    service_type: serviceType,
     service_date: row.service_date,
-    ...row.details,
+    ...row.details, // always spread details
     __raw: row
   };
+
+  // Walk window-specific
+  if (serviceType === 'walk_window' || serviceType === 'walk') {
+    let day_of_week = row.day_of_week;
+    if (!day_of_week && row.service_date) {
+      day_of_week = new Date(row.service_date).getDay();
+    }
+    let window_start = row.window_start;
+    if (!window_start && row.details?.start) window_start = row.details.start;
+
+    context = {
+      ...context,
+      walk_length_minutes: row.walk_length_minutes || row.details?.walk_length_minutes,
+      day_of_week,
+      window_start
+    };
+  }
+
+  // Boarding-specific
+  if (serviceType === 'boarding') {
+    // Ensure drop_off_day and pick_up_day are present in context (from either row or details)
+    context.drop_off_day = row.drop_off_day || row.details?.drop_off_day || null;
+    context.pick_up_day  = row.pick_up_day  || row.details?.pick_up_day  || null;
+
+    // Optionally add times if available
+    context.drop_off_time = row.drop_off_time || row.details?.drop_off_time || null;
+    context.pick_up_time  = row.pick_up_time  || row.details?.pick_up_time  || null;
+    // For compatibility, can add more fields as needed
+  }
+
+  return context;
 }
 
 /**
@@ -65,12 +89,11 @@ async function list(request, reply) {
   const pendingWithPrice = await Promise.all(
     pending_services.map(async (row) => {
       // Build the context for this service
-      const context = buildWalkPreviewContext(row);
+      const context = buildPendingServicePreviewContext(row);
       // Log all context and row data
       console.log('[pendingServicesController][DEBUG] Preview context:', JSON.stringify(context, null, 2));
-      // Determine service type: if "walk_window" or something else
-      let service_type = row.service_type || context.service_type || 'walk_window';
-      // Allow override by row if needed in future
+      // Determine service type
+      let service_type = context.service_type;
       const price_preview = await previewPrice(request.server, service_type, context);
       console.log('[pendingServicesController][DEBUG] Price preview result:', JSON.stringify(price_preview, null, 2));
       // Attach preview inline
@@ -91,9 +114,9 @@ async function retrieve(request, reply) {
   if (!row) return reply.code(404).send({ error: 'Pending service not found' });
 
   // Build and log context for preview
-  const context = buildWalkPreviewContext(row);
+  const context = buildPendingServicePreviewContext(row);
   console.log('[pendingServicesController][DEBUG] Preview context (single):', JSON.stringify(context, null, 2));
-  let service_type = row.service_type || context.service_type || 'walk_window';
+  let service_type = context.service_type;
   const price_preview = await previewPrice(request.server, service_type, context);
   console.log('[pendingServicesController][DEBUG] Price preview result (single):', JSON.stringify(price_preview, null, 2));
 
@@ -119,9 +142,9 @@ async function listForClient(request, reply) {
 
   const pendingWithPrice = await Promise.all(
     pending_services.map(async (row) => {
-      const context = buildWalkPreviewContext(row);
+      const context = buildPendingServicePreviewContext(row);
       console.log('[pendingServicesController][DEBUG][tenant] Preview context:', JSON.stringify(context, null, 2));
-      let service_type = row.service_type || context.service_type || 'walk_window';
+      let service_type = context.service_type;
       const price_preview = await previewPrice(request.server, service_type, context);
       console.log('[pendingServicesController][DEBUG][tenant] Price preview result:', JSON.stringify(price_preview, null, 2));
       return { ...row, price_preview };
