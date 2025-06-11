@@ -1,7 +1,7 @@
 import getUserId from './getUserId.js';
 import getTenantConfig from './getTenantConfig.js';
 import validateBlockTimeFields from './validateBlockTimeFields.js';
-import { getBoarding, updateBoarding } from '../services/boardingsService.js';
+import { getBoarding, updateBoarding } from '../services/index.js';
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
 export default async function modify(request, reply) {
