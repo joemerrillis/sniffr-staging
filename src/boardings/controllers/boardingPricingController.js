@@ -1,4 +1,4 @@
-import { calculateBoardingPrice } from '../services/boardingPricingService.js';
+import { calculateBoardingPrice } from '../services/calculateBoardingPrice.js';
 
 /**
  * POST /boardings/preview-price
