@@ -1,4 +1,4 @@
-import { getBoarding } from '../services/boardingsService.js';
+import { getBoarding } from '../services/index.js';
 
 export default async function retrieve(request, reply) {
   const { id } = request.params;
