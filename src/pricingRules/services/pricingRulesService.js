@@ -1,7 +1,13 @@
-// -- Core CRUD --
+// src/pricingRules/services/pricingRulesService.js
+
+import { previewPrice } from './pricingEngine.js';
+
+// ---------------------------
+// CRUD: Pricing Rules
+// ---------------------------
 export async function listPricingRules(server, tenant_id) {
   const { data, error } = await server.supabase
-    .from('pricing_rules') // Use generic rules table for all services
+    .from('pricing_rules')
     .select('*')
     .eq('tenant_id', tenant_id)
     .order('priority', { ascending: true });
@@ -39,95 +45,52 @@ export async function deletePricingRule(server, id) {
   if (error) throw error;
 }
 
-// -- Pricing Application Logic --
+// ---------------------------
+// Service Data Fetching (for price preview/calc)
+// ---------------------------
 async function fetchServiceData(server, { service_type, service_id }) {
-  // Dynamic table lookup (add more cases as needed)
-  if (service_type === 'boarding') {
-    const { data, error } = await server.supabase.from('boardings').select('*').eq('id', service_id).single();
-    if (error) throw error;
-    return data;
-  }
-  if (service_type === 'daycare') {
-    const { data, error } = await server.supabase.from('daycare_sessions').select('*').eq('id', service_id).single();
-    if (error) throw error;
-    return data;
-  }
-  if (service_type === 'walk_window') {
-    const { data, error } = await server.supabase.from('client_walk_windows').select('*').eq('id', service_id).single();
-    if (error) throw error;
-    return data;
-  }
-  if (service_type === 'walk_request') {
-    const { data, error } = await server.supabase.from('client_walk_requests').select('*').eq('id', service_id).single();
-    if (error) throw error;
-    return data;
-  }
-  throw new Error(`Unsupported service_type: ${service_type}`);
+  // Extend this as new service types are added.
+  const lookups = {
+    'boarding': 'boardings',
+    'daycare': 'daycare_sessions',
+    'walk_window': 'client_walk_windows',
+    'walk_request': 'client_walk_requests'
+  };
+  const table = lookups[service_type];
+  if (!table) throw new Error(`Unsupported service_type: ${service_type}`);
+  const { data, error } = await server.supabase.from(table).select('*').eq('id', service_id).single();
+  if (error) throw new Error(`[PricingRules] No ${service_type} found for id: ${service_id}`);
+  return data;
 }
 
+// ---------------------------
+// Price Preview (unified)
+// ---------------------------
+/**
+ * Main entrypoint for price preview/calc.
+ * - If service_id is provided, fetches base row from DB.
+ * - Merges serviceData with additional context for price previewing.
+ * - All price math is handled in pricingEngine.js (single source of truth).
+ * Returns: { price, breakdown } (optionally serviceData in dev)
+ */
 export async function previewServicePrice(server, { tenant_id, service_type, service_id, ...context }) {
-  // Get the service instance (boarding, daycare, etc)
-  const serviceData = await fetchServiceData(server, { service_type, service_id });
-  // Fetch rules for tenant
-  const rules = await listPricingRules(server, tenant_id);
-
-  let priceSoFar = 0;
-  let breakdown = [];
-  let matched = false;
-
-  for (const rule of rules.filter(r => r.enabled)) {
-    // -- NEW: Only apply the rule if all rule_data keys match context (with normalization) --
-    let matches = true;
-    if (rule.rule_data && typeof rule.rule_data === 'object') {
-      for (const [k, v] of Object.entries(rule.rule_data)) {
-        // Log both values and their types for easy debugging
-        console.log(`[DEBUG:rule-match] key: ${k} | rule:`, v, typeof v, '| context:', context[k], typeof context[k]);
-        if (
-          context[k] == null ||
-          String(context[k]) !== String(v)
-        ) {
-          matches = false;
-          break;
-        }
-      }
-    }
-    if (!matches) continue;
-    matched = true;
-
-    // Now apply price logic
-    let adjustment = 0;
-    if (rule.price_adjustment_type === 'set') {
-      adjustment = rule.price_adjustment_value;
-      priceSoFar = adjustment;
-    } else if (rule.price_adjustment_type === 'fixed') {
-      adjustment = rule.price_adjustment_value;
-      priceSoFar += adjustment;
-    } else if (rule.price_adjustment_type === 'percent') {
-      adjustment = priceSoFar * (rule.price_adjustment_value / 100);
-      priceSoFar += adjustment;
-    } else if (rule.price_adjustment_type === 'override') {
-      priceSoFar = rule.price_adjustment_value;
-      adjustment = 0;
-    }
-    breakdown.push({
-      id: rule.id,
-      name: rule.name,
-      rule_type: rule.rule_type,
-      description: rule.description,
-      adjustment,
-      price_so_far: priceSoFar
-    });
+  let serviceData = {};
+  // If service_id is present, fetch service instance from DB (boarding, walk, etc)
+  if (service_id) {
+    serviceData = await fetchServiceData(server, { service_type, service_id });
   }
 
-  // If nothing matched, return a clear error in the breakdown.
-  if (!matched) {
-    return {
-      price: 0,
-      breakdown: [],
-      serviceData,
-      error: 'No pricing rule matched.'
-    };
-  }
+  // Merge DB row with any additional form/preview context
+  // Context (form data) takes precedence for “what-if” price previews
+  const finalContext = { ...serviceData, ...context, tenant_id, service_type };
 
-  return { price: priceSoFar, breakdown, serviceData };
+  // Run through pricing engine for actual calculation
+  const result = await previewPrice(server, service_type, finalContext);
+
+  // In dev, you can return serviceData for easier debugging
+  if (process.env.NODE_ENV !== 'production') {
+    return { ...result, serviceData };
+  }
+  // In prod, keep response clean
+  return result;
 }
