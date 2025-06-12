@@ -37,13 +37,13 @@ export const purchasesSchemas = {
             price_preview:  { $ref: 'PricePreview#' }
           },
           required: ['id', 'service_type', 'service_date'],
-          additionalProperties: true   // <-- Let the object include more fields (safety)
+          additionalProperties: true
         }
       },
       created_at:       { type: 'string', format: 'date-time' },
       paid_at:          { type: ['string', 'null'], format: 'date-time' },
       delegations:      { type: ['array', 'null'], items: { $ref: 'Delegation#' } },
-      price_breakdown:  { $ref: 'PriceBreakdown#' },
+      price_breakdown:  { $ref: 'PriceBreakdown#' }, // <-- Always an object!
       applied_discounts: { type: ['array', 'null'], items: { $ref: 'Discount#' } },
       deposit_amount:   { type: ['number', 'null'] },
       meta:             { type: ['object', 'null'] }
@@ -62,9 +62,10 @@ export const purchasesSchemas = {
       price: { type: 'number' },
       breakdown: {
         type: 'array',
-        items: { $ref: 'PricePreview#' }
+        items: { type: 'object', additionalProperties: true }
       }
-    }
+    },
+    required: ['price', 'breakdown']
   },
 
   Discount: {
@@ -101,10 +102,7 @@ export const purchasesSchemas = {
             type: 'array',
             items: { type: 'object', additionalProperties: true }
           },
-          price_breakdown: {
-            type: 'array',
-            items: { type: 'object', additionalProperties: true }
-          },
+          price_breakdown: { $ref: 'PriceBreakdown#' }, // <-- Now matches shape in purchase!
           paymentUrl: { type: ['string', 'null'] }
         },
         required: ['purchase', 'cart', 'price_breakdown']
@@ -123,10 +121,7 @@ export const purchasesSchemas = {
                   type: 'array',
                   items: { type: 'object', additionalProperties: true }
                 },
-                price_breakdown: {
-                  type: 'array',
-                  items: { type: 'object', additionalProperties: true }
-                },
+                price_breakdown: { $ref: 'PriceBreakdown#' },
                 paymentUrl: { type: ['string', 'null'] }
               },
               required: ['purchase', 'cart', 'price_breakdown']
