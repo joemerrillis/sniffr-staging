@@ -146,7 +146,8 @@ export async function checkout(request, reply) {
         reference_id: `mock-${Date.now()}-${type}`,
         status: 'paid',
         paid_at: now,
-        price_breakdown: breakdown,
+        // --- Set price_breakdown as object for DB insert, if you store it
+        price_breakdown: { price: total, breakdown }
       });
 
       logPurchasesCtrl(`[${groupKey}] Purchase created:`, purchase);
@@ -154,10 +155,8 @@ export async function checkout(request, reply) {
       // Hydrate the purchase.cart for API response (patch step)
       purchase.cart = enrichedCart;
 
-      // --- FIX: Never let price_breakdown be null (schema requires array/object)
-      if (purchase.price_breakdown == null) {
-        purchase.price_breakdown = [];
-      }
+      // --- FIX: Always set price_breakdown as object for API response
+      purchase.price_breakdown = { price: total, breakdown };
 
       // Promote cart services
       logPurchasesCtrl(`[${groupKey}] Promoting cart services...`);
@@ -167,7 +166,7 @@ export async function checkout(request, reply) {
       purchaseResults.push({
         purchase,
         cart: enrichedCart,
-        price_breakdown: breakdown,
+        price_breakdown: { price: total, breakdown },
         paymentUrl: null // Stripe placeholder
       });
       logPurchasesCtrl(`[${groupKey}] checkout() response chunk:`, purchaseResults[purchaseResults.length-1]);
