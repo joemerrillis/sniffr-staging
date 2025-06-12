@@ -1,3 +1,5 @@
+// src/pricingRules/services/pricingEngine.js
+
 // Helper for price adjustment
 function applyAdjustment(price, rule) {
   switch (rule.price_adjustment_type) {
@@ -7,6 +9,16 @@ function applyAdjustment(price, rule) {
     default:
       console.warn('[pricingEngine] Unknown price_adjustment_type', rule.price_adjustment_type, rule);
       return price;
+  }
+}
+
+// Make sure to import this if you use it for boarding date parsing
+function safeDate(input, fallback = null) {
+  try {
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? fallback : d;
+  } catch (e) {
+    return fallback;
   }
 }
 
@@ -29,12 +41,28 @@ const serviceMatchers = {
     const nights = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
     return nights === rule.rule_data.nights;
   },
-  // Add more service types here
+  // Add more service types here as needed
 };
 
 export async function previewPrice(server, service_type, context) {
   try {
-    // ... (field validation and DB fetch as before) ...
+    // --- Fetch rules for this tenant & service_type ---
+    const { data: rules, error } = await server.supabase
+      .from('pricing_rules')
+      .select('*')
+      .eq('tenant_id', context.tenant_id)
+      .eq('rule_type', service_type)
+      .eq('enabled', true)
+      .order('priority', { ascending: true });
+
+    if (error) {
+      console.error('[pricingEngine] DB error:', error, { context, service_type });
+      return { error: error.message || 'Failed to fetch pricing rules' };
+    }
+    if (!rules || !Array.isArray(rules)) {
+      console.error('[pricingEngine] Fetched rules is not an array', { rules, context, service_type });
+      return { error: 'No pricing rules found or rules fetch error.' };
+    }
 
     let price = 0;
     const breakdown = [];
