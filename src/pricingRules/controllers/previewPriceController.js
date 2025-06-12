@@ -1,16 +1,20 @@
 // /controllers/previewPriceController.js
 
-import { previewPrice } from '../services/pricingEngine.js';
+import { previewServicePrice } from '../services/pricingRulesService.js';
 import { logAndReplyError } from '../utils/logging.js';
 
-export async function previewPrice(request, reply) {
+/**
+ * Handler for POST /pricing-rules/preview-price
+ * - Calls pricingRulesService.previewServicePrice, which delegates to pricingEngine
+ * - Returns { price, breakdown } or 400 with error
+ */
+export async function previewPriceHandler(request, reply) {
   try {
-    const { service_type, ...context } = request.body;
-    if (!service_type) {
-      return logAndReplyError(reply, 400, 'Missing service_type', { input: request.body });
+    const { tenant_id, service_type, ...serviceData } = request.body;
+    if (!tenant_id || !service_type) {
+      return logAndReplyError(reply, 400, 'Missing tenant_id or service_type', { input: request.body });
     }
-
-    const result = await previewPrice(request.server, service_type, context);
+    const result = await previewServicePrice(request.server, { tenant_id, service_type, ...serviceData });
     if (result.error) {
       return logAndReplyError(reply, 400, result.error, { input: request.body, result });
     }
