@@ -118,7 +118,7 @@ export async function promoteCart(server, purchase) {
           user_id: pending.user_id,
           walker_id,
           scheduled_at,
-          duration_minutes: pending.details?.length_minutes || 30,
+          duration_minutes: pending.details?.walk_length_minutes || 30,
           status: 'unscheduled',
           created_at: new Date().toISOString()
         };
