@@ -1,9 +1,10 @@
+// src/pricingRules/routes.js
+
 import {
   getRules,
   postRule,
   patchRule,
-  deleteRule,
-  previewPrice
+  deleteRule
 } from './controllers/pricingRulesController.js';
 
 import { previewPriceHandler } from './controllers/previewPriceController.js';
@@ -72,7 +73,7 @@ export default async function pricingRulesRoutes(fastify, opts) {
         200: {
           type: 'object',
           properties: {
-            suggested_price: { type: 'number' },
+            price: { type: 'number' },
             breakdown: {
               type: 'array',
               items: {
