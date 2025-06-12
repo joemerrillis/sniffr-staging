@@ -8,7 +8,7 @@ export const purchasesSchemas = {
       user_id:          { type: 'string', format: 'uuid' },
       type:             { 
         type: 'string',
-        enum: ['walk', 'boarding', 'daycare', 'credit_pack', 'other']
+        enum: ['walk', 'walk_window', 'boarding', 'daycare', 'credit_pack', 'other']
       },
       amount:           { type: 'number' },
       status:           { 
