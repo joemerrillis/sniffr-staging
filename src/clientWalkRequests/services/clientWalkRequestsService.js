@@ -1,6 +1,8 @@
+// src/clientWalkRequests/services/clientWalkRequestsService.js
+
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
-// Helper to fetch dog_ids for a set of walk request IDs
+// --- Fetch dog_ids for a set of walk request IDs ---
 async function getDogIdsForRequests(server, requestIds) {
   if (!requestIds.length) return {};
   const { data, error } = await server.supabase
@@ -9,7 +11,6 @@ async function getDogIdsForRequests(server, requestIds) {
     .eq('service_type', 'client_walk_request')
     .in('service_id', requestIds);
   if (error) throw error;
-  // Group by service_id
   const mapping = {};
   for (const row of data) {
     if (!mapping[row.service_id]) mapping[row.service_id] = [];
@@ -57,27 +58,25 @@ export async function getClientWalkRequest(server, userId, id) {
   };
 }
 
-// --- Time window validation ---
+// --- Time window validation: must be valid, and end > start ---
 function validateTimeWindow(window_start, window_end) {
-  // Expects "HH:MM" format, 24hr
   if (!window_start || !window_end) return 'window_start and window_end are required.';
   const [startH, startM] = window_start.split(':').map(Number);
   const [endH, endM] = window_end.split(':').map(Number);
   if (
     isNaN(startH) || isNaN(startM) ||
     isNaN(endH) || isNaN(endM)
-  ) {
-    return 'window_start and window_end must be valid times (HH:MM).';
-  }
+  ) return 'window_start and window_end must be valid times (HH:MM).';
   if (endH < startH || (endH === startH && endM <= startM)) {
     return 'window_end must be after window_start.';
   }
   return null;
 }
 
-// --- Helper: create pending_services row (does NOT store price_preview), but returns it ---
-async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id }) {
-  // Insert into pending_services
+// --- Insert a pending_services row and hydrate it with live price preview ---
+async function createPendingServiceForWalkRequest(server, {
+  user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id
+}) {
   const pendingInsert = {
     user_id,
     tenant_id,
@@ -85,11 +84,7 @@ async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, 
     service_type: 'walk_window',
     request_id,
     dog_ids,
-    details: {
-      window_start,
-      window_end,
-      walk_length_minutes,
-    },
+    details: { window_start, window_end, walk_length_minutes },
     is_confirmed: false,
     created_at: new Date().toISOString(),
   };
@@ -101,7 +96,6 @@ async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, 
   if (pendingError) throw pendingError;
   const pendingService = pendingServiceRows[0];
 
-  // Now calculate live price preview (not persisted)
   let pricePreview = null;
   if (pendingService) {
     pricePreview = await previewPrice(
@@ -119,7 +113,6 @@ async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, 
     );
   }
 
-  // Return enriched response for UI
   return pendingService
     ? { ...pendingService, price_preview: pricePreview }
     : null;
@@ -137,7 +130,7 @@ export async function createClientWalkRequest(server, payload) {
     ...rest
   } = payload;
 
-  // --- Time validation ---
+  // Validate window times before doing any inserts
   const windowErr = validateTimeWindow(window_start, window_end);
   if (windowErr) throw new Error(windowErr);
 
@@ -179,10 +172,9 @@ export async function createClientWalkRequest(server, payload) {
     window_start,
     window_end,
     walk_length_minutes,
-    request_id: data.id
+    request_id: data.id,
   });
 
-  // 4. Return walk request and the new cart row for controller/UI
   return {
     walk_request: {
       ...data,
