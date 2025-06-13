@@ -1,7 +1,18 @@
-// src/clientWalkRequests/services/createClientWalkRequest.js
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 import createPendingServiceForWalkRequest from './createPendingServiceForWalkRequest.js';
 import { validateTimeWindow } from './validateTimeWindow.js';
 import { log } from './logger.js';
+
+// Helper to fetch the actual pending_service row
+async function getPendingServiceByRequestId(server, request_id) {
+  const { data, error } = await server.supabase
+    .from('pending_services')
+    .select('*')
+    .eq('request_id', request_id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
 
 export default async function createClientWalkRequest(server, payload) {
   const {
@@ -48,23 +59,32 @@ export default async function createClientWalkRequest(server, payload) {
     if (dogError) throw dogError;
   }
 
-  // 3. Insert into pending_services and attach price_preview for UI
-  const pending_service = await createPendingServiceForWalkRequest(server, {
-    user_id,
-    tenant_id,
-    walk_date,
-    dog_ids,
-    window_start,
-    window_end,
-    walk_length_minutes,
-    request_id: data.id,
-  });
+  // 3. Get price estimate using previewPrice
+  let price_preview = null;
+  if (tenant_id) {
+    price_preview = await previewPrice(server, 'walk_request', {
+      tenant_id,
+      walk_length_minutes,
+      dog_ids: dog_ids || [],
+    });
+  }
+
+  // 4. Try to fetch pending_service row by request_id (cart row for UI)
+  let pending_service = null;
+  try {
+    pending_service = await getPendingServiceByRequestId(server, data.id);
+  } catch (err) {
+    // Optionally: log and continue (don't crash on missing pending_service)
+    log('Pending_service not found for request_id:', data.id);
+  }
 
   log('Created client_walk_request:', data);
+
   return {
     walk_request: {
       ...data,
       dog_ids: dog_ids || [],
+      price_preview, // Attach price here for parity with windows flow
     },
     pending_service
   };
