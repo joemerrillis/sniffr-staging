@@ -1,7 +1,7 @@
 // controllers/clientWalkRequests/create.js
 import getUserId from './getUserId.js';
 import validateTimeWindow from './validateTimeWindow.js';
-import { orchestrateCreateClientWalkRequest } from '../../services/createclientWalkRequests.js';
+import { orchestrateCreateClientWalkRequest } from '../../services/createclientWalkRequest.js';
 
 export default async function create(request, reply) {
   const userId = getUserId(request);
