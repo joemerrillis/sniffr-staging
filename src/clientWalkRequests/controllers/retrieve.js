@@ -1,6 +1,6 @@
 // controllers/clientWalkRequests/retrieve.js
 import getUserId from './getUserId.js';
-import { getClientWalkRequest } from '../services/getClientWalkRequest.js';
+import getClientWalkRequest from '../services/getClientWalkRequest.js';
 
 export default async function retrieve(request, reply) {
   const userId = getUserId(request);
