@@ -6,9 +6,9 @@ import update from './update.js';
 import remove from './remove.js';
 
 export {
-  createRequest,
-  listRequest,
-  retrieveRequest,
-  updateRequest,
-  removeRequest,
+  create as createRequest,
+  list as listRequest,
+  retrieve as retrieveRequest,
+  update as updateRequest,
+  remove as removeRequest,
 };
