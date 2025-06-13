@@ -6,15 +6,7 @@ import {
   createRequest,
   updateRequest,
   deleteRequest,
-} from './controllers/index.js'; // <-- Import from index.js
-
-import {
-  CreateClientWalkRequest,
-  UpdateClientWalkRequest,
-  ClientWalkRequest,
-  RequestsEnvelope,
-  RequestEnvelope,
-} from './schemas/clientWalkRequestsSchemas.js';
+} from './controllers/index.js';
 
 export default async function routes(fastify, opts) {
   // 1) LIST ALL WALK REQUESTS FOR CURRENT USER
@@ -25,7 +17,7 @@ export default async function routes(fastify, opts) {
         description: 'List all walk requests for the authenticated client.',
         tags: ['ClientWalkRequests'],
         response: {
-          200: RequestsEnvelope,
+          200: { $ref: 'RequestsEnvelope#' },
         },
       },
     },
@@ -45,7 +37,7 @@ export default async function routes(fastify, opts) {
           required: ['id'],
         },
         response: {
-          200: RequestEnvelope,
+          200: { $ref: 'RequestEnvelope#' },
         },
       },
     },
@@ -59,13 +51,13 @@ export default async function routes(fastify, opts) {
       schema: {
         description: 'Create a new walk request for a day/time outside regular windows.',
         tags: ['ClientWalkRequests'],
-        body: CreateClientWalkRequest,
+        body: { $ref: 'CreateClientWalkRequest#' },
         response: {
           201: {
             type: 'object',
             properties: {
-              request: ClientWalkRequest,
-              pending_service: { type: 'object' },
+              request: { $ref: 'ClientWalkRequest#' },
+              pending_service: { type: 'object' }, // If you ever add a schema with $id for this, use $ref here.
             },
           },
         },
@@ -86,9 +78,9 @@ export default async function routes(fastify, opts) {
           properties: { id: { type: 'string', format: 'uuid' } },
           required: ['id'],
         },
-        body: UpdateClientWalkRequest,
+        body: { $ref: 'UpdateClientWalkRequest#' },
         response: {
-          200: RequestEnvelope,
+          200: { $ref: 'RequestEnvelope#' },
         },
       },
     },
