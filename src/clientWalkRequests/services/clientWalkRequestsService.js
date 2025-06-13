@@ -1,5 +1,3 @@
-// src/clientWalkRequests/services/clientWalkRequestsService.js
-
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
 // Helper to fetch dog_ids for a set of walk request IDs
@@ -59,17 +57,32 @@ export async function getClientWalkRequest(server, userId, id) {
   };
 }
 
-// --- Helper: create pending_services row (without price_preview), return with calculated preview
-async function createPendingServiceForWalkRequest(
-  server,
-  { user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id }
-) {
-  // Insert into pending_services (DO NOT store price_preview)
+// --- Time window validation ---
+function validateTimeWindow(window_start, window_end) {
+  // Expects "HH:MM" format, 24hr
+  if (!window_start || !window_end) return 'window_start and window_end are required.';
+  const [startH, startM] = window_start.split(':').map(Number);
+  const [endH, endM] = window_end.split(':').map(Number);
+  if (
+    isNaN(startH) || isNaN(startM) ||
+    isNaN(endH) || isNaN(endM)
+  ) {
+    return 'window_start and window_end must be valid times (HH:MM).';
+  }
+  if (endH < startH || (endH === startH && endM <= startM)) {
+    return 'window_end must be after window_start.';
+  }
+  return null;
+}
+
+// --- Helper: create pending_services row (does NOT store price_preview), but returns it ---
+async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id }) {
+  // Insert into pending_services
   const pendingInsert = {
     user_id,
     tenant_id,
     service_date: walk_date,
-    service_type: 'walk_window', // CHANGED from 'walk'
+    service_type: 'walk_window',
     request_id,
     dog_ids,
     details: {
@@ -88,12 +101,12 @@ async function createPendingServiceForWalkRequest(
   if (pendingError) throw pendingError;
   const pendingService = pendingServiceRows[0];
 
-  // Now calculate live price preview (do not persist)
+  // Now calculate live price preview (not persisted)
   let pricePreview = null;
   if (pendingService) {
     pricePreview = await previewPrice(
       server,
-      'walk_window', // CHANGED from 'walk'
+      'walk_window',
       {
         tenant_id,
         user_id,
@@ -106,7 +119,7 @@ async function createPendingServiceForWalkRequest(
     );
   }
 
-  // Return enriched response for UI (but only return price_preview, do not store it)
+  // Return enriched response for UI
   return pendingService
     ? { ...pendingService, price_preview: pricePreview }
     : null;
@@ -123,6 +136,10 @@ export async function createClientWalkRequest(server, payload) {
     tenant_id,
     ...rest
   } = payload;
+
+  // --- Time validation ---
+  const windowErr = validateTimeWindow(window_start, window_end);
+  if (windowErr) throw new Error(windowErr);
 
   // 1. Insert client_walk_request
   const { data, error } = await server.supabase
@@ -153,7 +170,7 @@ export async function createClientWalkRequest(server, payload) {
     if (dogError) throw dogError;
   }
 
-  // 3. Insert into pending_services (with calculated price preview, not stored)
+  // 3. Insert into pending_services and attach price_preview for UI
   const pending_service = await createPendingServiceForWalkRequest(server, {
     user_id,
     tenant_id,
