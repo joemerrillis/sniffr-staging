@@ -59,19 +59,9 @@ export async function getClientWalkRequest(server, userId, id) {
   };
 }
 
-// --- Helper: create pending_services row and attach price breakdown ---
+// --- Helper: create pending_services row (without price_preview), return with calculated preview
 async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id }) {
-  // Get price preview
-  const context = {
-    tenant_id,
-    user_id,
-    walk_length_minutes,
-    walk_date,
-    dog_ids
-  };
-  const pricePreview = await previewPrice(server, 'walk', context);
-
-  // Insert into pending_services
+  // Insert into pending_services (DO NOT store price_preview)
   const pendingInsert = {
     user_id,
     tenant_id,
@@ -82,11 +72,10 @@ async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, 
     details: {
       window_start,
       window_end,
-      walk_length_minutes
+      walk_length_minutes,
     },
     is_confirmed: false,
-    price_preview: pricePreview,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
   };
 
   const { data: pendingServiceRows, error: pendingError } = await server.supabase
@@ -94,12 +83,30 @@ async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, 
     .insert([pendingInsert])
     .select('*');
   if (pendingError) throw pendingError;
+  const pendingService = pendingServiceRows[0];
 
-  // Return the pending_service row enriched with price_preview
-  return {
-    ...pendingServiceRows[0],
-    price_preview: pricePreview
-  };
+  // Now calculate live price preview (do not persist)
+  let pricePreview = null;
+  if (pendingService) {
+    pricePreview = await previewPrice(
+      server,
+      'walk',
+      {
+        tenant_id,
+        user_id,
+        dog_ids,
+        walk_length_minutes,
+        walk_date,
+        window_start,
+        window_end,
+      }
+    );
+  }
+
+  // Return enriched response for UI (but only return price_preview, do not store it)
+  return pendingService
+    ? { ...pendingService, price_preview: pricePreview }
+    : null;
 }
 
 export async function createClientWalkRequest(server, payload) {
@@ -143,7 +150,7 @@ export async function createClientWalkRequest(server, payload) {
     if (dogError) throw dogError;
   }
 
-  // 3. Insert into pending_services (with price breakdown)
+  // 3. Insert into pending_services (with calculated price preview, not stored)
   const pending_service = await createPendingServiceForWalkRequest(server, {
     user_id,
     tenant_id,
