@@ -60,13 +60,16 @@ export async function getClientWalkRequest(server, userId, id) {
 }
 
 // --- Helper: create pending_services row (without price_preview), return with calculated preview
-async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id }) {
+async function createPendingServiceForWalkRequest(
+  server,
+  { user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id }
+) {
   // Insert into pending_services (DO NOT store price_preview)
   const pendingInsert = {
     user_id,
     tenant_id,
     service_date: walk_date,
-    service_type: 'walk',
+    service_type: 'walk_window', // CHANGED from 'walk'
     request_id,
     dog_ids,
     details: {
@@ -90,7 +93,7 @@ async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, 
   if (pendingService) {
     pricePreview = await previewPrice(
       server,
-      'walk',
+      'walk_window', // CHANGED from 'walk'
       {
         tenant_id,
         user_id,
