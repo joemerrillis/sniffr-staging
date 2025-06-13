@@ -1,7 +1,7 @@
 // controllers/clientWalkRequests/update.js
 import getUserId from './getUserId.js';
 import validateTimeWindow from './validateTimeWindow.js';
-import { updateClientWalkRequest } from '../services/updateClientWalkRequest.js';
+import updateClientWalkRequest from '../services/updateClientWalkRequest.js';
 
 export default async function update(request, reply) {
   const userId = getUserId(request);
