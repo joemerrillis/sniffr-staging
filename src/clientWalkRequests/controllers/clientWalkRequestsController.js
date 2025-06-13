@@ -1,4 +1,3 @@
-// src/clientWalkRequests/controllers/clientWalkRequestsController.js
 import {
   listClientWalkRequests,
   getClientWalkRequest,
@@ -28,14 +27,12 @@ export async function getRequest(request, reply) {
 export async function createRequest(request, reply) {
   const userId = getUserId(request);
 
-  // --- LOGGING STARTS HERE ---
+  // LOGGING for transparency
   console.log('--- Creating Client Walk Request ---');
   console.log('JWT payload (request.user):', request.user);
   console.log('Resolved userId:', userId);
   console.log('Original request body:', request.body);
-  // --- LOGGING ENDS HERE ---
 
-  // Destructure walk_length_minutes too!
   const { walk_date, window_start, window_end, dog_ids, walk_length_minutes } = request.body;
 
   // Determine the correct tenant_id
@@ -43,11 +40,9 @@ export async function createRequest(request, reply) {
   const userRole = request.user?.role;
 
   if (userRole === 'tenant_admin' || userRole === 'tenant') {
-    // Use tenant_id from JWT if logged in as a tenant
     tenant_id = request.user.tenant_id;
     console.log('Resolved tenant_id from JWT (tenant):', tenant_id);
   } else {
-    // Lookup the "accepted" tenant for this client
     const { data: tenantClient, error } = await request.server.supabase
       .from('tenant_clients')
       .select('tenant_id')
@@ -62,18 +57,10 @@ export async function createRequest(request, reply) {
     console.log('Resolved tenant_id from tenant_clients:', tenant_id);
   }
 
-  // Compose payload including walk_length_minutes!
-  const payload = {
-    user_id: userId,
-    tenant_id,
-    walk_date,
-    window_start,
-    window_end,
-    dog_ids,
-    walk_length_minutes
-  };
+  // Compose payload including dog_ids array and walk_length_minutes
+  const payload = { user_id: userId, tenant_id, walk_date, window_start, window_end, dog_ids, walk_length_minutes };
 
-  // Log the final payload that will be sent to the service/DB:
+  // LOG what will be sent to the service
   console.log('Final payload sent to service:', payload);
 
   try {
@@ -81,6 +68,7 @@ export async function createRequest(request, reply) {
     const { walk_request, pending_service } = await createClientWalkRequest(request.server, payload);
     reply.code(201).send({ request: walk_request, pending_service });
   } catch (e) {
+    // Will catch both validation and Supabase errors
     reply.code(400).send({ error: e.message || e });
   }
 }
@@ -90,7 +78,7 @@ export async function updateRequest(request, reply) {
   const { id } = request.params;
   const payload = request.body;
 
-  // Log update attempts for transparency:
+  // Logging
   console.log('--- Updating Client Walk Request ---');
   console.log('JWT payload (request.user):', request.user);
   console.log('Resolved userId:', userId);
@@ -106,7 +94,7 @@ export async function deleteRequest(request, reply) {
   const userId = getUserId(request);
   const { id } = request.params;
 
-  // Log delete attempts for transparency:
+  // Logging
   console.log('--- Deleting Client Walk Request ---');
   console.log('JWT payload (request.user):', request.user);
   console.log('Resolved userId:', userId);
