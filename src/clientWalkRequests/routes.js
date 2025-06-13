@@ -45,26 +45,32 @@ export default async function routes(fastify, opts) {
   );
 
   // 3) CREATE A NEW WALK REQUEST
-  fastify.post(
-    '/',
-    {
-      schema: {
-        description: 'Create a new walk request for a day/time outside regular windows.',
-        tags: ['ClientWalkRequests'],
-        body: { $ref: 'CreateClientWalkRequest#' },
-        response: {
-          201: {
-            type: 'object',
-            properties: {
-              request: { $ref: 'ClientWalkRequest#' },
-              pending_service: { type: 'object' }, // If you ever add a schema with $id for this, use $ref here.
+ fastify.post(
+  '/',
+  {
+    schema: {
+      description: 'Create a new walk request for a day/time outside regular windows.',
+      tags: ['ClientWalkRequests'],
+      body: { $ref: 'CreateClientWalkRequest#' },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            walk_request: { $ref: 'ClientWalkRequest#' },
+            pending_service: { $ref: 'PendingService#' },
+            service_dogs: {
+              type: 'array',
+              items: { $ref: 'ServiceDog#' }
             },
+            price_preview: { $ref: 'PricePreview#' }
           },
-        },
+          required: ['walk_request', 'pending_service'] // add 'price_preview' if always present
+        }
       },
     },
-    createRequest
-  );
+  },
+  createRequest
+);
 
   // 4) UPDATE AN EXISTING WALK REQUEST
   fastify.patch(
