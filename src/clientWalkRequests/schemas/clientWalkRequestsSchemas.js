@@ -42,6 +42,7 @@ export const RequestEnvelope = {
 };
 
 export const CreateClientWalkRequest = {
+  $id: 'CreateClientWalkRequest',
   type: 'object',
   properties: {
     walk_date:           { type: 'string', format: 'date' },
@@ -57,6 +58,7 @@ export const CreateClientWalkRequest = {
 };
 
 export const UpdateClientWalkRequest = {
+  $id: 'UpdateClientWalkRequest',
   type: 'object',
   properties: {
     walk_date:           { type: 'string', format: 'date' },
