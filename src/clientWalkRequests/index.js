@@ -16,6 +16,6 @@ export default fp(async function clientWalkRequestsModule(fastify, opts) {
   fastify.addSchema(RequestEnvelope);
   fastify.addSchema(CreateClientWalkRequest);
   fastify.addSchema(UpdateClientWalkRequest);
-  fastiry.addSchema(ServiceDog);
+  fastify.addSchema(ServiceDog);
   fastify.register(routes, opts);
 });
