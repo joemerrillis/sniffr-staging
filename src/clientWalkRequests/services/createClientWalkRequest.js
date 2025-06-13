@@ -5,16 +5,23 @@ import { log } from './logger.js';
 
 // Helper to fetch the actual pending_service row
 async function getPendingServiceByRequestId(server, request_id) {
+  log('[getPendingServiceByRequestId] Looking up pending_service for request_id:', request_id);
   const { data, error } = await server.supabase
     .from('pending_services')
     .select('*')
     .eq('request_id', request_id)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    log('[getPendingServiceByRequestId] ERROR:', error);
+    throw error;
+  }
+  log('[getPendingServiceByRequestId] Result:', data);
   return data;
 }
 
 export default async function createClientWalkRequest(server, payload) {
+  log('[createClientWalkRequest] START payload:', payload);
+
   const {
     dog_ids,
     window_start,
@@ -27,10 +34,23 @@ export default async function createClientWalkRequest(server, payload) {
   } = payload;
 
   // Validate window times
+  log('[createClientWalkRequest] Validating window:', window_start, window_end);
   const windowErr = validateTimeWindow(window_start, window_end);
-  if (windowErr) throw new Error(windowErr);
+  if (windowErr) {
+    log('[createClientWalkRequest] Invalid window:', windowErr);
+    throw new Error(windowErr);
+  }
 
   // 1. Insert client_walk_request
+  log('[createClientWalkRequest] Inserting client_walk_request:', {
+    user_id,
+    tenant_id,
+    walk_date,
+    window_start,
+    window_end,
+    walk_length_minutes,
+    ...rest
+  });
   const { data, error } = await server.supabase
     .from('client_walk_requests')
     .insert({
@@ -44,7 +64,11 @@ export default async function createClientWalkRequest(server, payload) {
     })
     .select('*')
     .single();
-  if (error) throw error;
+  if (error) {
+    log('[createClientWalkRequest] ERROR inserting client_walk_request:', error);
+    throw error;
+  }
+  log('[createClientWalkRequest] Inserted client_walk_request:', data);
 
   // 2. Insert service_dogs for each dog
   if (Array.isArray(dog_ids) && dog_ids.length) {
@@ -53,32 +77,59 @@ export default async function createClientWalkRequest(server, payload) {
       service_id: data.id,
       dog_id,
     }));
+    log('[createClientWalkRequest] Inserting service_dogs:', dogRows);
     const { error: dogError } = await server.supabase
       .from('service_dogs')
       .insert(dogRows);
-    if (dogError) throw dogError;
+    if (dogError) {
+      log('[createClientWalkRequest] ERROR inserting service_dogs:', dogError);
+      throw dogError;
+    }
+    log('[createClientWalkRequest] Inserted service_dogs.');
+  } else {
+    log('[createClientWalkRequest] No dog_ids to insert into service_dogs.');
   }
 
   // 3. Get price estimate using previewPrice
   let price_preview = null;
   if (tenant_id) {
-    price_preview = await previewPrice(server, 'walk_window', {
+    log('[createClientWalkRequest] Fetching price_preview with:', {
       tenant_id,
       walk_length_minutes,
       dog_ids: dog_ids || [],
     });
+    try {
+      price_preview = await previewPrice(server, 'walk_window', {
+        tenant_id,
+        walk_length_minutes,
+        dog_ids: dog_ids || [],
+      });
+      log('[createClientWalkRequest] Got price_preview:', price_preview);
+    } catch (err) {
+      log('[createClientWalkRequest] ERROR in previewPrice:', err);
+    }
+  } else {
+    log('[createClientWalkRequest] No tenant_id; skipping price preview.');
   }
 
   // 4. Try to fetch pending_service row by request_id (cart row for UI)
   let pending_service = null;
   try {
+    log('[createClientWalkRequest] About to fetch pending_service by request_id:', data.id);
     pending_service = await getPendingServiceByRequestId(server, data.id);
+    log('[createClientWalkRequest] Got pending_service:', pending_service);
   } catch (err) {
-    // Optionally: log and continue (don't crash on missing pending_service)
-    log('Pending_service not found for request_id:', data.id);
+    log('[createClientWalkRequest] ERROR fetching pending_service:', err, 'request_id:', data.id);
   }
 
-  log('Created client_walk_request:', data);
+  log('[createClientWalkRequest] FINAL RESPONSE:', {
+    walk_request: {
+      ...data,
+      dog_ids: dog_ids || [],
+      price_preview,
+    },
+    pending_service
+  });
 
   return {
     walk_request: {
