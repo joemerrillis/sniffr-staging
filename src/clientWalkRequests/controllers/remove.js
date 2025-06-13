@@ -1,6 +1,6 @@
 // controllers/clientWalkRequests/remove.js
 import getUserId from './getUserId.js';
-import { deleteClientWalkRequest } from '../services/deleteClientWalkRequest.js';
+import deleteClientWalkRequest from '../services/deleteClientWalkRequest.js';
 
 export default async function remove(request, reply) {
   const userId = getUserId(request);
