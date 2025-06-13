@@ -148,6 +148,8 @@ await createPendingServiceForWalkRequest(server, {
       dog_ids: dog_ids || [],
       price_preview, // Attach price here for parity with windows flow
     },
-    pending_service
+    pending_service,
+    service_dogs,
+    price_preview
   };
 }
