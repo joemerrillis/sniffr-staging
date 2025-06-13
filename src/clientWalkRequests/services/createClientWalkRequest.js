@@ -62,7 +62,7 @@ export default async function createClientWalkRequest(server, payload) {
   // 3. Get price estimate using previewPrice
   let price_preview = null;
   if (tenant_id) {
-    price_preview = await previewPrice(server, 'walk_request', {
+    price_preview = await previewPrice(server, 'walk_window', {
       tenant_id,
       walk_length_minutes,
       dog_ids: dog_ids || [],
