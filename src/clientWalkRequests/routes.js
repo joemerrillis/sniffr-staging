@@ -5,11 +5,15 @@ import {
   getRequest,
   createRequest,
   updateRequest,
-  deleteRequest
-} from './controllers/clientWalkRequestsController.js';
+  deleteRequest,
+} from './controllers/index.js'; // <-- Import from index.js
+
 import {
   CreateClientWalkRequest,
-  UpdateClientWalkRequest
+  UpdateClientWalkRequest,
+  ClientWalkRequest,
+  RequestsEnvelope,
+  RequestEnvelope,
 } from './schemas/clientWalkRequestsSchemas.js';
 
 export default async function routes(fastify, opts) {
@@ -21,9 +25,9 @@ export default async function routes(fastify, opts) {
         description: 'List all walk requests for the authenticated client.',
         tags: ['ClientWalkRequests'],
         response: {
-          200: { $ref: 'RequestsEnvelope#' }
-        }
-      }
+          200: RequestsEnvelope,
+        },
+      },
     },
     listRequests
   );
@@ -38,12 +42,12 @@ export default async function routes(fastify, opts) {
         params: {
           type: 'object',
           properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
+          required: ['id'],
         },
         response: {
-          200: { $ref: 'RequestEnvelope#' }
-        }
-      }
+          200: RequestEnvelope,
+        },
+      },
     },
     getRequest
   );
@@ -60,12 +64,12 @@ export default async function routes(fastify, opts) {
           201: {
             type: 'object',
             properties: {
-              request: { $ref: 'ClientWalkRequest#' },
-              pending_service: { type: 'object' }
-            }
-          }
-        }
-      }
+              request: ClientWalkRequest,
+              pending_service: { type: 'object' },
+            },
+          },
+        },
+      },
     },
     createRequest
   );
@@ -80,13 +84,13 @@ export default async function routes(fastify, opts) {
         params: {
           type: 'object',
           properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
+          required: ['id'],
         },
         body: UpdateClientWalkRequest,
         response: {
-          200: { $ref: 'RequestEnvelope#' }
-        }
-      }
+          200: RequestEnvelope,
+        },
+      },
     },
     updateRequest
   );
@@ -101,10 +105,10 @@ export default async function routes(fastify, opts) {
         params: {
           type: 'object',
           properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
+          required: ['id'],
         },
-        response: { 204: { type: 'null' } }
-      }
+        response: { 204: { type: 'null' } },
+      },
     },
     deleteRequest
   );
