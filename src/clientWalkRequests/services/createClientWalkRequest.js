@@ -111,8 +111,19 @@ export default async function createClientWalkRequest(server, payload) {
   } else {
     log('[createClientWalkRequest] No tenant_id; skipping price preview.');
   }
-
-  // 4. Try to fetch pending_service row by request_id (cart row for UI)
+// 4. Actually insert the pending_service!
+log('[createClientWalkRequest] About to call createPendingServiceForWalkRequest');
+await createPendingServiceForWalkRequest(server, {
+  user_id,
+  tenant_id,
+  walk_date,
+  dog_ids,
+  window_start,
+  window_end,
+  walk_length_minutes,
+  request_id: data.id
+});
+  // 5. Try to fetch pending_service row by request_id (cart row for UI)
   let pending_service = null;
   try {
     log('[createClientWalkRequest] About to fetch pending_service by request_id:', data.id);
