@@ -35,7 +35,8 @@ export async function createRequest(request, reply) {
   console.log('Original request body:', request.body);
   // --- LOGGING ENDS HERE ---
 
-  const { walk_date, window_start, window_end, dog_ids } = request.body;
+  // Destructure walk_length_minutes too!
+  const { walk_date, window_start, window_end, dog_ids, walk_length_minutes } = request.body;
 
   // Determine the correct tenant_id
   let tenant_id = null;
@@ -61,8 +62,16 @@ export async function createRequest(request, reply) {
     console.log('Resolved tenant_id from tenant_clients:', tenant_id);
   }
 
-  // Compose payload including dog_ids array
-  const payload = { user_id: userId, tenant_id, walk_date, window_start, window_end, dog_ids };
+  // Compose payload including walk_length_minutes!
+  const payload = {
+    user_id: userId,
+    tenant_id,
+    walk_date,
+    window_start,
+    window_end,
+    dog_ids,
+    walk_length_minutes
+  };
 
   // Log the final payload that will be sent to the service/DB:
   console.log('Final payload sent to service:', payload);
@@ -70,9 +79,8 @@ export async function createRequest(request, reply) {
   try {
     // Service now returns: { walk_request, pending_service }
     const { walk_request, pending_service } = await createClientWalkRequest(request.server, payload);
-    reply.code(201).send({ request: walk_request, pending_service }); // <-- changed key!
+    reply.code(201).send({ request: walk_request, pending_service });
   } catch (e) {
-    // Optional: You could also sanitize the error message here
     reply.code(400).send({ error: e.message || e });
   }
 }
