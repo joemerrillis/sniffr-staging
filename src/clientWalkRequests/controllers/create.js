@@ -15,7 +15,7 @@ export default async function create(request, reply) {
     return reply.code(400).send({ error: 'window_start must be before window_end.' });
 
   try {
-    const result = await orchestrateCreateClientWalkRequest(request, {
+    const result = await createClientWalkRequest(request, {
       walk_date, window_start, window_end, dog_ids, walk_length_minutes, user_id: userId
     });
     reply.code(201).send(result);
