@@ -70,25 +70,28 @@ export default async function createClientWalkRequest(server, payload) {
   }
   log('[createClientWalkRequest] Inserted client_walk_request:', data);
 
-  // 2. Insert service_dogs for each dog
-  if (Array.isArray(dog_ids) && dog_ids.length) {
-    const dogRows = dog_ids.map(dog_id => ({
-      service_type: 'client_walk_request',
-      service_id: data.id,
-      dog_id,
-    }));
-    log('[createClientWalkRequest] Inserting service_dogs:', dogRows);
-    const { error: dogError } = await server.supabase
-      .from('service_dogs')
-      .insert(dogRows);
-    if (dogError) {
-      log('[createClientWalkRequest] ERROR inserting service_dogs:', dogError);
-      throw dogError;
-    }
-    log('[createClientWalkRequest] Inserted service_dogs.');
-  } else {
-    log('[createClientWalkRequest] No dog_ids to insert into service_dogs.');
+let service_dogs = [];
+if (Array.isArray(dog_ids) && dog_ids.length) {
+  const dogRows = dog_ids.map(dog_id => ({
+    service_type: 'client_walk_request',
+    service_id: data.id,
+    dog_id,
+  }));
+  log('[createClientWalkRequest] Inserting service_dogs:', dogRows);
+  const { data: insertedDogs, error: dogError } = await server.supabase
+    .from('service_dogs')
+    .insert(dogRows)
+    .select('*');
+  if (dogError) {
+    log('[createClientWalkRequest] ERROR inserting service_dogs:', dogError);
+    throw dogError;
   }
+  log('[createClientWalkRequest] Inserted service_dogs:', insertedDogs);
+  service_dogs = insertedDogs || [];
+} else {
+  log('[createClientWalkRequest] No dog_ids to insert into service_dogs.');
+}
+
 
   // 3. Get price estimate using previewPrice
   let price_preview = null;
