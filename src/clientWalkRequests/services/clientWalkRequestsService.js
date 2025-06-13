@@ -1,5 +1,7 @@
 // src/clientWalkRequests/services/clientWalkRequestsService.js
 
+import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
+
 // Helper to fetch dog_ids for a set of walk request IDs
 async function getDogIdsForRequests(server, requestIds) {
   if (!requestIds.length) return {};
@@ -26,11 +28,9 @@ export async function listClientWalkRequests(server, userId) {
     .order('walk_date', { ascending: true });
   if (error) throw error;
 
-  // Get all request IDs
   const requestIds = data.map(req => req.id);
   const dogMap = await getDogIdsForRequests(server, requestIds);
 
-  // Attach dog_ids to each request
   return data.map(req => ({
     ...req,
     dog_ids: dogMap[req.id] || [],
@@ -46,7 +46,6 @@ export async function getClientWalkRequest(server, userId, id) {
     .single();
   if (error) throw error;
 
-  // Fetch dog_ids for this request
   const { data: dogs, error: dogError } = await server.supabase
     .from('service_dogs')
     .select('dog_id')
@@ -60,19 +59,71 @@ export async function getClientWalkRequest(server, userId, id) {
   };
 }
 
+// --- Helper: create pending_services row and attach price breakdown ---
+async function createPendingServiceForWalkRequest(server, { user_id, tenant_id, walk_date, dog_ids, window_start, window_end, walk_length_minutes, request_id }) {
+  // Get price preview
+  const context = {
+    tenant_id,
+    user_id,
+    walk_length_minutes,
+    walk_date,
+    dog_ids
+  };
+  const pricePreview = await previewPrice(server, 'walk', context);
+
+  // Insert into pending_services
+  const pendingInsert = {
+    user_id,
+    tenant_id,
+    service_date: walk_date,
+    service_type: 'walk',
+    request_id,
+    dog_ids,
+    details: {
+      window_start,
+      window_end,
+      walk_length_minutes
+    },
+    is_confirmed: false,
+    price_preview: pricePreview,
+    created_at: new Date().toISOString()
+  };
+
+  const { data: pendingServiceRows, error: pendingError } = await server.supabase
+    .from('pending_services')
+    .insert([pendingInsert])
+    .select('*');
+  if (pendingError) throw pendingError;
+
+  // Return the pending_service row enriched with price_preview
+  return {
+    ...pendingServiceRows[0],
+    price_preview: pricePreview
+  };
+}
+
 export async function createClientWalkRequest(server, payload) {
-  // FIX: Explicitly destructure tenant_id from payload
-  const { dog_ids, window_start, window_end, walk_date, user_id, tenant_id, ...rest } = payload;
+  const {
+    dog_ids,
+    window_start,
+    window_end,
+    walk_date,
+    walk_length_minutes,
+    user_id,
+    tenant_id,
+    ...rest
+  } = payload;
 
   // 1. Insert client_walk_request
   const { data, error } = await server.supabase
     .from('client_walk_requests')
     .insert({
       user_id,
-      tenant_id, // Make sure tenant_id is included in insert!
+      tenant_id,
       walk_date,
       window_start,
       window_end,
+      walk_length_minutes,
       ...rest
     })
     .select('*')
@@ -92,27 +143,17 @@ export async function createClientWalkRequest(server, payload) {
     if (dogError) throw dogError;
   }
 
-  // 3. Insert into pending_services (the cart) for immediate UI update
-  const pendingInsert = {
+  // 3. Insert into pending_services (with price breakdown)
+  const pending_service = await createPendingServiceForWalkRequest(server, {
     user_id,
-    tenant_id, 
-    service_date: walk_date,
-    service_type: 'walk',
-    request_id: data.id,
+    tenant_id,
+    walk_date,
     dog_ids,
-    details: {
-      window_start,
-      window_end,
-    },
-    is_confirmed: false,
-  };
-
-  const { data: pendingServiceRows, error: pendingError } = await server.supabase
-    .from('pending_services')
-    .insert([pendingInsert])
-    .select('*');
-
-  if (pendingError) throw pendingError;
+    window_start,
+    window_end,
+    walk_length_minutes,
+    request_id: data.id
+  });
 
   // 4. Return walk request and the new cart row for controller/UI
   return {
@@ -120,15 +161,14 @@ export async function createClientWalkRequest(server, payload) {
       ...data,
       dog_ids: dog_ids || [],
     },
-    pending_service: pendingServiceRows[0] || null,
+    pending_service
   };
 }
 
 export async function updateClientWalkRequest(server, userId, id, payload) {
-  // Separate out dog_ids if present
   const { dog_ids, ...rest } = payload;
 
-  // 1. Update the main walk request fields (if any)
+  // 1. Update the main walk request fields
   const { data, error } = await server.supabase
     .from('client_walk_requests')
     .update(rest)
@@ -138,17 +178,14 @@ export async function updateClientWalkRequest(server, userId, id, payload) {
     .single();
   if (error) throw error;
 
-  // 2. If dog_ids array provided, update service_dogs entries
+  // 2. If dog_ids provided, update service_dogs
   if (Array.isArray(dog_ids)) {
-    // a) Delete existing entries for this request
-    const { error: delErr } = await server.supabase
+    await server.supabase
       .from('service_dogs')
       .delete()
       .eq('service_type', 'client_walk_request')
       .eq('service_id', id);
-    if (delErr) throw delErr;
 
-    // b) Insert new dog_ids
     if (dog_ids.length) {
       const dogRows = dog_ids.map(dog_id => ({
         service_type: 'client_walk_request',
