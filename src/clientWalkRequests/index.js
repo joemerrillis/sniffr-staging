@@ -6,7 +6,8 @@ import {
   RequestsEnvelope,
   RequestEnvelope,
   CreateClientWalkRequest,
-  UpdateClientWalkRequest
+  UpdateClientWalkRequest,
+  ServiceDog
 } from './schemas/clientWalkRequestsSchemas.js';
 
 export default fp(async function clientWalkRequestsModule(fastify, opts) {
@@ -15,5 +16,6 @@ export default fp(async function clientWalkRequestsModule(fastify, opts) {
   fastify.addSchema(RequestEnvelope);
   fastify.addSchema(CreateClientWalkRequest);
   fastify.addSchema(UpdateClientWalkRequest);
+  fastiry.addSchema(ServiceDog);
   fastify.register(routes, opts);
 });
