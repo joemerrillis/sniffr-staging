@@ -10,5 +10,5 @@ export {
   list as listRequest,
   retrieve as retrieveRequest,
   update as updateRequest,
-  remove as removeRequest,
+  remove as deleteRequest,
 };
