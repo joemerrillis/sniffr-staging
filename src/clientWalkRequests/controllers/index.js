@@ -8,7 +8,7 @@ import remove from './remove.js';
 export {
   create as createRequest,
   list as listRequest,
-  retrieve as retrieveRequest,
+  retrieve as getRequest,
   update as updateRequest,
   remove as deleteRequest,
 };
