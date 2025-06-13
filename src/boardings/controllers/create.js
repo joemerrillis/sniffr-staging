@@ -4,6 +4,46 @@ import validateBlockTimeFields from './validateBlockTimeFields.js';
 import { createBoarding } from '../services/index.js';
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
+// Helper: Checks if any dog has a negative sentiment with any other dog in the cohort during the booking dates
+async function needsApproval(server, tenant_id, dog_ids, drop_off_day, pick_up_day) {
+  // For simplicity, check for *any* negative sentiment involving any of the dogs during the period
+  const { data, error } = await server.supabase
+    .from('dog_cohorts')
+    .select('dog_id, co_dog_id, start_date, end_date, sentiment')
+    .in('dog_id', dog_ids)
+    .gte('end_date', drop_off_day)
+    .lte('start_date', pick_up_day)
+    .eq('sentiment', 'negative');
+
+  if (error) {
+    console.error('[BoardingCreate] Error checking dog_cohorts for negative sentiment:', error);
+    // Be safe: require approval if we can't check
+    return true;
+  }
+
+  return data && data.length > 0;
+}
+
+async function createPendingServiceForBoarding(server, boarding) {
+  // Insert a pending_services row for this boarding
+  const { data, error } = await server.supabase
+    .from('pending_services')
+    .insert([{
+      user_id: boarding.user_id,
+      tenant_id: boarding.tenant_id,
+      service_date: boarding.drop_off_day,
+      service_type: 'boarding',
+      boarding_request_id: boarding.id,
+      dog_ids: boarding.dogs,
+      details: { drop_off_day: boarding.drop_off_day, pick_up_day: boarding.pick_up_day },
+      is_confirmed: false,
+      created_at: new Date().toISOString()
+    }]);
+  if (error) {
+    console.error('[BoardingCreate] Failed to insert into pending_services:', error);
+  }
+}
+
 export default async function create(request, reply) {
   const userId = getUserId(request);
   let {
@@ -65,6 +105,16 @@ export default async function create(request, reply) {
     }
   }
 
+  // 1. Check if this boarding requires approval (any negative sentiment in cohort)
+  let requiresApproval = await needsApproval(
+    request.server,
+    tenant_id,
+    dogs,
+    drop_off_day,
+    pick_up_day
+  );
+
+  // 2. Create the boarding row (may be draft or pending_approval)
   const payload = {
     tenant_id,
     user_id: userId,
@@ -82,12 +132,18 @@ export default async function create(request, reply) {
     booking_id,
     is_draft,
     final_price,
-    dogs
+    dogs,
+    status: requiresApproval ? 'pending_approval' : 'draft'
   };
 
   try {
     const { boarding, service_dogs } = await createBoarding(request.server, payload);
-    reply.code(201).send({ boarding, service_dogs, breakdown });
+
+    // 3. If auto-approved, add to pending_services
+    if (!requiresApproval) {
+      await createPendingServiceForBoarding(request.server, boarding);
+    }
+    reply.code(201).send({ boarding, service_dogs, breakdown, requiresApproval });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
