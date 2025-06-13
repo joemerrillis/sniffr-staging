@@ -71,3 +71,17 @@ export const UpdateClientWalkRequest = {
     walk_length_minutes: { type: 'integer', minimum: 1 }
   }
 };
+
+// ---------- ServiceDog schema added below! ----------
+
+export const ServiceDog = {
+  $id: 'ServiceDog',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    service_type: { type: 'string' },
+    service_id: { type: 'string', format: 'uuid' },
+    dog_id: { type: 'string', format: 'uuid' }
+  },
+  required: ['id', 'service_type', 'service_id', 'dog_id']
+};
