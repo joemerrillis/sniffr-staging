@@ -49,7 +49,6 @@ export function buildPriceContext(serviceRow, logger) {
   return context;
 }
 
-
 export function groupCartServices(services) {
   const grouped = {};
 
@@ -57,15 +56,15 @@ export function groupCartServices(services) {
     let groupKey = service.service_type;
 
     // Special split for walk_window by id type
-if (service.service_type === 'walk_window') {
-  if (service.walk_window_id) {
-    groupKey = 'walk_window:walk_window_id';
-  } else if (service.request_id) {
-    groupKey = 'walk_window:request_id';
-  } else {
-    groupKey = 'walk_window:unknown';
-  }
-}
+    if (service.service_type === 'walk_window') {
+      if (service.walk_window_id) {
+        groupKey = 'walk_window:walk_window_id';
+      } else if (service.request_id) {
+        groupKey = 'walk_window:request_id';
+      } else {
+        groupKey = 'walk_window:unknown';
+      }
+    }
 
     if (!grouped[groupKey]) grouped[groupKey] = [];
     grouped[groupKey].push(service);
@@ -73,7 +72,6 @@ if (service.service_type === 'walk_window') {
 
   return grouped;
 }
-
 
 export async function enrichCartGroup(server, group, previewPrice, logger) {
   let total = 0;
@@ -83,6 +81,8 @@ export async function enrichCartGroup(server, group, previewPrice, logger) {
       logger('Processing cart item:', row.id, row);
       const context = buildPriceContext(row, logger);
       let service_type = row.service_type || context.service_type || 'walk_window';
+      // Normalize daycare to daycare_session for price matching
+      if (service_type === 'daycare') service_type = 'daycare_session';
       logger('Previewing price for service_type:', service_type, '| context:', context);
       const pricePreview = await previewPrice(server, service_type, context);
       logger('Price preview result:', pricePreview);
