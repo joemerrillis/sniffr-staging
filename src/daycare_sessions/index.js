@@ -4,7 +4,7 @@ import { daycareSessionSchemas } from './schemas/daycareSessionsSchemas.js';
 
 export default fp(async function daycareSessionsPlugin(fastify, opts) {
   // Register schemas (for response validation)
-  fastify.addSchema(daycareSessionSchemas.DaycareSession);
+ 
 
   // Register routes
   fastify.register(routes, { prefix: '/daycare_sessions' });
