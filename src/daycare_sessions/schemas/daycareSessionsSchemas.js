@@ -5,8 +5,8 @@ export const DaycareSession = {
     id:                  { type: 'string', format: 'uuid' },
     tenant_id:           { type: 'string', format: 'uuid' },
     user_id:             { type: 'string', format: 'uuid' },
-    service_date:        { type: 'string', format: 'date' },      // e.g. "2025-06-14"
-    drop_off_time:       { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' }, // "09:00"
+    service_date:        { type: 'string', format: 'date' },
+    drop_off_time:       { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     expected_pick_up_time:{ type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     pick_up_time:        { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     notes:               { type: ['string', 'null'] },
@@ -61,41 +61,51 @@ export const UpdateDaycareSession = {
   }
 };
 
-// Optionally, you can export as a bundle:
+// --- Envelope and Response Objects ---
+export const DaycareSessionEnvelope = {
+  $id: 'DaycareSessionEnvelope',
+  type: 'object',
+  properties: {
+    daycare_session: { $ref: 'DaycareSession#' },
+    pending_service: { type: ['object', 'null'] },
+    breakdown: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          rule_type: { type: 'string' },
+          description: { type: 'string' },
+          adjustment: { type: 'number' },
+          price_so_far: { type: 'number' }
+        },
+        required: ['id','name','rule_type','description','adjustment','price_so_far']
+      }
+    },
+    requiresApproval: { type: 'boolean' }
+  },
+  required: ['daycare_session']
+};
+
+// Optionally, for list endpoints:
+export const DaycareSessionsEnvelope = {
+  $id: 'DaycareSessionsEnvelope',
+  type: 'object',
+  properties: {
+    sessions: {
+      type: 'array',
+      items: { $ref: 'DaycareSession#' }
+    }
+  },
+  required: ['sessions']
+};
+
+// --- Bundle Export ---
 export const daycareSessionSchemas = {
   DaycareSession,
   CreateDaycareSession,
-  UpdateDaycareSession
+  UpdateDaycareSession,
+  DaycareSessionEnvelope,
+  DaycareSessionsEnvelope
 };
-
-
-  // --- Envelope and Response Objects ---
-  DaycareSessionEnvelope: {
-    $id: 'DaycareSessionEnvelope',
-    type: 'object',
-    properties: {
-      daycare_session: { $ref: 'DaycareSession#' },
-      pending_service: { type: ['object', 'null'] }, // see: PendingService#
-      breakdown: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-            name: { type: 'string' },
-            rule_type: { type: 'string' },
-            description: { type: 'string' },
-            adjustment: { type: 'number' },
-            price_so_far: { type: 'number' }
-          },
-          required: ['id','name','rule_type','description','adjustment','price_so_far']
-        }
-      },
-      requiresApproval: { type: 'boolean' }
-    },
-    required: ['daycare_session']
-  },
-
-  // ...You can also add a DaycareSessionsEnvelope (for lists) if needed...
-};
-
