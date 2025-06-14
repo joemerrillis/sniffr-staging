@@ -8,6 +8,16 @@ import {
 } from '../services/daycareSessionsService.js';
 import createDaycareSession from '../services/createDaycareSession.js';
 
+// Helper to fetch all owned dog_ids if needed
+async function fetchOwnedDogIds(server, user_id) {
+  const { data, error } = await server.supabase
+    .from('dog_owners')
+    .select('dog_id')
+    .eq('user_id', user_id);
+  if (error) return [];
+  return (data || []).map(row => row.dog_id);
+}
+
 // List all daycare sessions with optional filters
 export async function list(req, reply) {
   try {
@@ -30,16 +40,25 @@ export async function retrieve(req, reply) {
   }
 }
 
-// Create a new daycare session (with pricing, pending_service, approval check)
+// Create a new daycare session
 export async function create(req, reply) {
   try {
     const user_id = req.user?.id || req.body.user_id;
     const server = req.server;
-
-    // Normalize dog_ids if sent as dog_id
     let payload = { ...req.body, user_id };
-    if (payload.dog_id && !payload.dog_ids) {
-      payload.dog_ids = [payload.dog_id];
+
+    // Normalize dog_ids: use dog_id if present, or fetch all owned dogs if neither provided
+    if (!payload.dog_ids || !Array.isArray(payload.dog_ids) || payload.dog_ids.length === 0) {
+      if (payload.dog_id) {
+        payload.dog_ids = [payload.dog_id];
+      } else {
+        // Fetch all owned dog_ids for this user
+        const ownedDogIds = await fetchOwnedDogIds(server, user_id);
+        if (!ownedDogIds.length) {
+          return reply.code(400).send({ error: 'No dogs found for this user. Please specify at least one dog.' });
+        }
+        payload.dog_ids = ownedDogIds;
+      }
     }
 
     const {
