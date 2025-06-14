@@ -9,6 +9,9 @@ import {
 import { daycareSessionSchemas } from './schemas/daycareSessionsSchemas.js';
 
 export default async function routes(fastify, opts) {
+  // Register all schemas for $ref resolution
+  Object.values(daycareSessionSchemas).forEach(s => fastify.addSchema(s));
+
   // GET /daycare_sessions
   fastify.get(
     '/',
@@ -66,19 +69,14 @@ export default async function routes(fastify, opts) {
     retrieve
   );
 
-  // POST /daycare_sessions
+  // POST /daycare_sessions (envelope response!)
   fastify.post(
     '/',
     {
       schema: {
-        body: daycareSessionSchemas.CreateDaycareSession,
+        body: { $ref: 'CreateDaycareSession#' },
         response: {
-          201: {
-            type: 'object',
-            properties: {
-              session: { $ref: 'DaycareSession#' },
-            },
-          },
+          201: { $ref: 'DaycareSessionEnvelope#' }
         },
         tags: ['DaycareSessions'],
         summary: 'Create a daycare session',
@@ -99,7 +97,7 @@ export default async function routes(fastify, opts) {
           },
           required: ['id'],
         },
-        body: daycareSessionSchemas.UpdateDaycareSession,
+        body: { $ref: 'UpdateDaycareSession#' },
         response: {
           200: {
             type: 'object',
