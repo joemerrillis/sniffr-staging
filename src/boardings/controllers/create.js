@@ -6,7 +6,6 @@ import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
 // Helper: Checks if any dog has a negative sentiment with any other dog in the cohort during the booking dates
 async function needsApproval(server, tenant_id, dog_ids, drop_off_day, pick_up_day) {
-  // For simplicity, check for *any* negative sentiment involving any of the dogs during the period
   const { data, error } = await server.supabase
     .from('dog_cohorts')
     .select('dog_id, co_dog_id, start_date, end_date, sentiment')
@@ -17,15 +16,30 @@ async function needsApproval(server, tenant_id, dog_ids, drop_off_day, pick_up_d
 
   if (error) {
     console.error('[BoardingCreate] Error checking dog_cohorts for negative sentiment:', error);
-    // Be safe: require approval if we can't check
-    return true;
+    return true; // Be safe: require approval if check fails
   }
-
   return data && data.length > 0;
 }
 
 async function createPendingServiceForBoarding(server, boarding) {
-  // Insert a pending_services row for this boarding
+  // Always use UUIDs for dog_ids
+  const dog_ids = Array.isArray(boarding.dogs)
+    ? boarding.dogs.map(d => typeof d === 'string' ? d : d.dog_id)
+    : [];
+
+  // Prevent duplicate inserts (idempotency)
+  const { data: existing, error: selectError } = await server.supabase
+    .from('pending_services')
+    .select('id')
+    .eq('boarding_request_id', boarding.id)
+    .maybeSingle();
+
+  if (existing) {
+    console.log('[BoardingCreate] Pending service already exists for this boarding.');
+    return existing;
+  }
+
+  // Insert pending_services row for this boarding
   const { data, error } = await server.supabase
     .from('pending_services')
     .insert([{
@@ -34,14 +48,19 @@ async function createPendingServiceForBoarding(server, boarding) {
       service_date: boarding.drop_off_day,
       service_type: 'boarding',
       boarding_request_id: boarding.id,
-      dog_ids: boarding.dogs,
+      dog_ids,
       details: { drop_off_day: boarding.drop_off_day, pick_up_day: boarding.pick_up_day },
       is_confirmed: false,
       created_at: new Date().toISOString()
-    }]);
+    }])
+    .select('*')
+    .single();
+
   if (error) {
     console.error('[BoardingCreate] Failed to insert into pending_services:', error);
+    return null;
   }
+  return data;
 }
 
 export default async function create(request, reply) {
@@ -65,6 +84,19 @@ export default async function create(request, reply) {
     dogs
   } = request.body;
 
+  // Normalize dogs to always be UUIDs
+  if (!Array.isArray(dogs) || !dogs.length) {
+    const { data: ownedDogs, error: dogErr } = await request.server.supabase
+      .from('dog_owners')
+      .select('dog_id')
+      .eq('user_id', userId);
+    if (dogErr) return reply.code(400).send({ error: 'Could not fetch user dogs.' });
+    dogs = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
+  } else {
+    dogs = dogs.map(d => typeof d === 'string' ? d : d.dog_id);
+  }
+
+  // Validate block/time fields
   let tenant;
   try {
     tenant = await getTenantConfig(request.server, tenant_id);
@@ -76,15 +108,7 @@ export default async function create(request, reply) {
     return reply.code(400).send({ error: blockTimeErr });
   }
 
-  if (!Array.isArray(dogs) || !dogs.length) {
-    const { data: ownedDogs, error: dogErr } = await request.server.supabase
-      .from('dog_owners')
-      .select('dog_id')
-      .eq('user_id', userId);
-    if (dogErr) return reply.code(400).send({ error: 'Could not fetch user dogs.' });
-    dogs = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
-  }
-
+  // Get price if not provided
   let pricingResult = null;
   let breakdown = [];
   if (!price || isNaN(Number(price))) {
@@ -105,7 +129,7 @@ export default async function create(request, reply) {
     }
   }
 
-  // 1. Check if this boarding requires approval (any negative sentiment in cohort)
+  // 1. Check if this boarding requires approval
   let requiresApproval = await needsApproval(
     request.server,
     tenant_id,
@@ -114,7 +138,10 @@ export default async function create(request, reply) {
     pick_up_day
   );
 
-  // 2. Create the boarding row (may be draft or pending_approval)
+  // 2. Set the correct initial status
+  const status = requiresApproval ? 'pending_approval' : 'confirmed';
+
+  // 3. Create the boarding row
   const payload = {
     tenant_id,
     user_id: userId,
@@ -130,20 +157,28 @@ export default async function create(request, reply) {
     proposed_pick_up_time,
     proposed_changes,
     booking_id,
-    is_draft,
+    is_draft: false, // Draft should be false if submitting for real
     final_price,
     dogs,
-    status: requiresApproval ? 'pending_approval' : 'draft'
+    status
   };
 
   try {
     const { boarding, service_dogs } = await createBoarding(request.server, payload);
 
-    // 3. If auto-approved, add to pending_services
+    // 4. If auto-approved, add to pending_services immediately
+    let pending_service = null;
     if (!requiresApproval) {
-      await createPendingServiceForBoarding(request.server, boarding);
+      pending_service = await createPendingServiceForBoarding(request.server, boarding);
     }
-    reply.code(201).send({ boarding, service_dogs, breakdown, requiresApproval });
+
+    reply.code(201).send({
+      boarding: { ...boarding, status },
+      service_dogs,
+      breakdown,
+      requiresApproval,
+      pending_service // include for symmetry with walks
+    });
   } catch (e) {
     reply.code(400).send({ error: e.message || e });
   }
