@@ -7,8 +7,9 @@ export async function create(req, reply) {
     const server = req.server;
     const payload = { ...req.body, user_id };
 
-    const { daycare_session, pending_service, breakdown, requiresApproval } =
-      await createDaycareSession(server, payload);
+const { daycare_session, pending_service, breakdown, requiresApproval } = 
+  await createDaycareSession(req.body, req.server); // Pass in the Fastify server
+
 
     reply.code(201).send({
       daycare_session,
