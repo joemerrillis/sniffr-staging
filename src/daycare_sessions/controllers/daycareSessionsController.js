@@ -1,36 +1,22 @@
-import {
-  listDaycareSessions,
-  getDaycareSession,
-  createDaycareSession,
-  updateDaycareSession,
-  deleteDaycareSession
-} from '../services/daycareSessionsService.js';
-
-export async function list(req, reply) {
-  const filters = req.query;
-  const sessions = await listDaycareSessions(filters);
-  reply.send({ sessions });
-}
-
-export async function retrieve(req, reply) {
-  const { id } = req.params;
-  const session = await getDaycareSession(id);
-  reply.send({ session });
-}
+import createDaycareSession from '../services/createDaycareSession.js';
 
 export async function create(req, reply) {
-  const session = await createDaycareSession(req.body);
-  reply.code(201).send({ session });
-}
+  try {
+    // Attach server/user context to payload if not present
+    const user_id = req.user?.id || req.body.user_id;
+    const server = req.server;
+    const payload = { ...req.body, user_id };
 
-export async function modify(req, reply) {
-  const { id } = req.params;
-  const session = await updateDaycareSession(id, req.body);
-  reply.send({ session });
-}
+    const { daycare_session, pending_service, breakdown, requiresApproval } =
+      await createDaycareSession(server, payload);
 
-export async function remove(req, reply) {
-  const { id } = req.params;
-  await deleteDaycareSession(id);
-  reply.code(204).send();
+    reply.code(201).send({
+      daycare_session,
+      pending_service,
+      breakdown,
+      requiresApproval
+    });
+  } catch (e) {
+    reply.code(400).send({ error: e.message || e });
+  }
 }
