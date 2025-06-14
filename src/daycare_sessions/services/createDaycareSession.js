@@ -77,7 +77,10 @@ export default async function createDaycareSession(payload, server) {
         service_type: 'daycare',
         daycare_request_id: data.id,
         dog_ids,
-        details: { service_date },
+        details: { 
+          service_date: session_date,
+          drop_off_time: payload.drop_off_time,
+          expected_pick_up_time: payload.expected_pick_up_time },
         is_confirmed: false,
         created_at: new Date().toISOString()
       })
