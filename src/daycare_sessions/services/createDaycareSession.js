@@ -4,11 +4,11 @@ import needsApproval from '../helpers/needsApproval.js';
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
 export default async function createDaycareSession(payload, server) {
-  const { tenant_id, user_id, service_date } = payload;
+  const { tenant_id, user_id, service_date, drop_off_time, expected_pick_up_time } = payload;
   let { dog_ids, ...rest } = payload;
 
-  // 1. Determine dogs to include (use provided or fetch from dog_owners)
-  if (!dog_ids || !dog_ids.length) {
+  // 1. Determine dog_ids to use
+  if (!dog_ids || !Array.isArray(dog_ids) || !dog_ids.length) {
     const { data: ownedDogs, error: dogErr } = await server.supabase
       .from('dog_owners')
       .select('dog_id')
@@ -18,7 +18,7 @@ export default async function createDaycareSession(payload, server) {
     if (!dog_ids.length) throw new Error('No dogs found for user.');
   }
 
-  // 2. Price preview (pass the right context!)
+  // 2. Price preview
   const pricingResult = await previewPrice(server, 'daycare_session', {
     tenant_id,
     service_date,
@@ -26,7 +26,6 @@ export default async function createDaycareSession(payload, server) {
   });
 
   if (pricingResult.error) throw new Error(pricingResult.error);
-
   const price = pricingResult.price;
   const breakdown = pricingResult.breakdown || [];
 
@@ -40,6 +39,8 @@ export default async function createDaycareSession(payload, server) {
       tenant_id,
       user_id,
       service_date,
+      drop_off_time,
+      expected_pick_up_time,
       price,
       status: requiresApproval ? 'pending_approval' : 'approved',
       ...rest
@@ -49,7 +50,7 @@ export default async function createDaycareSession(payload, server) {
 
   if (error) throw new Error(error.message);
 
-  // 5. Insert service_dogs rows
+  // 5. Insert service_dogs rows (link all dogs to this session)
   let insertedServiceDogs = [];
   if (dog_ids.length) {
     const dogRows = dog_ids.map(dog_id => ({
@@ -77,10 +78,11 @@ export default async function createDaycareSession(payload, server) {
         service_type: 'daycare',
         daycare_request_id: data.id,
         dog_ids,
-        details: { 
-          service_date: session_date,
-          drop_off_time: payload.drop_off_time,
-          expected_pick_up_time: payload.expected_pick_up_time },
+        details: {
+          service_date,
+          drop_off_time,
+          expected_pick_up_time
+        },
         is_confirmed: false,
         created_at: new Date().toISOString()
       })
