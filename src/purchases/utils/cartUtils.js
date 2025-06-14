@@ -16,8 +16,23 @@ export function buildPriceContext(serviceRow, logger) {
   if (!day_of_week && serviceRow.service_date) {
     day_of_week = new Date(serviceRow.service_date).getDay();
   }
+
   let window_start = serviceRow.window_start;
   if (!window_start && serviceRow.details?.start) window_start = serviceRow.details.start;
+
+  let hours;
+  if (serviceRow.service_type === 'daycare') {
+    const drop = serviceRow.drop_off_time || serviceRow.details?.drop_off_time;
+    const pick = serviceRow.expected_pick_up_time || serviceRow.details?.expected_pick_up_time;
+    if (drop && pick) {
+      const [dh, dm] = drop.split(':').map(Number);
+      const [ph, pm] = pick.split(':').map(Number);
+      hours = (ph + pm / 60) - (dh + dm / 60);
+      if (hours < 0) hours += 24;
+      hours = Math.round(hours * 100) / 100;
+    }
+  }
+
   const context = {
     tenant_id: serviceRow.tenant_id,
     user_id: serviceRow.user_id,
@@ -26,12 +41,14 @@ export function buildPriceContext(serviceRow, logger) {
     day_of_week,
     window_start,
     service_date: serviceRow.service_date,
+    hours,
     ...serviceRow.details,
     __raw: serviceRow
   };
   logger('Price context for serviceRow', serviceRow.id, ':', context);
   return context;
 }
+
 
 export function groupCartServices(services) {
   const grouped = {};
