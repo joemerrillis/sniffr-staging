@@ -7,7 +7,7 @@ import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 // Helper: Checks if any dog has a negative sentiment with any other dog in the cohort during the booking dates
 async function needsApproval(server, tenant_id, dog_ids, drop_off_day, pick_up_day) {
   const { data, error } = await server.supabase
-    .from('dog_cohorts')
+    .from('dog_cohort_overlap')
     .select('dog_id, co_dog_id, start_date, end_date, sentiment')
     .in('dog_id', dog_ids)
     .gte('end_date', drop_off_day)
@@ -15,7 +15,7 @@ async function needsApproval(server, tenant_id, dog_ids, drop_off_day, pick_up_d
     .eq('sentiment', 'negative');
 
   if (error) {
-    console.error('[BoardingCreate] Error checking dog_cohorts for negative sentiment:', error);
+    console.error('[BoardingCreate] Error checking dog_cohort_overlap for negative sentiment:', error);
     return true; // Be safe: require approval if check fails
   }
   return data && data.length > 0;
