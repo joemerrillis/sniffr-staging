@@ -8,7 +8,7 @@ import {
 } from '../services/daycareSessionsService.js';
 import createDaycareSession from '../services/createDaycareSession.js';
 
-// Helper to fetch all owned dog_ids if needed
+// Helper: fetch all owned dog_ids if needed
 async function fetchOwnedDogIds(server, user_id) {
   const { data, error } = await server.supabase
     .from('dog_owners')
@@ -40,19 +40,18 @@ export async function retrieve(req, reply) {
   }
 }
 
-// Create a new daycare session
+// Create a new daycare session (normalizes dog_ids from dog_id or dog_owners)
 export async function create(req, reply) {
   try {
     const user_id = req.user?.id || req.body.user_id;
     const server = req.server;
     let payload = { ...req.body, user_id };
 
-    // Normalize dog_ids: use dog_id if present, or fetch all owned dogs if neither provided
+    // Normalize dog_ids: use dog_id if present, otherwise fetch all owned dogs
     if (!payload.dog_ids || !Array.isArray(payload.dog_ids) || payload.dog_ids.length === 0) {
       if (payload.dog_id) {
         payload.dog_ids = [payload.dog_id];
       } else {
-        // Fetch all owned dog_ids for this user
         const ownedDogIds = await fetchOwnedDogIds(server, user_id);
         if (!ownedDogIds.length) {
           return reply.code(400).send({ error: 'No dogs found for this user. Please specify at least one dog.' });
@@ -64,13 +63,15 @@ export async function create(req, reply) {
     const {
       daycare_session,
       pending_service,
+      service_dogs,
       breakdown,
       requiresApproval,
-    } = await createDaycareSession(server, payload);
+    } = await createDaycareSession(payload, server);
 
     reply.code(201).send({
       daycare_session,
       pending_service,
+      service_dogs,
       breakdown,
       requiresApproval,
     });
