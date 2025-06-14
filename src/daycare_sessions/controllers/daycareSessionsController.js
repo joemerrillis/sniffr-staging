@@ -3,11 +3,12 @@
 import {
   listDaycareSessions,
   getDaycareSession,
-  createDaycareSession,
   updateDaycareSession,
   deleteDaycareSession
 } from '../services/daycareSessionsService.js';
+import createDaycareSession from '../services/createDaycareSession.js';
 
+// List all daycare sessions with optional filters
 export async function list(req, reply) {
   try {
     const filters = req.query;
@@ -18,6 +19,7 @@ export async function list(req, reply) {
   }
 }
 
+// Retrieve a single daycare session by ID
 export async function retrieve(req, reply) {
   try {
     const { id } = req.params;
@@ -28,14 +30,24 @@ export async function retrieve(req, reply) {
   }
 }
 
+// Create a new daycare session (with pricing, pending_service, approval check)
 export async function create(req, reply) {
   try {
     const user_id = req.user?.id || req.body.user_id;
     const server = req.server;
-    const payload = { ...req.body, user_id };
 
-    const { daycare_session, pending_service, breakdown, requiresApproval } =
-      await createDaycareSession(payload, server);
+    // Normalize dog_ids if sent as dog_id
+    let payload = { ...req.body, user_id };
+    if (payload.dog_id && !payload.dog_ids) {
+      payload.dog_ids = [payload.dog_id];
+    }
+
+    const {
+      daycare_session,
+      pending_service,
+      breakdown,
+      requiresApproval,
+    } = await createDaycareSession(server, payload);
 
     reply.code(201).send({
       daycare_session,
@@ -48,6 +60,7 @@ export async function create(req, reply) {
   }
 }
 
+// Update a daycare session by ID
 export async function modify(req, reply) {
   try {
     const { id } = req.params;
@@ -58,6 +71,7 @@ export async function modify(req, reply) {
   }
 }
 
+// Delete a daycare session by ID
 export async function remove(req, reply) {
   try {
     const { id } = req.params;
