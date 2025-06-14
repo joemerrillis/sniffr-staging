@@ -40,15 +40,15 @@ export function groupCartServices(services) {
     let groupKey = service.service_type;
 
     // Special split for walk_window by id type
-    if (service.service_type === 'walk_window') {
-      if (service.walk_window_id) {
-        groupKey = `walk_window:walk_window_id:${service.walk_window_id}`;
-      } else if (service.request_id) {
-        groupKey = `walk_window:request_id:${service.request_id}`;
-      } else {
-        groupKey = `walk_window:unknown`;
-      }
-    }
+if (service.service_type === 'walk_window') {
+  if (service.walk_window_id) {
+    groupKey = 'walk_window:walk_window_id';
+  } else if (service.request_id) {
+    groupKey = 'walk_window:request_id';
+  } else {
+    groupKey = 'walk_window:unknown';
+  }
+}
 
     if (!grouped[groupKey]) grouped[groupKey] = [];
     grouped[groupKey].push(service);
