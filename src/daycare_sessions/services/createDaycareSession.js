@@ -3,81 +3,43 @@
 import needsApproval from '../helpers/needsApproval.js';
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
 
-// Helper to compute hours as decimal between two "HH:mm" strings
-function computeHours(start, end) {
-  if (!start || !end) return undefined;
-  // Use built-in JS Date for pure time math (date part is irrelevant)
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  const startMins = sh * 60 + sm;
-  const endMins = eh * 60 + em;
-  let diff = endMins - startMins;
-  // If pickup is after midnight (shouldn't happen for daycare, but just in case)
-  if (diff < 0) diff += 24 * 60;
-  return +(diff / 60).toFixed(2); // force decimal, max two decimals
-}
+export default async function createDaycareSession(payload, server) {
+  const { tenant_id, user_id, service_date } = payload;
+  let { dog_ids, ...rest } = payload;
 
-export default async function createDaycareSession(server, payload) {
-  // Normalize and destructure
-  const {
+  // 1. Determine dogs to include (use provided or fetch from dog_owners)
+  if (!dog_ids || !dog_ids.length) {
+    const { data: ownedDogs, error: dogErr } = await server.supabase
+      .from('dog_owners')
+      .select('dog_id')
+      .eq('user_id', user_id);
+    if (dogErr) throw new Error('Could not fetch user dogs.');
+    dog_ids = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
+    if (!dog_ids.length) throw new Error('No dogs found for user.');
+  }
+
+  // 2. Price preview (pass the right context!)
+  const pricingResult = await previewPrice(server, 'daycare_session', {
     tenant_id,
-    user_id,
-    dog_id,         // Could be dog_id or dog_ids array (for multi-dog in future)
+    service_date,
     dog_ids,
-    service_date,
-    drop_off_time,
-    expected_pick_up_time,
-    notes,
-    // ...rest
-    ...rest
-  } = payload;
-
-  // Always have dog_ids as an array
-  const _dog_ids = Array.isArray(dog_ids)
-    ? dog_ids
-    : dog_id
-      ? [dog_id]
-      : [];
-
-  // Compute hours for pricing
-  const hours = computeHours(drop_off_time, expected_pick_up_time);
-
-  // Build context for pricing engine (MUST match rule_type: "daycare_session")
-  const pricingContext = {
-    tenant_id,
-    service_date,
-    hours,
-    dog_ids: _dog_ids,
-    // Any other context fields you want pricing rules to match on
-  };
-
-  // Price preview using the right rule_type
-  const pricingResult = await previewPrice(server, 'daycare_session', pricingContext);
+  });
 
   if (pricingResult.error) throw new Error(pricingResult.error);
+
   const price = pricingResult.price;
   const breakdown = pricingResult.breakdown || [];
 
-  // Approval check: (You may want to pass service_date + hours for the whole window)
-  const requiresApproval = await needsApproval(
-    server,
-    tenant_id,
-    _dog_ids,
-    service_date,
-    service_date // For daycare, dropoff/pickup is same date; pass both as same day
-  );
+  // 3. Approval logic
+  const requiresApproval = await needsApproval(server, tenant_id, dog_ids, service_date);
 
-  // Insert daycare session
+  // 4. Insert daycare session (no dog_ids column!)
   const { data, error } = await server.supabase
     .from('daycare_sessions')
     .insert({
       tenant_id,
       user_id,
       service_date,
-      drop_off_time,
-      expected_pick_up_time,
-      notes,
-      dog_ids: _dog_ids,
       price,
       status: requiresApproval ? 'pending_approval' : 'approved',
       ...rest
@@ -87,7 +49,23 @@ export default async function createDaycareSession(server, payload) {
 
   if (error) throw new Error(error.message);
 
-  // Insert pending_services if auto-approved
+  // 5. Insert service_dogs rows
+  let insertedServiceDogs = [];
+  if (dog_ids.length) {
+    const dogRows = dog_ids.map(dog_id => ({
+      service_type: 'daycare',
+      service_id: data.id,
+      dog_id,
+    }));
+    const { data: inserted, error: serviceDogErr } = await server.supabase
+      .from('service_dogs')
+      .insert(dogRows)
+      .select('*');
+    if (serviceDogErr) throw new Error(serviceDogErr.message);
+    insertedServiceDogs = inserted;
+  }
+
+  // 6. Insert into pending_services if not requiring approval
   let pending_service = null;
   if (!requiresApproval) {
     const { data: ps, error: psErr } = await server.supabase
@@ -98,12 +76,8 @@ export default async function createDaycareSession(server, payload) {
         service_date,
         service_type: 'daycare',
         daycare_request_id: data.id,
-        dog_ids: _dog_ids,
-        details: {
-          drop_off_time,
-          expected_pick_up_time,
-          hours
-        },
+        dog_ids,
+        details: { service_date },
         is_confirmed: false,
         created_at: new Date().toISOString()
       })
@@ -115,5 +89,11 @@ export default async function createDaycareSession(server, payload) {
     pending_service = ps;
   }
 
-  return { daycare_session: data, pending_service, breakdown, requiresApproval };
+  return {
+    daycare_session: { ...data, dogs: dog_ids },
+    pending_service,
+    service_dogs: insertedServiceDogs,
+    breakdown,
+    requiresApproval
+  };
 }
