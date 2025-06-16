@@ -11,6 +11,7 @@ import {
 
 import { dogMemoriesSchemas } from './schemas/dogMemoriesSchemas.js';
 import { getSignedUploadUrl } from './services/mediaProcessing.js';
+import { uploadToCloudflareImages } from './services/cloudflareImages.js';
 
 export default async function dogMemoriesRoutes(fastify, opts) {
   // Register schemas for Swagger validation (if not already global)
@@ -155,6 +156,40 @@ fastify.post(
     reply.send(result);
   }
 );
+
+  fastify.post('/dog-memories/upload', async (request, reply) => {
+  const { dog_ids, event_id, ...otherMeta } = request.body;
+  const file = request.files?.[0]; // Use fastify-multipart or similar
+
+  if (!file) return reply.code(400).send({ error: 'Image file required' });
+
+  // Metadata to send to Cloudflare
+  const metadata = {
+    dog_ids,
+    event_id,
+    ...otherMeta,
+  };
+
+  // Upload to Cloudflare
+  const cloudflareResp = await uploadToCloudflareImages({
+    fileBuffer: file.buffer,
+    fileName: file.filename,
+    metadata,
+  });
+
+  // Save to your DB (pseudo-code)
+  const newMemory = await insertDogMemory({
+    image_id: cloudflareResp.id,
+    dog_ids,
+    uploader_id: request.user.id,
+    event_id,
+    ...otherMeta,
+    // add the Cloudflare Images delivery URL
+    image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/<image_id>/<variant_name>`,
+  });
+
+  reply.code(201).send({ memory: newMemory });
+});
     remove
   );
 }
