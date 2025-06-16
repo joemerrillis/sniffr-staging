@@ -1,18 +1,3 @@
-// src/dog_memories/routes.js
-
-import { 
-  create, 
-  retrieve, 
-  listByDog, 
-  listByUploader, 
-  modify, 
-  remove 
-} from './controllers/dogMemoriesController.js';
-
-import { dogMemoriesSchemas } from './schemas/dogMemoriesSchemas.js';
-import { getSignedUploadUrl } from './services/mediaProcessing.js';
-import { uploadToCloudflareImages } from './services/cloudflareImages.js';
-
 export default async function dogMemoriesRoutes(fastify, opts) {
   // Register schemas for Swagger validation (if not already global)
   for (const schema of Object.values(dogMemoriesSchemas)) {
@@ -124,72 +109,73 @@ export default async function dogMemoriesRoutes(fastify, opts) {
         } }
       }
     },
+    remove
+  );
 
-fastify.post(
-  '/dog-memories/upload-url',
-  {
-    schema: {
-      tags: ['DogMemories'],
-      body: {
-        type: 'object',
-        properties: {
-          fileType: { type: 'string' },
-          fileExt: { type: 'string' }
-        },
-        required: ['fileType', 'fileExt']
-      },
-      response: {
-        200: {
+  // SIGNED UPLOAD URL (optional R2 support)
+  fastify.post(
+    '/dog-memories/upload-url',
+    {
+      schema: {
+        tags: ['DogMemories'],
+        body: {
           type: 'object',
           properties: {
-            uploadUrl: { type: 'string' },
-            publicUrl: { type: 'string' },
-            objectKey: { type: 'string' }
+            fileType: { type: 'string' },
+            fileExt: { type: 'string' }
+          },
+          required: ['fileType', 'fileExt']
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              uploadUrl: { type: 'string' },
+              publicUrl: { type: 'string' },
+              objectKey: { type: 'string' }
+            }
           }
         }
       }
+    },
+    async (request, reply) => {
+      const { fileType, fileExt } = request.body;
+      const result = await getSignedUploadUrl({ fileType, fileExt });
+      reply.send(result);
     }
-  },
-  async (request, reply) => {
-    const { fileType, fileExt } = request.body;
-    const result = await getSignedUploadUrl({ fileType, fileExt });
-    reply.send(result);
-  }
-);
-
-  fastify.post('/dog-memories/upload', async (request, reply) => {
-  const { dog_ids, event_id, ...otherMeta } = request.body;
-  const file = request.files?.[0]; // Use fastify-multipart or similar
-
-  if (!file) return reply.code(400).send({ error: 'Image file required' });
-
-  // Metadata to send to Cloudflare
-  const metadata = {
-    dog_ids,
-    event_id,
-    ...otherMeta,
-  };
-
-  // Upload to Cloudflare
-  const cloudflareResp = await uploadToCloudflareImages({
-    fileBuffer: file.buffer,
-    fileName: file.filename,
-    metadata,
-  });
-
-  // Save to your DB (pseudo-code)
-  const newMemory = await insertDogMemory({
-    image_id: cloudflareResp.id,
-    dog_ids,
-    uploader_id: request.user.id,
-    event_id,
-    ...otherMeta,
-    // add the Cloudflare Images delivery URL
-    image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/<image_id>/<variant_name>`,
-  });
-
-  reply.code(201).send({ memory: newMemory });
-});
-    remove
   );
+
+  // DIRECT UPLOAD TO CLOUDFLARE IMAGES
+  fastify.post('/dog-memories/upload', async (request, reply) => {
+    const { dog_ids, event_id, ...otherMeta } = request.body;
+    const file = request.files?.[0]; // Use fastify-multipart or similar
+
+    if (!file) return reply.code(400).send({ error: 'Image file required' });
+
+    // Metadata to send to Cloudflare
+    const metadata = {
+      dog_ids,
+      event_id,
+      ...otherMeta,
+    };
+
+    // Upload to Cloudflare
+    const cloudflareResp = await uploadToCloudflareImages({
+      fileBuffer: file.buffer,
+      fileName: file.filename,
+      metadata,
+    });
+
+    // Save to your DB (pseudo-code)
+    const newMemory = await insertDogMemory({
+      image_id: cloudflareResp.id,
+      dog_ids,
+      uploader_id: request.user.id,
+      event_id,
+      ...otherMeta,
+      image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
+    });
+
+    reply.code(201).send({ memory: newMemory });
+  });
 }
