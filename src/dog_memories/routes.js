@@ -1,8 +1,23 @@
+import { 
+  create, 
+  retrieve, 
+  listByDog, 
+  listByUploader, 
+  modify, 
+  remove 
+} from './controllers/dogMemoriesController.js';
+
+import { dogMemoriesSchemas } from './schemas/dogMemoriesSchemas.js';  // <-- THIS LINE
+
+import { getSignedUploadUrl } from './services/mediaProcessing.js';
+import { uploadToCloudflareImages } from './services/cloudflareImages.js';
+
 export default async function dogMemoriesRoutes(fastify, opts) {
   // Register schemas for Swagger validation (if not already global)
   for (const schema of Object.values(dogMemoriesSchemas)) {
     try { fastify.addSchema(schema); } catch (e) {}
   }
+
 
   // CREATE
   fastify.post(
