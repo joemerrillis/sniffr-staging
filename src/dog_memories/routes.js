@@ -161,7 +161,7 @@ export default async function dogMemoriesRoutes(fastify, opts) {
   );
 
   // DIRECT UPLOAD TO CLOUDFLARE IMAGES
-  fastify.post(
+ fastify.post(
   '/dog-memories/upload',
   {
     schema: {
@@ -170,11 +170,36 @@ export default async function dogMemoriesRoutes(fastify, opts) {
       description: 'Uploads an image file to Cloudflare Images and creates a new dog memory record.',
       // Optionally, define request body and response schemas here!
     }
-  }, async (request, reply) => {
-    const { dog_ids, event_id, ...otherMeta } = request.body;
-    const file = request.files?.[0]; // Use fastify-multipart or similar
+  },
+  async (request, reply) => {
+    const parts = request.parts();
+    let file, fields = {};
+
+    for await (const part of parts) {
+      if (part.file) {
+        file = part;
+      } else {
+        fields[part.fieldname] = part.value;
+      }
+    }
 
     if (!file) return reply.code(400).send({ error: 'Image file required' });
+
+    // Handle dog_ids as an array or string
+    const dog_ids = fields.dog_ids
+      ? Array.isArray(fields.dog_ids)
+        ? fields.dog_ids
+        : [fields.dog_ids]
+      : [];
+
+    // Optionally parse event_id and any other metadata
+    const event_id = fields.event_id || null;
+    const otherMeta = { ...fields };
+    delete otherMeta.dog_ids;
+    delete otherMeta.event_id;
+
+    // Read file stream into buffer
+    const fileBuffer = await streamToBuffer(file.file);
 
     // Metadata to send to Cloudflare
     const metadata = {
@@ -185,7 +210,7 @@ export default async function dogMemoriesRoutes(fastify, opts) {
 
     // Upload to Cloudflare
     const cloudflareResp = await uploadToCloudflareImages({
-      fileBuffer: file.buffer,
+      fileBuffer,
       fileName: file.filename,
       metadata,
     });
@@ -194,12 +219,21 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     const newMemory = await insertDogMemory({
       image_id: cloudflareResp.id,
       dog_ids,
-      uploader_id: request.user.id,
+      uploader_id: request.user?.id || null,
       event_id,
       ...otherMeta,
       image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
     });
 
     reply.code(201).send({ memory: newMemory });
-  });
+  }
+);
+
+// Helper function to read a stream to a buffer
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
