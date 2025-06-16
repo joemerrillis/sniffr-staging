@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyMultipart from 'fastify-multipart'; // <-- Added
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
@@ -27,6 +28,8 @@ import boardingsPlugin from './src/boardings/index.js';
 import daycareSessionsPlugin from './src/daycare_sessions/index.js';
 import purchasesPlugin from './src/purchases/index.js';
 import pricingRulesPlugin from './src/pricingRules/index.js';
+
+import dogMemoriesPlugin from './src/dog_memories/index.js'; // <-- Added
 
 dotenv.config();
 
@@ -66,6 +69,9 @@ await fastify.register(fastifySwaggerUi, {
 // --- Core (Supabase client, error hooks, logging) ---
 await fastify.register(corePlugin);
 
+// --- Register fastify-multipart (for file uploads) ---
+fastify.register(fastifyMultipart); // <-- Added here
+
 // --- Public health check (no auth required) ---
 fastify.get('/healthz', async () => ({ status: 'ok' }));
 
@@ -93,6 +99,8 @@ await fastify.register(boardingsPlugin, { prefix: '/boardings' });
 await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
 await fastify.register(purchasesPlugin, { prefix: '/purchases' });
 await fastify.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
+
+await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' }); // <-- Added here
 
 // --- GLOBAL ERROR HANDLER ---
 fastify.setErrorHandler((error, request, reply) => {
