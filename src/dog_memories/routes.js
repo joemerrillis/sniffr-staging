@@ -10,6 +10,7 @@ import {
 } from './controllers/dogMemoriesController.js';
 
 import { dogMemoriesSchemas } from './schemas/dogMemoriesSchemas.js';
+import { getSignedUploadUrl } from './services/mediaProcessing.js';
 
 export default async function dogMemoriesRoutes(fastify, opts) {
   // Register schemas for Swagger validation (if not already global)
@@ -122,6 +123,38 @@ export default async function dogMemoriesRoutes(fastify, opts) {
         } }
       }
     },
+
+fastify.post(
+  '/dog-memories/upload-url',
+  {
+    schema: {
+      tags: ['DogMemories'],
+      body: {
+        type: 'object',
+        properties: {
+          fileType: { type: 'string' },
+          fileExt: { type: 'string' }
+        },
+        required: ['fileType', 'fileExt']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            uploadUrl: { type: 'string' },
+            publicUrl: { type: 'string' },
+            objectKey: { type: 'string' }
+          }
+        }
+      }
+    }
+  },
+  async (request, reply) => {
+    const { fileType, fileExt } = request.body;
+    const result = await getSignedUploadUrl({ fileType, fileExt });
+    reply.send(result);
+  }
+);
     remove
   );
 }
