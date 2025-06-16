@@ -161,7 +161,16 @@ export default async function dogMemoriesRoutes(fastify, opts) {
   );
 
   // DIRECT UPLOAD TO CLOUDFLARE IMAGES
-  fastify.post('/dog-memories/upload', async (request, reply) => {
+  fastify.post(
+  '/dog-memories/upload',
+  {
+    schema: {
+      tags: ['DogMemories'],
+      summary: 'Directly upload a photo and create a memory',
+      description: 'Uploads an image file to Cloudflare Images and creates a new dog memory record.',
+      // Optionally, define request body and response schemas here!
+    }
+  }, async (request, reply) => {
     const { dog_ids, event_id, ...otherMeta } = request.body;
     const file = request.files?.[0]; // Use fastify-multipart or similar
 
