@@ -237,3 +237,4 @@ async function streamToBuffer(stream) {
   }
   return Buffer.concat(chunks);
 }
+}
