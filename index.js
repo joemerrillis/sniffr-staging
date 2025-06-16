@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
-import fastifyMultipart from 'fastify/multipart'; // <-- Added
+import fastifyMultipart from '@fastify/multipart'; // <-- Added
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
