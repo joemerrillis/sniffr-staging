@@ -17,12 +17,8 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     try { fastify.addSchema(schema); } catch (e) {}
   }
 
-  // TEST UPLOAD PAGE (move this up top, but anywhere inside is fine)
-  fastify.get('/dog-memories/test-upload',  {
-    schema: { /* ... */ },
-    preHandler: [] // disables default auth for this route
-  },
-              async (request, reply) => {
+  // TEST UPLOAD PAGE (public, for convenience)
+  fastify.get('/dog-memories/test-upload', async (request, reply) => {
     reply.type('text/html').send(`
       <form action="/dog-memories/upload" method="post" enctype="multipart/form-data">
         <input type="file" name="file"><br>
@@ -177,7 +173,7 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     }
   );
 
-  // DIRECT UPLOAD TO CLOUDFLARE IMAGES
+  // DIRECT UPLOAD TO CLOUDFLARE IMAGES - PUBLIC for browser testing!
   fastify.post(
     '/dog-memories/upload',
     {
@@ -185,7 +181,8 @@ export default async function dogMemoriesRoutes(fastify, opts) {
         tags: ['DogMemories'],
         summary: 'Directly upload a photo and create a memory',
         description: 'Uploads an image file to Cloudflare Images and creates a new dog memory record.',
-      }
+      },
+      preHandler: [] // <-- disables JWT/auth for this route
     },
     async (request, reply) => {
       fastify.log.info('Starting upload handler');
