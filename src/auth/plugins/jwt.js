@@ -21,23 +21,28 @@ export default fp(async function jwtPlugin(fastify, opts) {
     }
   });
 
-  // 3) Global onRequest hook that *skips* public paths
-  fastify.addHook('onRequest', async (request, reply) => {
-    const { method, url } = request.raw;
+// 3) Global onRequest hook that *skips* public paths
+fastify.addHook('onRequest', async (request, reply) => {
+  const { method, url } = request.raw;
 
-    // Allow unauthenticated access to:
-    //  - Health check: GET or HEAD on '/'
-    //  - All /auth routes (login, register, etc.)
-    //  - All /docs and /docs/json (Swagger UI and OpenAPI spec)
-    if (
-      (url === '/' && (method === 'GET' || method === 'HEAD')) ||
-      url.startsWith('/auth') ||
-      url.startsWith('/docs')
-    ) {
-      return;
-    }
+  // List of public (no-auth) paths
+  const publicPaths = [
+    '/',                         // Health check
+    '/auth',                     // All /auth routes
+    '/docs',                     // Swagger UI
+    '/docs/json',                // Swagger JSON
+    '/dog-memories/test-upload', // Your test upload form
+    '/dog-memories/upload'       // The direct upload endpoint (for now)
+  ];
 
-    // Everything else requires a valid JWT
-    await fastify.authenticate(request, reply);
-  });
+  // Allow unauthenticated access to: root GET/HEAD, any matching prefix in publicPaths
+  if (
+    (url === '/' && (method === 'GET' || method === 'HEAD')) ||
+    publicPaths.some(path => url === path || url.startsWith(path + '/'))
+  ) {
+    return;
+  }
+
+  // Everything else requires a valid JWT
+  await fastify.authenticate(request, reply);
 });
