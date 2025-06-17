@@ -1,6 +1,10 @@
 // src/dog_memories/models/dogMemoryModel.js
 
-import supabase from '../../core/supabase.js'; // Update this path to match your actual Supabase client location
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+export default supabase;
 
 const TABLE = 'dog_memories';
 
