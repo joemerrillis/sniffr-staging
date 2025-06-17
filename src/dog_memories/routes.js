@@ -9,7 +9,7 @@ import {
 
 import { dogMemoriesSchemas } from './schemas/dogMemoriesSchemas.js';
 
-import { getSignedUploadUrl } from './services/mediaProcessing.js';
+
 import { uploadToCloudflareImages } from './services/cloudflareImages.js';
 
 export default async function dogMemoriesRoutes(fastify, opts) {
