@@ -26,24 +26,33 @@ export default fp(async function jwtPlugin(fastify, opts) {
     const { method, url } = request.raw;
 
     // List of public (no-auth) paths
-    const publicPaths = [
-      '/',                         // Health check
-      '/auth',                     // All /auth routes
-      '/docs',                     // Swagger UI
-      '/docs/json',                // Swagger JSON
-      '/dog-memories/test-upload', // Test upload form
-      '/dog-memories/upload'       // Direct upload endpoint (for browser dev)
-    ];
+const publicPrefixes = [
+  '/auth',
+  '/docs',
+  '/dog-memories/test-upload',
+  '/dog-memories/upload'
+];
 
-    // Allow unauthenticated access to: root GET/HEAD, any matching prefix in publicPaths
-    if (
-      (url === '/' && (method === 'GET' || method === 'HEAD')) ||
-      publicPaths.some(path => url === path || url.startsWith(path + '/'))
-    ) {
-      return;
-    }
+fastify.addHook('onRequest', async (request, reply) => {
+  const { method, url } = request.raw;
 
-    // Everything else requires a valid JWT
-    await fastify.authenticate(request, reply);
-  });
+  // Health check root GET/HEAD
+  if (url === '/' && (method === 'GET' || method === 'HEAD')) {
+    return;
+  }
+
+  // Allow unauthenticated access to anything matching a public prefix
+  if (publicPrefixes.some(path => url === path || url.startsWith(path + '/'))) {
+    fastify.log.info({ url, method }, 'Public route hit, skipping JWT check');
+    return;
+  }
+
+  // Handle trailing slash edge case
+  if (url.replace(/\/$/, '') === '/dog-memories/upload') {
+    fastify.log.info({ url, method }, 'Public route hit (trailing slash), skipping JWT check');
+    return;
+  }
+
+  // All others require JWT
+  await fastify.authenticate(request, reply);
 });
