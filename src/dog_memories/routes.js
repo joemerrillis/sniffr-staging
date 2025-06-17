@@ -8,8 +8,7 @@ import {
 } from './controllers/dogMemoriesController.js';
 
 import { dogMemoriesSchemas } from './schemas/dogMemoriesSchemas.js';
-
-import { uploadToCloudflareImages } from './services/cloudflareImages.js';
+import { handleDogMemoryUpload } from './services/uploadHandler.js';
 
 export default async function dogMemoriesRoutes(fastify, opts) {
   // Register schemas for Swagger validation (if not already global)
@@ -18,55 +17,49 @@ export default async function dogMemoriesRoutes(fastify, opts) {
   }
 
   // TEST UPLOAD PAGE (public, for convenience)
- fastify.get('/dog-memories/test-upload', async (request, reply) => {
-  reply.type('text/html').send(`
-    <form id="uploadForm" action="/dog-memories/upload" method="post" enctype="multipart/form-data">
-      <input type="file" name="file"><br>
-      <input type="text" name="dog_ids" value="test-dog-id"><br>
-      <input type="text" name="event_id" value="test-event-id"><br>
-      <button type="submit">Upload</button>
-      <button type="button" id="cancelBtn">Cancel Upload</button>
-    </form>
-    <pre id="result"></pre>
-    <script>
-    let currentXHR = null;
-
-    document.getElementById('uploadForm').onsubmit = function(e) {
-      e.preventDefault();
-      const form = e.target;
-      const data = new FormData(form);
-      const resultBox = document.getElementById('result');
-      resultBox.textContent = "Uploading...";
-
-      // Use XMLHttpRequest for easy abort/cancel
-      currentXHR = new XMLHttpRequest();
-      currentXHR.open('POST', '/dog-memories/upload', true);
-      currentXHR.onload = function() {
-        resultBox.textContent = currentXHR.responseText;
-        currentXHR = null;
+  fastify.get('/dog-memories/test-upload', async (request, reply) => {
+    reply.type('text/html').send(`
+      <form id="uploadForm" action="/dog-memories/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required><br>
+        <input type="text" name="dog_ids" value="318aa1f8-f2ab-4f2b-92de-044a22b6c8ae" required><br>
+        <input type="text" name="event_id" value="98a40eb1-4f9c-4758-b0fa-778a7d92d377" required><br>
+        <button type="submit">Upload</button>
+        <button type="button" id="cancelBtn">Cancel Upload</button>
+      </form>
+      <pre id="result"></pre>
+      <script>
+      let currentXHR = null;
+      document.getElementById('uploadForm').onsubmit = function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = new FormData(form);
+        const resultBox = document.getElementById('result');
+        resultBox.textContent = "Uploading...";
+        currentXHR = new XMLHttpRequest();
+        currentXHR.open('POST', '/dog-memories/upload', true);
+        currentXHR.onload = function() {
+          resultBox.textContent = currentXHR.responseText;
+          currentXHR = null;
+        };
+        currentXHR.onerror = function() {
+          resultBox.textContent = "Upload failed.";
+          currentXHR = null;
+        };
+        currentXHR.send(data);
       };
-      currentXHR.onerror = function() {
-        resultBox.textContent = "Upload failed.";
-        currentXHR = null;
+      document.getElementById('cancelBtn').onclick = function() {
+        if (currentXHR) {
+          currentXHR.abort();
+          document.getElementById('result').textContent = "Upload canceled.";
+          currentXHR = null;
+        }
+        document.getElementById('uploadForm').reset();
       };
-      currentXHR.send(data);
-    };
+      </script>
+    `);
+  });
 
-    // Cancel button logic
-    document.getElementById('cancelBtn').onclick = function() {
-      if (currentXHR) {
-        currentXHR.abort();
-        document.getElementById('result').textContent = "Upload canceled.";
-        currentXHR = null;
-      }
-      document.getElementById('uploadForm').reset();
-    };
-    </script>
-  `);
-});
-
-
-  // CREATE
+  // CRUD routes
   fastify.post(
     '/dog-memories',
     {
@@ -79,7 +72,6 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     create
   );
 
-  // GET BY ID
   fastify.get(
     '/dog-memories/:id',
     {
@@ -91,7 +83,6 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     retrieve
   );
 
-  // LIST BY DOG
   fastify.get(
     '/dog-memories/dog/:dogId',
     {
@@ -117,7 +108,6 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     listByDog
   );
 
-  // LIST BY UPLOADER
   fastify.get(
     '/dog-memories/uploader/:userId',
     {
@@ -143,7 +133,6 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     listByUploader
   );
 
-  // UPDATE
   fastify.patch(
     '/dog-memories/:id',
     {
@@ -156,7 +145,6 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     modify
   );
 
-  // DELETE
   fastify.delete(
     '/dog-memories/:id',
     {
@@ -174,7 +162,7 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     remove
   );
 
-  // SIGNED UPLOAD URL (optional R2 support)
+  // SIGNED UPLOAD URL (optional R2 support, may want to refactor out later)
   fastify.post(
     '/dog-memories/upload-url',
     {
@@ -204,99 +192,23 @@ export default async function dogMemoriesRoutes(fastify, opts) {
       fastify.log.info('upload-url route called');
       const { fileType, fileExt } = request.body;
       fastify.log.info({ fileType, fileExt }, 'Received fileType and fileExt');
+      // You must implement getSignedUploadUrl in your services for this to work!
       const result = await getSignedUploadUrl({ fileType, fileExt });
       fastify.log.info({ result }, 'Signed upload URL generated');
       reply.send(result);
     }
   );
 
-fastify.post(
-  '/dog-memories/upload',
-  {
-    schema: { /* ... */ },
-    preHandler: []
-  },
-  async (request, reply) => {
-    fastify.log.info('Starting upload handler');
-    const parts = request.parts();
-    let file = null;
-    const fields = {};
-
-    for await (const part of parts) {
-      if (part.file) {
-        if (!file) {
-          fastify.log.info({ filename: part.filename, mimetype: part.mimetype }, 'File part received');
-          file = part;
-        } else {
-          // Already got a file, discard extra files
-          fastify.log.warn({ filename: part.filename }, 'Extra file part detected, discarding');
-          await part.file.resume();
-        }
-      } else if (part.fieldname) {
-        fastify.log.info({ field: part.fieldname, value: part.value }, 'Field part received');
-        fields[part.fieldname] = part.value;
-      }
+  // File upload (uses separate handler for sanity)
+  fastify.post(
+    '/dog-memories/upload',
+    {
+      schema: { /* ... */ },
+      preHandler: []
+    },
+    async (request, reply) => {
+      // Notice we pass fastify for logger
+      await handleDogMemoryUpload(request, reply, fastify);
     }
-    fastify.log.info('All parts processed, file and fields extracted');
-
-    if (!file) {
-      fastify.log.warn('No file uploaded!');
-      return reply.code(400).send({ error: 'Image file required' });
-    }
-
-    // Parse dog_ids to array (expects CSV string from form)
-    let dog_ids = [];
-    if (fields.dog_ids) {
-      dog_ids = Array.isArray(fields.dog_ids)
-        ? fields.dog_ids
-        : fields.dog_ids.split(',').map(id => id.trim()).filter(Boolean);
-    }
-
-    fastify.log.info('About to read file stream...');
-    let fileBuffer;
-    try {
-      fileBuffer = await streamToBuffer(file.file);
-      fastify.log.info('File buffer created, length: ' + fileBuffer.length);
-    } catch (err) {
-      fastify.log.error({ err }, 'Error while reading file stream to buffer');
-      return reply.code(500).send({ error: 'Could not read file upload' });
-    }
-
-    let cloudflareResp;
-    try {
-      fastify.log.info('About to upload to Cloudflare...');
-      cloudflareResp = await uploadToCloudflareImages({
-        fileBuffer,
-        fileName: file.filename,
-        metadata: { dog_ids, event_id: fields.event_id }
-      });
-      fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
-    } catch (err) {
-      fastify.log.error({ err }, 'Error during upload to Cloudflare Images');
-      return reply.code(502).send({ error: err.message || 'Failed to upload to Cloudflare Images' });
-    }
-
-    // You may want to require more fields depending on your DB schema!
-    try {
-      fastify.log.info('About to insert into DB...');
-      const newMemory = await insertDogMemory({
-        image_id: cloudflareResp.id,
-        dog_ids,
-        uploader_id: request.user?.id || null,
-        event_id: fields.event_id,
-        image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}`,
-        // Add any other required/default fields here (e.g., caption, event_type)
-        caption: fields.caption || 'Photo upload',
-        event_type: fields.event_type || 'manual'
-      });
-      fastify.log.info({ newMemory }, 'DB insert finished');
-
-      reply.code(201).send({ memory: newMemory });
-      fastify.log.info('Upload route completed');
-    } catch (err) {
-      fastify.log.error({ err }, 'Upload failed');
-      reply.code(500).send({ error: err.message || 'Upload failed' });
-    }
-  }
-);
+  );
 }
