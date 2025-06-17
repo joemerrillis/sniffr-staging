@@ -210,107 +210,60 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     }
   );
 
-  // DIRECT UPLOAD TO CLOUDFLARE IMAGES - PUBLIC for browser testing!
-  fastify.post(
-    '/dog-memories/upload',
-    {
-      schema: {
-        tags: ['DogMemories'],
-        summary: 'Directly upload a photo and create a memory',
-        description: 'Uploads an image file to Cloudflare Images and creates a new dog memory record.',
-      },
-      preHandler: [] // <-- disables JWT/auth for this route
-    },
-    async (request, reply) => {
-      fastify.log.info('Starting upload handler');
+fastify.post(
+  '/dog-memories/upload',
+  {
+    schema: { /* ... */ },
+    preHandler: []
+  },
+  async (request, reply) => {
+    // START logging here:
+    fastify.log.info('Starting upload handler');
+    const parts = request.parts();
+    let file, fields = {};
 
-      const parts = request.parts();
-      let file, fields = {};
-
-      for await (const part of parts) {
-        if (part.file) {
-          fastify.log.info({ filename: part.filename, mimetype: part.mimetype }, 'File part received');
-          file = part;
-        } else {
-          fastify.log.info({ field: part.fieldname, value: part.value }, 'Field part received');
-          fields[part.fieldname] = part.value;
-        }
+    for await (const part of parts) {
+      if (part.file) {
+        fastify.log.info({ filename: part.filename, mimetype: part.mimetype }, 'File part received');
+        file = part;
+      } else {
+        fastify.log.info({ field: part.fieldname, value: part.value }, 'Field part received');
+        fields[part.fieldname] = part.value;
       }
-
-      if (!file) {
-        fastify.log.warn('No file uploaded!');
-        return reply.code(400).send({ error: 'Image file required' });
-      }
-
-      fastify.log.info({ fields }, 'Parsed fields from upload');
-
-      // Handle dog_ids as an array or string
-      const dog_ids = fields.dog_ids
-        ? Array.isArray(fields.dog_ids)
-          ? fields.dog_ids
-          : [fields.dog_ids]
-        : [];
-
-      fastify.log.info({ dog_ids }, 'Parsed dog_ids');
-
-      // Optionally parse event_id and any other metadata
-      const event_id = fields.event_id || null;
-      fastify.log.info({ event_id }, 'Parsed event_id');
-
-      const otherMeta = { ...fields };
-      delete otherMeta.dog_ids;
-      delete otherMeta.event_id;
-
-      // Read file stream into buffer
-      fastify.log.info('Reading file stream into buffer...');
-      const fileBuffer = await streamToBuffer(file.file);
-      fastify.log.info({ fileBufferLength: fileBuffer.length }, 'File buffer created');
-
-      // Metadata to send to Cloudflare
-      const metadata = {
-        dog_ids,
-        event_id,
-        ...otherMeta,
-      };
-      fastify.log.info({ metadata }, 'Prepared metadata for Cloudflare');
-
-      // Upload to Cloudflare
-      let cloudflareResp;
-      try {
-        fastify.log.info('Uploading to Cloudflare Images...');
-        cloudflareResp = await uploadToCloudflareImages({
-          fileBuffer,
-          fileName: file.filename,
-          metadata,
-        });
-        fastify.log.info({ cloudflareResp }, 'Received response from Cloudflare');
-      } catch (err) {
-        fastify.log.error({ err }, 'Cloudflare upload failed');
-        return reply.code(500).send({ error: 'Cloudflare upload failed', details: err.message });
-      }
-
-      // Save to your DB (pseudo-code)
-      let newMemory;
-      try {
-        fastify.log.info('Inserting memory into DB...');
-        newMemory = await insertDogMemory({
-          image_id: cloudflareResp.id,
-          dog_ids,
-          uploader_id: request.user?.id || null,
-          event_id,
-          ...otherMeta,
-          image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
-        });
-        fastify.log.info({ newMemory }, 'Inserted memory into DB');
-      } catch (err) {
-        fastify.log.error({ err }, 'DB insert failed');
-        return reply.code(500).send({ error: 'DB insert failed', details: err.message });
-      }
-
-      reply.code(201).send({ memory: newMemory });
-      fastify.log.info('Upload route completed successfully');
     }
-  );
+    fastify.log.info('All parts processed, file and fields extracted');
+
+    if (!file) {
+      fastify.log.warn('No file uploaded!');
+      return reply.code(400).send({ error: 'Image file required' });
+    }
+
+    fastify.log.info('About to read file stream...');
+    const fileBuffer = await streamToBuffer(file.file);
+    fastify.log.info('File buffer created, length: ' + fileBuffer.length);
+
+    fastify.log.info('About to upload to Cloudflare...');
+    const cloudflareResp = await uploadToCloudflareImages({
+      fileBuffer,
+      fileName: file.filename,
+      metadata: { dog_ids: fields.dog_ids, event_id: fields.event_id } // example metadata
+    });
+    fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
+
+    fastify.log.info('About to insert into DB...');
+    const newMemory = await insertDogMemory({
+      image_id: cloudflareResp.id,
+      dog_ids: fields.dog_ids,
+      uploader_id: request.user?.id || null,
+      event_id: fields.event_id,
+      image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
+    });
+    fastify.log.info({ newMemory }, 'DB insert finished');
+
+    reply.code(201).send({ memory: newMemory });
+    fastify.log.info('Upload route completed');
+  }
+);
 
   // Helper function to read a stream to a buffer
   async function streamToBuffer(stream) {
