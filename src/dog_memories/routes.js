@@ -299,3 +299,4 @@ fastify.post(
     }
   }
 );
+}
