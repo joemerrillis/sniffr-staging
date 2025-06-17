@@ -275,3 +275,13 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     return buffer;
   }
 }
+fastify.get('/dog-memories/test-upload', async (request, reply) => {
+  reply.type('text/html').send(`
+    <form action="/dog-memories/upload" method="post" enctype="multipart/form-data">
+      <input type="file" name="file"><br>
+      <input type="text" name="dog_ids" value="test-dog-id"><br>
+      <input type="text" name="event_id" value="test-event-id"><br>
+      <button type="submit">Upload</button>
+    </form>
+  `);
+});
