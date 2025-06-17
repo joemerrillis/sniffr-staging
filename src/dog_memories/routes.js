@@ -18,16 +18,53 @@ export default async function dogMemoriesRoutes(fastify, opts) {
   }
 
   // TEST UPLOAD PAGE (public, for convenience)
-  fastify.get('/dog-memories/test-upload', async (request, reply) => {
-    reply.type('text/html').send(`
-      <form action="/dog-memories/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file"><br>
-        <input type="text" name="dog_ids" value="test-dog-id"><br>
-        <input type="text" name="event_id" value="test-event-id"><br>
-        <button type="submit">Upload</button>
-      </form>
-    `);
-  });
+ fastify.get('/dog-memories/test-upload', async (request, reply) => {
+  reply.type('text/html').send(`
+    <form id="uploadForm" action="/dog-memories/upload" method="post" enctype="multipart/form-data">
+      <input type="file" name="file"><br>
+      <input type="text" name="dog_ids" value="test-dog-id"><br>
+      <input type="text" name="event_id" value="test-event-id"><br>
+      <button type="submit">Upload</button>
+      <button type="button" id="cancelBtn">Cancel Upload</button>
+    </form>
+    <pre id="result"></pre>
+    <script>
+    let currentXHR = null;
+
+    document.getElementById('uploadForm').onsubmit = function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = new FormData(form);
+      const resultBox = document.getElementById('result');
+      resultBox.textContent = "Uploading...";
+
+      // Use XMLHttpRequest for easy abort/cancel
+      currentXHR = new XMLHttpRequest();
+      currentXHR.open('POST', '/dog-memories/upload', true);
+      currentXHR.onload = function() {
+        resultBox.textContent = currentXHR.responseText;
+        currentXHR = null;
+      };
+      currentXHR.onerror = function() {
+        resultBox.textContent = "Upload failed.";
+        currentXHR = null;
+      };
+      currentXHR.send(data);
+    };
+
+    // Cancel button logic
+    document.getElementById('cancelBtn').onclick = function() {
+      if (currentXHR) {
+        currentXHR.abort();
+        document.getElementById('result').textContent = "Upload canceled.";
+        currentXHR = null;
+      }
+      document.getElementById('uploadForm').reset();
+    };
+    </script>
+  `);
+});
+
 
   // CREATE
   fastify.post(
