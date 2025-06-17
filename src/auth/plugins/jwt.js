@@ -22,38 +22,34 @@ export default fp(async function jwtPlugin(fastify, opts) {
   });
 
   // 3) Global onRequest hook that *skips* public paths
+  const publicPrefixes = [
+    '/auth',
+    '/docs',
+    '/dog-memories/test-upload',
+    '/dog-memories/upload'
+  ];
+
   fastify.addHook('onRequest', async (request, reply) => {
     const { method, url } = request.raw;
 
-    // List of public (no-auth) paths
-const publicPrefixes = [
-  '/auth',
-  '/docs',
-  '/dog-memories/test-upload',
-  '/dog-memories/upload'
-];
+    // Health check root GET/HEAD
+    if (url === '/' && (method === 'GET' || method === 'HEAD')) {
+      return;
+    }
 
-fastify.addHook('onRequest', async (request, reply) => {
-  const { method, url } = request.raw;
+    // Allow unauthenticated access to anything matching a public prefix
+    if (publicPrefixes.some(path => url === path || url.startsWith(path + '/'))) {
+      fastify.log.info({ url, method }, 'Public route hit, skipping JWT check');
+      return;
+    }
 
-  // Health check root GET/HEAD
-  if (url === '/' && (method === 'GET' || method === 'HEAD')) {
-    return;
-  }
+    // Handle trailing slash edge case
+    if (url.replace(/\/$/, '') === '/dog-memories/upload') {
+      fastify.log.info({ url, method }, 'Public route hit (trailing slash), skipping JWT check');
+      return;
+    }
 
-  // Allow unauthenticated access to anything matching a public prefix
-  if (publicPrefixes.some(path => url === path || url.startsWith(path + '/'))) {
-    fastify.log.info({ url, method }, 'Public route hit, skipping JWT check');
-    return;
-  }
-
-  // Handle trailing slash edge case
-  if (url.replace(/\/$/, '') === '/dog-memories/upload') {
-    fastify.log.info({ url, method }, 'Public route hit (trailing slash), skipping JWT check');
-    return;
-  }
-
-  // All others require JWT
-  await fastify.authenticate(request, reply);
-});
+    // All others require JWT
+    await fastify.authenticate(request, reply);
+  });
 });
