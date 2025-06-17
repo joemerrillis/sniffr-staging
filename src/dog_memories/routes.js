@@ -18,7 +18,11 @@ export default async function dogMemoriesRoutes(fastify, opts) {
   }
 
   // TEST UPLOAD PAGE (move this up top, but anywhere inside is fine)
-  fastify.get('/dog-memories/test-upload', async (request, reply) => {
+  fastify.get('/dog-memories/test-upload',  {
+    schema: { /* ... */ },
+    preHandler: [] // disables default auth for this route
+  },
+              async (request, reply) => {
     reply.type('text/html').send(`
       <form action="/dog-memories/upload" method="post" enctype="multipart/form-data">
         <input type="file" name="file"><br>
