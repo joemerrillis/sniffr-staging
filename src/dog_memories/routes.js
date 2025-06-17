@@ -252,39 +252,39 @@ fastify.post(
         : fields.dog_ids.split(',').map(id => id.trim()).filter(Boolean);
     }
 
-fastify.log.info('About to read file stream...');
-let fileBuffer;
-try {
-  fileBuffer = await streamToBuffer(file.file);
-  fastify.log.info('File buffer created, length: ' + fileBuffer.length);
-} catch (err) {
-  fastify.log.error({ err }, 'Error while reading file stream to buffer');
-  return reply.code(500).send({ error: 'Could not read file upload' });
-}
+    fastify.log.info('About to read file stream...');
+    let fileBuffer;
+    try {
+      fileBuffer = await streamToBuffer(file.file);
+      fastify.log.info('File buffer created, length: ' + fileBuffer.length);
+    } catch (err) {
+      fastify.log.error({ err }, 'Error while reading file stream to buffer');
+      return reply.code(500).send({ error: 'Could not read file upload' });
+    }
 
-let cloudflareResp;
-try {
-  fastify.log.info('About to upload to Cloudflare...');
-  cloudflareResp = await uploadToCloudflareImages({
-    fileBuffer,
-    fileName: file.filename,
-    metadata: { dog_ids, event_id: fields.event_id }
-  });
-  fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
-} catch (err) {
-  fastify.log.error({ err }, 'Error during upload to Cloudflare Images');
-  return reply.code(502).send({ error: err.message || 'Failed to upload to Cloudflare Images' });
-}
-)
+    let cloudflareResp;
+    try {
+      fastify.log.info('About to upload to Cloudflare...');
+      cloudflareResp = await uploadToCloudflareImages({
+        fileBuffer,
+        fileName: file.filename,
+        metadata: { dog_ids, event_id: fields.event_id }
+      });
+      fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
+    } catch (err) {
+      fastify.log.error({ err }, 'Error during upload to Cloudflare Images');
+      return reply.code(502).send({ error: err.message || 'Failed to upload to Cloudflare Images' });
+    }
 
-      // You may want to require more fields depending on your DB schema!
+    // You may want to require more fields depending on your DB schema!
+    try {
       fastify.log.info('About to insert into DB...');
       const newMemory = await insertDogMemory({
         image_id: cloudflareResp.id,
         dog_ids,
         uploader_id: request.user?.id || null,
         event_id: fields.event_id,
-       image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}`,
+        image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}`,
         // Add any other required/default fields here (e.g., caption, event_type)
         caption: fields.caption || 'Photo upload',
         event_type: fields.event_type || 'manual'
@@ -299,16 +299,3 @@ try {
     }
   }
 );
-
-  // Helper function to read a stream to a buffer
-  async function streamToBuffer(stream) {
-    fastify.log.info('Starting streamToBuffer...');
-    const chunks = [];
-    for await (const chunk of stream) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-    fastify.log.info({ bufferLength: buffer.length }, 'streamToBuffer complete');
-    return buffer;
-  }
-}
