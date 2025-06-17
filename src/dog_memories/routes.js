@@ -275,7 +275,7 @@ try {
   fastify.log.error({ err }, 'Error during upload to Cloudflare Images');
   return reply.code(502).send({ error: err.message || 'Failed to upload to Cloudflare Images' });
 }
-
+)
 
       // You may want to require more fields depending on your DB schema!
       fastify.log.info('About to insert into DB...');
