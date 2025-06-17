@@ -252,18 +252,30 @@ fastify.post(
         : fields.dog_ids.split(',').map(id => id.trim()).filter(Boolean);
     }
 
-    fastify.log.info('About to read file stream...');
-    const fileBuffer = await streamToBuffer(file.file);
-    fastify.log.info('File buffer created, length: ' + fileBuffer.length);
+fastify.log.info('About to read file stream...');
+let fileBuffer;
+try {
+  fileBuffer = await streamToBuffer(file.file);
+  fastify.log.info('File buffer created, length: ' + fileBuffer.length);
+} catch (err) {
+  fastify.log.error({ err }, 'Error while reading file stream to buffer');
+  return reply.code(500).send({ error: 'Could not read file upload' });
+}
 
-    try {
-      fastify.log.info('About to upload to Cloudflare...');
-      const cloudflareResp = await uploadToCloudflareImages({
-        fileBuffer,
-        fileName: file.filename,
-        metadata: { dog_ids, event_id: fields.event_id }
-      });
-      fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
+let cloudflareResp;
+try {
+  fastify.log.info('About to upload to Cloudflare...');
+  cloudflareResp = await uploadToCloudflareImages({
+    fileBuffer,
+    fileName: file.filename,
+    metadata: { dog_ids, event_id: fields.event_id }
+  });
+  fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
+} catch (err) {
+  fastify.log.error({ err }, 'Error during upload to Cloudflare Images');
+  return reply.code(502).send({ error: err.message || 'Failed to upload to Cloudflare Images' });
+}
+
 
       // You may want to require more fields depending on your DB schema!
       fastify.log.info('About to insert into DB...');
@@ -272,7 +284,7 @@ fastify.post(
         dog_ids,
         uploader_id: request.user?.id || null,
         event_id: fields.event_id,
-        image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
+       image_url: `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}`,
         // Add any other required/default fields here (e.g., caption, event_type)
         caption: fields.caption || 'Photo upload',
         event_type: fields.event_type || 'manual'
