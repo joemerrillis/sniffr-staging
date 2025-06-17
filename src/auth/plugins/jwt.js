@@ -56,3 +56,4 @@ fastify.addHook('onRequest', async (request, reply) => {
   // All others require JWT
   await fastify.authenticate(request, reply);
 });
+});
