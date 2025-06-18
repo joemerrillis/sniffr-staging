@@ -1,6 +1,7 @@
 // src/dog_memories/services/uploadHandler.js
 
 import { uploadToCloudflareImages } from './cloudflareImages.js'; // adjust path if needed
+import { insertDogMemory } from '../models/dogMemoryModel.js';    // adjust path if needed
 
 export async function handleDogMemoryUpload(request, reply, fastify) {
   fastify.log.info('UPLOAD HANDLER STARTED');
@@ -58,18 +59,32 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
       return reply.code(502).send({ error: 'Cloudflare upload failed', details: err.message });
     }
 
-    // Return full info for debugging
+    // === DB INSERT STEP ===
+    let newMemory;
+    try {
+      fastify.log.info('About to insert dog memory into DB...');
+      newMemory = await insertDogMemory({
+        image_id: cloudflareResp.id,
+        uploader_id: request.user?.id || null,
+        dog_ids: fields.dog_ids,
+        event_id: fields.event_id,
+        image_url: cloudflareResp.variants?.[0] ||
+                   `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
+        // add more fields as needed!
+        meta: cloudflareResp.meta,
+        // Optionally other fields, e.g., caption, ai_caption, etc.
+      });
+      fastify.log.info({ newMemory }, 'Dog memory inserted');
+    } catch (err) {
+      fastify.log.error({ err }, 'Dog memory insert failed');
+      return reply.code(500).send({ error: 'DB insert failed', details: err.message });
+    }
+
+    // === Respond to Client ===
     return reply.code(201).send({
       ok: true,
-      message: "File buffered and uploaded to Cloudflare",
-      bufferLength: fileBuffer.length,
-      fileInfo,
-      fields,
-      cloudflareResp,
-      partsSeen: count,
-      filesSeen: fileCount,
-      fieldsSeen: fieldCount,
-      partNames
+      message: "File uploaded and dog memory created",
+      memory: newMemory
     });
 
   } catch (err) {
