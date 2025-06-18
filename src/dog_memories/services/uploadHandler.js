@@ -8,18 +8,17 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
   let fieldCount = 0;
   let partNames = [];
   let filePart = null;
-
   try {
     for await (const part of parts) {
       count++;
       if (part.file) {
         if (!filePart) {
-          filePart = part; // Only keep reference to the first file part
+          filePart = part; // Save reference, DO NOT resume/drain!
         }
         fileCount++;
         partNames.push(part.filename || 'unnamed-file');
         fastify.log.info({ partNum: count, filename: part.filename, mimetype: part.mimetype }, 'File part received');
-        // Do NOT drain/resume here; we'll do that in streamToBuffer
+        // DO NOT: await part.file.resume();
       } else if (part.fieldname) {
         fieldCount++;
         partNames.push(part.fieldname);
@@ -30,7 +29,6 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
     }
     fastify.log.info({ count, fileCount, fieldCount, partNames }, 'All parts processed, starting file buffer step');
 
-    // Only proceed if a file was received
     if (fileCount < 1 || !filePart) {
       fastify.log.warn('No file uploaded');
       return reply.code(400).send({ error: 'No file uploaded' });
@@ -54,14 +52,12 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
       fastify.log.error({ err }, 'Failed to buffer file');
       return reply.code(500).send({ error: 'Could not buffer file' });
     }
-
   } catch (err) {
     fastify.log.error({ err, count }, 'Error in upload handler');
     return reply.code(500).send({ error: err.message || 'Upload handler failed' });
   }
 }
 
-// Helper function for buffering the file stream
 async function streamToBuffer(stream, fastify) {
   fastify.log.info('streamToBuffer started');
   const chunks = [];
