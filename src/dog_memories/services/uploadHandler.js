@@ -64,15 +64,15 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
     try {
       fastify.log.info('About to insert dog memory into DB...');
       newMemory = await insertDogMemory({
-        object_key: cloudflareResp.id, 
+        object_key: cloudflareResp.id,
         uploader_id: request.user?.id || null,
         dog_ids: fields.dog_ids,
         event_id: fields.event_id,
         image_url: cloudflareResp.variants?.[0] ||
                    `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
-        // add more fields as needed!
-        meta: cloudflareResp.meta,
-        // Optionally other fields, e.g., caption, ai_caption, etc.
+        file_type: fileInfo.mimetype,
+        file_ext: (fileInfo.filename || '').split('.').pop(),
+        meta: cloudflareResp.meta, // Add this now that you have a meta column
       });
       fastify.log.info({ newMemory }, 'Dog memory inserted');
     } catch (err) {
