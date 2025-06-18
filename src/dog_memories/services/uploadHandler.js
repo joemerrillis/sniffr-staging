@@ -1,5 +1,7 @@
 // src/dog_memories/services/uploadHandler.js
 
+import { uploadToCloudflareImages } from './cloudflareImages.js'; // adjust path if needed
+
 export async function handleDogMemoryUpload(request, reply, fastify) {
   fastify.log.info('UPLOAD HANDLER STARTED');
   const parts = request.parts();
@@ -34,19 +36,36 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
       }
     }
 
-    fastify.log.info({ count, fileCount, fieldCount, partNames }, 'All parts processed, responding with buffer info');
+    fastify.log.info({ count, fileCount, fieldCount, partNames }, 'All parts processed, starting Cloudflare upload');
 
     if (!fileBuffer) {
       fastify.log.warn('No file uploaded');
       return reply.code(400).send({ error: 'No file uploaded' });
     }
 
-    return reply.code(200).send({
+    // === CLOUDLFARE UPLOAD STEP ===
+    let cloudflareResp;
+    try {
+      fastify.log.info('About to upload to Cloudflare Images...');
+      cloudflareResp = await uploadToCloudflareImages({
+        fileBuffer,
+        fileName: fileInfo.filename,
+        metadata: fields
+      });
+      fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
+    } catch (err) {
+      fastify.log.error({ err }, 'Cloudflare upload failed');
+      return reply.code(502).send({ error: 'Cloudflare upload failed', details: err.message });
+    }
+
+    // Return full info for debugging
+    return reply.code(201).send({
       ok: true,
-      message: "File buffered successfully",
+      message: "File buffered and uploaded to Cloudflare",
       bufferLength: fileBuffer.length,
       fileInfo,
       fields,
+      cloudflareResp,
       partsSeen: count,
       filesSeen: fileCount,
       fieldsSeen: fieldCount,
