@@ -64,7 +64,7 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
     try {
       fastify.log.info('About to insert dog memory into DB...');
       newMemory = await insertDogMemory({
-        image_id: cloudflareResp.id,
+        object_key: cloudflareResp.id, 
         uploader_id: request.user?.id || null,
         dog_ids: fields.dog_ids,
         event_id: fields.event_id,
