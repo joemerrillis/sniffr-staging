@@ -59,6 +59,20 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
       return reply.code(502).send({ error: 'Cloudflare upload failed', details: err.message });
     }
 
+    // === DATA NORMALIZATION ===
+    // dog_ids must always be an array (even if one value, Postgres _uuid)
+    let dogIds;
+    if (Array.isArray(fields.dog_ids)) {
+      dogIds = fields.dog_ids;
+    } else if (typeof fields.dog_ids === 'string') {
+      dogIds = fields.dog_ids.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      dogIds = [];
+    }
+
+    // event_id is a single UUID (uuid type)
+    let eventId = (typeof fields.event_id === 'string') ? fields.event_id.trim() : null;
+
     // === DB INSERT STEP ===
     let newMemory;
     try {
@@ -66,13 +80,13 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
       newMemory = await insertDogMemory({
         object_key: cloudflareResp.id,
         uploader_id: request.user?.id || null,
-        dog_ids: fields.dog_ids,
-        event_id: fields.event_id,
+        dog_ids: dogIds,
+        event_id: eventId,
         image_url: cloudflareResp.variants?.[0] ||
                    `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
         file_type: fileInfo.mimetype,
         file_ext: (fileInfo.filename || '').split('.').pop(),
-        meta: cloudflareResp.meta, // Add this now that you have a meta column
+        meta: cloudflareResp.meta,
       });
       fastify.log.info({ newMemory }, 'Dog memory inserted');
     } catch (err) {
