@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "cf:dev": "wrangler dev --config wrangler.toml",
+    "cf:deploy": "wrangler deploy --config wrangler.toml"
   },
   "dependencies": {
     "fastify": "^4.27.2",
@@ -20,9 +22,9 @@
     "@fastify/swagger-ui": "^1.8.0",
     "@fastify/multipart": "^6.0.0",
     "form-data": "^4.0.0"
-
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^2.0.22",
+    "wrangler": "^4.20.3"
   }
 }
