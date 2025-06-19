@@ -1,0 +1,7 @@
+name = "sniffr-images-worker"
+main = "workers/images-worker.js"
+compatibility_date = "2025-06-19"
+
+[vectorize]
+binding = "VECTORIZE"
+index_name = "sniffr-dog-images"
