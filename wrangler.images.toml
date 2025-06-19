@@ -7,5 +7,5 @@ account_id = "774b68e8a6ad8edd33820cd760f785d9"
 binding = "VECTORIZE"
 index_name = "sniffr-dog-images"
 
-[[ai]]
+[ai]
 binding = "AI"
