@@ -6,3 +6,6 @@ account_id = "774b68e8a6ad8edd33820cd760f785d9"
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "sniffr-dog-images"
+
+[[ai]]
+binding = "AI"
