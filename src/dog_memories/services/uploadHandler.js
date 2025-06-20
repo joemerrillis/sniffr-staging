@@ -2,6 +2,7 @@
 
 import { uploadToCloudflareImages } from './cloudflareImages.js'; // adjust path if needed
 import { insertDogMemory } from '../models/dogMemoryModel.js';    // adjust path if needed
+import { onPhotoUploaded } from './mediaProcessing.js';
 
 export async function handleDogMemoryUpload(request, reply, fastify) {
   fastify.log.info('UPLOAD HANDLER STARTED');
@@ -116,4 +117,10 @@ async function streamToBuffer(stream, fastify) {
   const buffer = Buffer.concat(chunks);
   fastify.log.info({ bufferLength: buffer.length }, 'streamToBuffer complete');
   return buffer;
+}
+// After successful DB insert:
+try {
+  onPhotoUploaded({ memory: newMemory }); // Don't await!
+} catch (err) {
+  fastify.log.error({ err }, 'Failed to trigger media processing');
 }
