@@ -95,6 +95,14 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
       return reply.code(500).send({ error: 'DB insert failed', details: err.message });
     }
 
+    // === Kick off async media processing (embedding/vectorization) ===
+    try {
+      onPhotoUploaded({ memory: newMemory }); // Don't await!
+    } catch (err) {
+      // Use console.error here; fastify is not available in this async context!
+      console.error('Failed to trigger media processing', err);
+    }
+
     // === Respond to Client ===
     return reply.code(201).send({
       ok: true,
@@ -117,10 +125,4 @@ async function streamToBuffer(stream, fastify) {
   const buffer = Buffer.concat(chunks);
   fastify.log.info({ bufferLength: buffer.length }, 'streamToBuffer complete');
   return buffer;
-}
-// After successful DB insert:
-try {
-  onPhotoUploaded({ memory: newMemory }); // Don't await!
-} catch (err) {
-  fastify.log.error({ err }, 'Failed to trigger media processing');
 }
