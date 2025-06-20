@@ -2,24 +2,39 @@
 
 import fetch from 'node-fetch';
 import { updateDogMemory } from '../models/dogMemoryModel.js';
+import { getDogById } from '../../dogs/models/dogModel.js'; // adjust path if needed
+
+// Helper to get dog name from dog_ids array (uses the first ID if multiple)
+async function getDogNameFromIds(dogIds) {
+  if (!dogIds || !dogIds.length) return "Unknown";
+  try {
+    const dog = await getDogById(dogIds[0]);
+    return dog?.name || "Unknown";
+  } catch (e) {
+    // Log error if needed, but fallback gracefully
+    return "Unknown";
+  }
+}
 
 export async function onPhotoUploaded({ memory }) {
-  // `memory` should be the full DB record after insert
+  // memory: the full DB record after insert
 
-  // 1. Call the Cloudflare Worker for embedding
+  // 1. Look up dog name (sync for onboarding, future: smarter inference)
+  const dogName = await getDogNameFromIds(memory.dog_ids);
+
+  // 2. Call the Cloudflare Worker for embedding
   const vectorizeUrl = process.env.CF_VECTORIZE_URL;
-  const dogName = /* look up dog name from dog_ids, or fallback */;
   const payload = {
     image_url: memory.image_url,
     dog_name: dogName,
     meta: {
       memory_id: memory.id,
       dog_ids: memory.dog_ids,
-      // any other metadata you want...
+      // ...add any other metadata you want here
     }
   };
 
-  let embedding_id, embedding_version, vector_status = 'error';
+  let embedding_id = null, embedding_version = null, vector_status = 'error';
 
   try {
     const res = await fetch(vectorizeUrl, {
@@ -30,7 +45,7 @@ export async function onPhotoUploaded({ memory }) {
     const data = await res.json();
     if (res.ok && data.id) {
       embedding_id = data.id;
-      embedding_version = 'clip-v1'; // or whatever version you use
+      embedding_version = 'clip-v1'; // Use your actual model/version as needed
       vector_status = 'complete';
     } else {
       vector_status = 'error';
@@ -39,7 +54,7 @@ export async function onPhotoUploaded({ memory }) {
     vector_status = 'error';
   }
 
-  // 2. Update the dog_memories record with vector info
+  // 3. Update the dog_memories record with vector info (append to meta as well)
   await updateDogMemory(memory.id, {
     embedding_id,
     embedding_version,
