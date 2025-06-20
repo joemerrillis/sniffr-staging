@@ -31,7 +31,7 @@ export default {
     try {
       // Example model: "@cf/openai/clip"
       const aiRes = await env.AI.run(
-        "@cf/openai/clip",
+        @cf/openai/clip-vit-base-patch16",
         {
           image: [...new Uint8Array(imageBuffer)],
         }
