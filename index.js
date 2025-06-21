@@ -33,9 +33,9 @@ import visibilityPlugin from './src/dogVisibility/index.js';
 
 dotenv.config();
 
-await fastify.register(fastifyMultipart);
-
 const fastify = Fastify({ logger: true });
+
+await fastify.register(fastifyMultipart);
 
 // Initialize Replicate client
 const replicate = new Replicate({
