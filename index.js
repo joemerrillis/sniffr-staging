@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
-import Replicate from 'replicate';
+import Replicate from '@replicate/replicate';
 
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
