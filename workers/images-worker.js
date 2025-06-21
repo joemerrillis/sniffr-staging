@@ -35,6 +35,8 @@ export default {
           image: [...new Uint8Array(imageBuffer)],
         }
       );
+      // Log the *entire* response to see what comes back from Workers AI
+console.log("Full AI response:", JSON.stringify(aiRes));
       // Cloudflare guidance: use only .data
       embedding = aiRes.data;
       // Optionally log for debugging:
