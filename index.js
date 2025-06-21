@@ -1,9 +1,9 @@
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
+import Replicate from 'replicate';
 
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
-import fastifyMultipart from '@fastify/multipart'; // <-- For uploads
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
@@ -28,21 +28,36 @@ import boardingsPlugin from './src/boardings/index.js';
 import daycareSessionsPlugin from './src/daycare_sessions/index.js';
 import purchasesPlugin from './src/purchases/index.js';
 import pricingRulesPlugin from './src/pricingRules/index.js';
-import dogMemoriesPlugin from './src/dog_memories/index.js';
 
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
-// --- Register fastify-multipart FIRST for file uploads ---
-await fastify.register(fastifyMultipart);
+// Initialize Replicate client
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
 
+async function getClipEmbeddingFromFile(filePath) {
+  const file = fs.readFileSync(filePath);
+  const base64 = file.toString('base64');
+  const dataUri = `data:image/${path.extname(filePath).substring(1)};base64,${base64}`;
+
+  const output = await replicate.run(
+    "krthr/clip-embeddings:latest",
+    {
+      input: { image: "https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/<image_id>/<variant_name>" },
+    }
+  );
+
+  return output.embedding;
+}
 // --- Register Swagger (OpenAPI) docs FIRST ---
 await fastify.register(fastifySwagger, {
   openapi: {
     info: {
-      title: 'Sniffr API TEST',
-      description: 'API documentation for dog walking SaaS + social layer - Test Environment',
+      title: 'Sniffr API',
+      description: 'API documentation for dog walking SaaS + social layer',
       version: '1.0.0'
     },
     components: {
@@ -59,7 +74,6 @@ await fastify.register(fastifySwagger, {
     ]
   }
 });
-
 // --- Register Swagger UI ---
 await fastify.register(fastifySwaggerUi, {
   routePrefix: '/docs',
@@ -74,6 +88,25 @@ await fastify.register(corePlugin);
 
 // --- Public health check (no auth required) ---
 fastify.get('/healthz', async () => ({ status: 'ok' }));
+
+// Clip embedding endpoint
+fastify.post('/dogs/:id/embedding', async (req, reply) => {
+  const { id } = req.params;
+  const { imagePath } = req.body; // or parse upload file
+
+  if (!imagePath) {
+    return reply.code(400).send({ error: "Select a local imagePath<1MB to embed." });
+  }
+
+  try {
+    const embedding = await getClipEmbeddingFromFile(imagePath);
+    // Save/use the embedding for dog ID ...
+    return { dogId: id, embedding };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.code(500).send({ error: "Embedding failed" });
+  }
+});
 
 // --- Auth plugin (JWT, /auth routes, protects subsequent routes) ---
 await fastify.register(authPlugin);
@@ -99,7 +132,6 @@ await fastify.register(boardingsPlugin, { prefix: '/boardings' });
 await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
 await fastify.register(purchasesPlugin, { prefix: '/purchases' });
 await fastify.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
-await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' }); // <-- For uploads!
 
 // --- GLOBAL ERROR HANDLER ---
 fastify.setErrorHandler((error, request, reply) => {
