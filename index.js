@@ -4,6 +4,7 @@ import Replicate from 'replicate';
 
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyMultipart from '@fastify/multipart';
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
@@ -31,6 +32,8 @@ import dogFriendsPlugin from './src/dogFriends/index.js';
 import visibilityPlugin from './src/dogVisibility/index.js';
 
 dotenv.config();
+
+await fastify.register(fastifyMultipart);
 
 const fastify = Fastify({ logger: true });
 
