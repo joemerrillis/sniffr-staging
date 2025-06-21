@@ -8,13 +8,18 @@ export default {
     try {
       data = await request.json();
     } catch (e) {
+      console.log("Invalid JSON:", e);
       return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
     }
 
     const { image_url, dog_name, meta } = data;
     if (!image_url || !dog_name) {
+      console.log("Missing image_url or dog_name");
       return new Response(JSON.stringify({ error: "image_url and dog_name required" }), { status: 400 });
     }
+
+    // --- DEBUG LOG: Input
+    console.log("Input received:", { image_url, dog_name, meta });
 
     // Fetch the image as a buffer (as base64 for Replicate API)
     let imageBuffer, imageBase64;
@@ -22,59 +27,83 @@ export default {
       const imgRes = await fetch(image_url);
       if (!imgRes.ok) throw new Error("Could not fetch image");
       imageBuffer = await imgRes.arrayBuffer();
-      // Replicate API expects a data URL (base64-encoded)
       const uint8Array = new Uint8Array(imageBuffer);
       let binary = '';
       for (let i = 0; i < uint8Array.byteLength; i++) {
         binary += String.fromCharCode(uint8Array[i]);
       }
-      imageBase64 = btoa(binary); // browser/worker btoa
-      // Format as a data URL
+      imageBase64 = btoa(binary);
       const contentType = imgRes.headers.get("content-type") || "image/jpeg";
       imageBase64 = `data:${contentType};base64,${imageBase64}`;
+
+      // --- DEBUG LOG: Image Fetch/Conversion
+      console.log("Fetched image, contentType:", contentType, "Base64 length:", imageBase64.length);
+
     } catch (e) {
+      console.log("Image fetch failed:", e);
       return new Response(JSON.stringify({ error: "Image fetch failed", details: e.message }), { status: 400 });
     }
+
+    // --- DEBUG LOG: Replicate Token
+    console.log("Replicate token (first 8 chars):", env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.substring(0,8) : 'undefined');
 
     // Call Replicate API for embedding
     let embedding;
     try {
+      const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
+      // --- DEBUG LOG: Replicate Token About To Be Used
+      console.log("Using Replicate Token (trimmed, first 8):", replicateToken.substring(0,8));
+
       const replicateRes = await fetch("https://api.replicate.com/v1/predictions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${env.REPLICATE_API_TOKEN}`,
+          "Authorization": `Bearer ${replicateToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          version: "e4005b1c90c6ceab8ad4be80d3d0a41a7bc5a19e8dc6c9a6557b515df20607d6", // Clip Vit-L/14, from Replicate docs
+          version: "e4005b1c90c6ceab8ad4be80d3d0a41a7bc5a19e8dc6c9a6557b515df20607d6",
           input: {
             image: imageBase64,
           }
         }),
       });
 
+      // --- DEBUG LOG: Replicate POST Response
+      console.log("Replicate POST response status:", replicateRes.status);
+
       const replicateJson = await replicateRes.json();
       if (replicateRes.status !== 201) {
+        console.log("Replicate API error JSON:", replicateJson);
         return new Response(JSON.stringify({ error: "Replicate API failed", details: replicateJson }), { status: 500 });
       }
+
       // Replicate API is async; poll the prediction endpoint until status is "succeeded"
       let prediction = replicateJson;
+      let pollCount = 0;
       while (["starting", "processing"].includes(prediction.status)) {
-        await new Promise(r => setTimeout(r, 1000)); // wait 1 sec
+        await new Promise(r => setTimeout(r, 1000));
+        pollCount++;
         const pollRes = await fetch(prediction.urls.get, {
-          headers: { "Authorization": `Token ${env.REPLICATE_API_TOKEN}` }
+          headers: { "Authorization": `Bearer ${replicateToken}` } // <-- Use Bearer!
         });
         prediction = await pollRes.json();
+        // --- DEBUG LOG: Polling
+        console.log(`Polling prediction status (try ${pollCount}):`, prediction.status);
       }
       if (prediction.status !== "succeeded") {
+        console.log("Replicate prediction failed:", prediction);
         return new Response(JSON.stringify({ error: "Replicate prediction failed", details: prediction }), { status: 500 });
       }
       embedding = prediction.output.embedding;
+      console.log("Embedding received, length:", embedding ? embedding.length : "null");
+
     } catch (e) {
+      console.log("Replicate embedding failed:", e);
       return new Response(JSON.stringify({ error: "Replicate embedding failed", details: e.message }), { status: 500 });
     }
 
     if (!embedding || !Array.isArray(embedding)) {
+      console.log("No embedding returned");
       return new Response(JSON.stringify({ error: "No embedding returned" }), { status: 500 });
     }
 
@@ -89,12 +118,15 @@ export default {
         ...meta
       }
     };
+    console.log("Vectorize record:", record);
 
     // Store in Vectorize
     try {
       await env.VECTORIZE.insert([record]);
+      console.log("Vectorize insert OK, id:", id);
       return new Response(JSON.stringify({ ok: true, id }), { status: 201, headers: { "content-type": "application/json" } });
     } catch (e) {
+      console.log("Vectorize insert failed:", e);
       return new Response(JSON.stringify({ error: "Vectorize insert failed", details: e.message }), { status: 500 });
     }
   }
