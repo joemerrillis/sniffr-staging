@@ -26,17 +26,19 @@ export default {
       return new Response(JSON.stringify({ error: "Image fetch failed", details: e.message }), { status: 400 });
     }
 
-    // Call Workers AI (OpenAI CLIP or your preferred model)
+    // Call Workers AI for embedding
     let embedding;
     try {
-      // Example model: "@cf/openai/clip"
       const aiRes = await env.AI.run(
         "@cf/unum/uform-gen2-qwen-500m",
         {
           image: [...new Uint8Array(imageBuffer)],
         }
       );
-      embedding = aiRes.embedding || aiRes.result;
+      // Cloudflare guidance: use only .data
+      embedding = aiRes.data;
+      // Optionally log for debugging:
+      // console.log("AI response:", JSON.stringify(aiRes));
     } catch (e) {
       return new Response(JSON.stringify({ error: "AI embedding failed", details: e.message }), { status: 500 });
     }
