@@ -28,6 +28,7 @@ import boardingsPlugin from './src/boardings/index.js';
 import daycareSessionsPlugin from './src/daycare_sessions/index.js';
 import purchasesPlugin from './src/purchases/index.js';
 import pricingRulesPlugin from './src/pricingRules/index.js';
+import dogMemoriesPlugin from './src/dog_memories/index.js';
 
 dotenv.config();
 
@@ -132,6 +133,7 @@ await fastify.register(boardingsPlugin, { prefix: '/boardings' });
 await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
 await fastify.register(purchasesPlugin, { prefix: '/purchases' });
 await fastify.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
+await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
 
 // --- GLOBAL ERROR HANDLER ---
 fastify.setErrorHandler((error, request, reply) => {
