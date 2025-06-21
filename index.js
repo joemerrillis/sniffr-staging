@@ -32,6 +32,8 @@ import dogFriendsPlugin from './src/dogFriends/index.js';
 import visibilityPlugin from './src/dogVisibility/index.js';
 
 dotenv.config();
+console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN);
+
 
 const fastify = Fastify({ logger: true });
 
