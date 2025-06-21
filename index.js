@@ -11,24 +11,24 @@ import authPlugin from './src/auth/index.js';
 import usersPlugin from './src/users/index.js';
 import tenantsPlugin from './src/tenants/index.js';
 import domainsPlugin from './src/domains/index.js';
-import dogsPlugin from './src/dogs/index.js';
-import visibilityPlugin from './src/dogVisibility/index.js';
-import dogFriendsPlugin from './src/dogFriends/index.js';
-import dogAssignmentsPlugin from './src/dogAssignments/index.js';
 import employeesPlugin from './src/employees/index.js';
-import clientWalkersPlugin from './src/clientWalkers/index.js';
+import dogsPlugin from './src/dogs/index.js';
 import tenantClientsPlugin from './src/tenantClients/index.js';
-import walksPlugin from './src/walks/index.js';
+import clientWalkersPlugin from './src/clientWalkers/index.js';
+import dogAssignmentsPlugin from './src/dogAssignments/index.js';
 import clientWalkWindowsPlugin from './src/clientWalkWindows/index.js';
 import clientWalkRequestsPlugin from './src/clientWalkRequests/index.js';
-import pendingServicesPlugin from './src/pendingServices/index.js';
-import schedulingPlugin from './src/scheduling/index.js';
-import availabilityPlugin from './src/availability/index.js';
 import boardingsPlugin from './src/boardings/index.js';
 import daycareSessionsPlugin from './src/daycare_sessions/index.js';
+import pendingServicesPlugin from './src/pendingServices/index.js';
 import purchasesPlugin from './src/purchases/index.js';
 import pricingRulesPlugin from './src/pricingRules/index.js';
+import schedulingPlugin from './src/scheduling/index.js';
+import availabilityPlugin from './src/availability/index.js';
+import walksPlugin from './src/walks/index.js';
 import dogMemoriesPlugin from './src/dog_memories/index.js';
+import dogFriendsPlugin from './src/dogFriends/index.js';
+import visibilityPlugin from './src/dogVisibility/index.js';
 
 dotenv.config();
 
@@ -116,24 +116,25 @@ await fastify.register(authPlugin);
 await fastify.register(usersPlugin, { prefix: '/users' });
 await fastify.register(tenantsPlugin, { prefix: '/tenants' });
 await fastify.register(domainsPlugin, { prefix: '/domains' });
-await fastify.register(dogsPlugin, { prefix: '/dogs' });
-await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
-await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
-await fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
 await fastify.register(employeesPlugin, { prefix: '/employees' });
-await fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
+await fastify.register(dogsPlugin, { prefix: '/dogs' });
 await fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
-await fastify.register(walksPlugin, { prefix: '/walks' });
+await fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
+await fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
 await fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
 await fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
-await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
-await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
-await fastify.register(availabilityPlugin, { prefix: '/availability' });
 await fastify.register(boardingsPlugin, { prefix: '/boardings' });
 await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
+await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
 await fastify.register(purchasesPlugin, { prefix: '/purchases' });
 await fastify.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
+await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
+await fastify.register(availabilityPlugin, { prefix: '/availability' });
+await fastify.register(walksPlugin, { prefix: '/walks' });
 await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
+await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
+await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
+
 
 // --- GLOBAL ERROR HANDLER ---
 fastify.setErrorHandler((error, request, reply) => {
