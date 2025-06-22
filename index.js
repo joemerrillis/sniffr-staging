@@ -41,7 +41,7 @@ await fastify.register(fastifyMultipart);
 
 // Initialize Replicate client
 const replicate = new Replicate({
-  
+  auth: process.env.REPLICATE_API_TOKEN
 });
 
 async function getClipEmbeddingFromFile(filePath) {
