@@ -82,7 +82,7 @@ export default {
       let prediction = replicateJson;
       let pollCount = 0;
       while (["starting", "processing"].includes(prediction.status)) {
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 3000));
         pollCount++;
         const pollRes = await fetch(prediction.urls.get, {
           headers: { "Authorization": `Bearer ${replicateToken}` } // <-- Use Bearer!
