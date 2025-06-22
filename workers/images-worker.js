@@ -47,48 +47,48 @@ export default {
     // --- DEBUG LOG: Replicate Token
     console.log("Replicate token (first 8 chars):", env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.substring(0,8) : 'undefined');
 
-    // Call Replicate API for embedding
+    // Call Replicate API for embedding using async polling pattern
     let embedding;
     try {
       const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
-      // --- DEBUG LOG: Replicate Token About To Be Used
       console.log("Using Replicate Token (trimmed, first 8):", replicateToken.substring(0,8));
 
-      const replicateRes = await fetch("https://api.replicate.com/v1/predictions", {
+      // Step 1: Start the prediction (POST)
+      const startRes = await fetch("https://api.replicate.com/v1/predictions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${replicateToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          // 🚨 *** UPDATED VERSION ID ***
           version: "1c0371070cb827ec3c7f2f28adcdde54b50dcd239aa6faea0bc98b174ef03fb4",
-          input: {
-            image: imageBase64,
-          }
+          input: { image: imageBase64 }
         }),
       });
+      const startJson = await startRes.json();
+      console.log("Replicate POST response status:", startRes.status);
 
-      // --- DEBUG LOG: Replicate POST Response
-      console.log("Replicate POST response status:", replicateRes.status);
-
-      const replicateJson = await replicateRes.json();
-      if (replicateRes.status !== 201) {
-        console.log("Replicate API error JSON:", replicateJson);
-        return new Response(JSON.stringify({ error: "Replicate API failed", details: replicateJson }), { status: 500 });
+      if (startRes.status !== 201) {
+        console.log("Replicate API error JSON:", startJson);
+        return new Response(JSON.stringify({ error: "Replicate API failed", details: startJson }), { status: 500 });
       }
 
-      // Replicate API is async; poll the prediction endpoint until status is "succeeded"
-      let prediction = replicateJson;
+      // Step 2: Poll until prediction is complete, using GET on the prediction ID
+      let prediction = startJson;
       let pollCount = 0;
+      const maxPolls = 25;
       while (["starting", "processing"].includes(prediction.status)) {
-        await new Promise(r => setTimeout(r, 3000));
         pollCount++;
-        const pollRes = await fetch(prediction.urls.get, {
-          headers: { "Authorization": `Bearer ${replicateToken}` } // <-- Use Bearer!
+        if (pollCount > maxPolls) {
+          console.log("Replicate polling exceeded max limit; still running.");
+          return new Response(JSON.stringify({ error: "Replicate polling timeout", details: prediction }), { status: 504 });
+        }
+        await new Promise(r => setTimeout(r, 5000));
+        const pollUrl = `https://api.replicate.com/v1/predictions/${startJson.id}`; // 👈 Use official GET endpoint!
+        const pollRes = await fetch(pollUrl, {
+          headers: { "Authorization": `Bearer ${replicateToken}` }
         });
         prediction = await pollRes.json();
-        // --- DEBUG LOG: Polling
         console.log(`Polling prediction status (try ${pollCount}):`, prediction.status);
       }
       if (prediction.status !== "succeeded") {
