@@ -61,7 +61,8 @@ export default {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          version: "e4005b1c90c6ceab8ad4be80d3d0a41a7bc5a19e8dc6c9a6557b515df20607d6",
+          // 🚨 *** UPDATED VERSION ID ***
+          version: "9dcd6d78e7c6560c34d0916fe32e9f24aabfa331e5cce95fe31f77fb03121426",
           input: {
             image: imageBase64,
           }
