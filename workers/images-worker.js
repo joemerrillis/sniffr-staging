@@ -62,7 +62,7 @@ export default {
         },
         body: JSON.stringify({
           // 🚨 *** UPDATED VERSION ID ***
-          version: "9dcd6d78e7c6560c34d0916fe32e9f24aabfa331e5cce95fe31f77fb03121426",
+          version: "1c0371070cb827ec3c7f2f28adcdde54b50dcd239aa6faea0bc98b174ef03fb4",
           input: {
             image: imageBase64,
           }
