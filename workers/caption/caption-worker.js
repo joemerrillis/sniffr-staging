@@ -1,4 +1,4 @@
-import { buildCaptionPrompt } from './utils/promptUtils.js';
+import { buildCaptionPrompt } from '../utils/promptUtils.js'; // adjust if needed
 
 export default {
   async fetch(request, env, ctx) {
@@ -14,12 +14,8 @@ export default {
       return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
     }
 
-    // Destructure with defaults
     const { dog_names = [], event_type } = data || {};
-
-    // Now you can safely use dog_names and event_type!
     const prompt = buildCaptionPrompt({ dogNames: dog_names, eventType: event_type });
-
     let data;
     try {
       data = await request.json();
