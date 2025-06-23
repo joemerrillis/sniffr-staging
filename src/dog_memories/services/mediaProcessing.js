@@ -36,6 +36,7 @@ async function callEmbeddingWorker(memory, dogNames) {
   const payload = {
     image_url: memory.image_url,
     dog_names: dogNames,
+    dog_name: dogNames[0] || "Unknown",    // <--- This is the key fix!
     meta: {
       memory_id: memory.id,
       dog_ids: memory.dog_ids,
