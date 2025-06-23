@@ -1,0 +1,4 @@
+name = "sniffr-tag-worker"
+main = "tags-worker.js"
+compatibility_date = "2025-06-19"
+account_id = "774b68e8a6ad8edd33820cd760f785d9"
