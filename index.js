@@ -30,6 +30,8 @@ import walksPlugin from './src/walks/index.js';
 import dogMemoriesPlugin from './src/dog_memories/index.js';
 import dogFriendsPlugin from './src/dogFriends/index.js';
 import visibilityPlugin from './src/dogVisibility/index.js';
+import chatPlugin from './src/chat/index.js';
+
 
 dotenv.config();
 console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN);
@@ -139,6 +141,8 @@ await fastify.register(walksPlugin, { prefix: '/walks' });
 await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
 await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
 await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
+await fastify.register(chatPlugin, { prefix: '/chats' });
+
 
 
 // --- GLOBAL ERROR HANDLER ---
