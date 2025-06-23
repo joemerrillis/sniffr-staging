@@ -5,19 +5,19 @@ import { getDogById } from '../../dogs/models/dogModel.js';
 // Helper to get all dog names, returns an array
 async function getDogNamesFromIds(dogIds) {
   if (!dogIds || !dogIds.length) return [];
-  // Return all dog names, skipping unknowns
   const names = [];
   for (const id of dogIds) {
     try {
       const dog = await getDogById(id);
       if (dog?.name) names.push(dog.name);
-    } catch {}
+    } catch (e) {
+      console.error("[getDogNamesFromIds] Error fetching dog name:", e);
+    }
   }
   return names.length ? names : ["Unknown"];
 }
 
 export async function onPhotoUploaded({ memory }) {
-  // Grab all known dog names for prompt
   const dogNames = await getDogNamesFromIds(memory.dog_ids);
   const eventType = memory.event_type || null;
 
@@ -36,13 +36,16 @@ async function callEmbeddingWorker(memory, dogNames) {
   const payload = {
     image_url: memory.image_url,
     dog_names: dogNames,
-    dog_name: dogNames[0] || "Unknown",    // <--- This is the key fix!
+    dog_name: dogNames[0] || "Unknown", // <--- Must be string
     meta: {
       memory_id: memory.id,
       dog_ids: memory.dog_ids,
       // ...add more as needed
     }
   };
+
+  console.log("[EmbeddingWorker] Sending payload:", JSON.stringify(payload));
+
   try {
     const res = await fetch(vectorizeUrl, {
       method: 'POST',
@@ -50,15 +53,17 @@ async function callEmbeddingWorker(memory, dogNames) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    // Only update embedding fields; don't overwrite others
+
+    console.log("[EmbeddingWorker] Response:", JSON.stringify(data));
+
     if (res.ok && data.id) {
       await updateDogMemory(memory.id, {
         embedding_id: data.id,
-        embedding_version: 'clip-v1', // update as needed
+        embedding_version: 'clip-v1',
         meta: { ...memory.meta, vector_status: 'complete', vectorize_at: new Date().toISOString() }
       });
+      console.log("[EmbeddingWorker] Embedding updated in DB.");
     } else {
-      // log errors
       console.error("[EmbeddingWorker] Worker error:", data);
     }
   } catch (e) {
@@ -76,6 +81,9 @@ async function callCaptionWorker(memory, dogNames, eventType) {
     event_type: eventType,
     meta: { memory_id: memory.id, dog_ids: memory.dog_ids }
   };
+
+  console.log("[CaptionWorker] Sending payload:", JSON.stringify(payload));
+
   try {
     const res = await fetch(captionUrl, {
       method: 'POST',
@@ -83,10 +91,13 @@ async function callCaptionWorker(memory, dogNames, eventType) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    // The model returns { output: [...] }
+
+    console.log("[CaptionWorker] Response:", JSON.stringify(data));
+
     if (res.ok && Array.isArray(data.output)) {
       const caption = data.output.join(' ').trim();
       await updateDogMemory(memory.id, { ai_caption: caption });
+      console.log("[CaptionWorker] Caption updated in DB.");
     } else {
       console.error("[CaptionWorker] Worker error:", data);
     }
@@ -104,6 +115,9 @@ async function callTagsWorker(memory, dogNames) {
     dog_names: dogNames,
     meta: { memory_id: memory.id, dog_ids: memory.dog_ids }
   };
+
+  console.log("[TagsWorker] Sending payload:", JSON.stringify(payload));
+
   try {
     const res = await fetch(tagsUrl, {
       method: 'POST',
@@ -111,15 +125,17 @@ async function callTagsWorker(memory, dogNames) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
+
+    console.log("[TagsWorker] Response:", JSON.stringify(data));
+
     if (res.ok && Array.isArray(data.output)) {
-      // Split and trim tags, in case LLaVA returns comma-separated in one string
       let tags = [];
       for (const tagString of data.output) {
         tags = tags.concat(tagString.split(',').map(t => t.trim()));
       }
-      // Remove empty tags and deduplicate
       tags = [...new Set(tags.filter(Boolean))];
       await updateDogMemory(memory.id, { tags });
+      console.log("[TagsWorker] Tags updated in DB.");
     } else {
       console.error("[TagsWorker] Worker error:", data);
     }
