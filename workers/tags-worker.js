@@ -1,8 +1,24 @@
+import { buildTagsPrompt } from './utils/promptUtils.js';
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== "POST") {
       return new Response("Only POST allowed", { status: 405 });
     }
+
+    let data;
+    try {
+      data = await request.json();
+    } catch (e) {
+      console.log("Invalid JSON:", e);
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
+    }
+
+    // Destructure with defaults
+    const { dog_names = [] } = data || {};
+
+    // Use your utility to build the prompt
+    const prompt = buildTagsPrompt(dog_names);
 
     let data;
     try {
