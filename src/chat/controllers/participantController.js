@@ -1,7 +1,8 @@
 // src/chat/controllers/participantController.js
 
 import { addParticipant, removeParticipant } from '../services/chatService.js';
-import { getSupabase } from '../../utils/chatUtils.js';
+import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
+
 
 // Add participant
 export async function addParticipantHandler(request, reply) {
