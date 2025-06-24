@@ -52,7 +52,7 @@ export default {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          version: "c08caa37eb7c7a3c2e6f4c2c4279e8f2e207799cae64b98fc87104d10eae960c", // Example: "text-embedding-ada-002"
+          version: "d619cff29338b9a37c3d06605042e1ff0594a8c3eff0175fd6967f5643fc4d47", // mark3labs/embeddings-gte-base
           input: { text: body }
         }),
       });
@@ -86,7 +86,7 @@ export default {
         console.log("Replicate prediction failed:", prediction);
         return new Response(JSON.stringify({ error: "Replicate prediction failed", details: prediction }), { status: 500 });
       }
-      embedding = prediction.output.embedding;
+      embedding = prediction.output.vectors; // <<<<< CHANGED!
       console.log("Embedding received, length:", embedding ? embedding.length : "null");
 
     } catch (e) {
