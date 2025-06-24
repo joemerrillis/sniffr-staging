@@ -1,6 +1,6 @@
 // src/chat/controllers/reactionController.js
 
-import { addReaction, removeReaction } from '../services/chatService.js';
+import { addReaction, removeReaction } from '../services/reactionService.js';
 import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
 
 
