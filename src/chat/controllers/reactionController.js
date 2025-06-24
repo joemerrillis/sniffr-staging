@@ -1,7 +1,8 @@
 // src/chat/controllers/reactionController.js
 
 import { addReaction, removeReaction } from '../services/chatService.js';
-import { getSupabase } from '../../utils/chatUtils.js';
+import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
+
 
 // Add reaction to a message
 export async function addReactionHandler(request, reply) {
