@@ -1,5 +1,3 @@
-// src/chat/routes/chatRoutes.js
-
 import { listChats, createChatHandler, retrieveChat } from '../controllers/chatController.js';
 
 export default async function (fastify, opts) {
@@ -10,7 +8,18 @@ export default async function (fastify, opts) {
     schema: {
       tags: ['Chat'],
       description: 'List all chats for the current user.',
-      response: { 200: { type: 'object' } }
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: 'Chat#' }
+            }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -22,7 +31,15 @@ export default async function (fastify, opts) {
       tags: ['Chat'],
       description: 'Create a new chat.',
       body: { $ref: 'CreateChat#' },
-      response: { 201: { $ref: 'Chat#' } }
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'Chat#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -34,7 +51,15 @@ export default async function (fastify, opts) {
       tags: ['Chat'],
       description: 'Get a single chat and its participants/messages.',
       params: { id: { type: 'string', format: 'uuid' } },
-      response: { 200: { $ref: 'Chat#' } }
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'Chat#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 }
