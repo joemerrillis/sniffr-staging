@@ -1,5 +1,3 @@
-// workers/chat/embed-chat-worker.js
-
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== "POST") {
@@ -18,6 +16,20 @@ export default {
     if (!message_id || !body || !body.trim()) {
       console.log("Missing message_id or body");
       return new Response(JSON.stringify({ error: "message_id and body required" }), { status: 400 });
+    }
+
+    // --- NEW: Dedupe check with Vectorize
+    try {
+      const existing = await env.VECTORIZE_TEXT.get(message_id);
+      if (existing && existing.id === message_id) {
+        console.log("Embedding already exists for this message_id, skipping.");
+        return new Response(JSON.stringify({ ok: true, id: message_id, skipped: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+    } catch (e) {
+      console.log("Vectorize get error or not found, will proceed to embed:", e.message);
     }
 
     // --- DEBUG LOG: Input
@@ -40,7 +52,7 @@ export default {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          version: "c08caa37eb7c7a3c2e6f4c2c4279e8f2e207799cae64b98fc87104d10eae960c", // Example: "text-embedding-ada-002" (replace with your model)
+          version: "c08caa37eb7c7a3c2e6f4c2c4279e8f2e207799cae64b98fc87104d10eae960c", // Example: "text-embedding-ada-002"
           input: { text: body }
         }),
       });
@@ -88,13 +100,13 @@ export default {
     }
 
     // Compose the Vectorize record
-    const id = message_id; // Use message_id as the vector doc ID for easy dedupe
+    const id = message_id;
     const record = {
       id,
       values: embedding,
       metadata: {
         ...meta,
-        body, // Keep original message text for retrieval/RAG
+        body, // for retrieval/RAG
       }
     };
     console.log("Vectorize TEXT record:", record);
