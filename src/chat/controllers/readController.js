@@ -1,6 +1,6 @@
 // src/chat/controllers/readController.js
 
-import { markRead } from '../services/chatService.js';
+import { markRead } from '../services/readService.js';
 import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
 
 
