@@ -1,7 +1,8 @@
 // src/chat/controllers/messageController.js
 
 import { sendMessage, listMessages, editMessage, deleteMessage } from '../services/chatService.js';
-import { getSupabase, getUserId } from '../../utils/chatUtils.js';
+import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
+
 
 // List messages in a chat (paginated)
 export async function listMessagesHandler(request, reply) {
