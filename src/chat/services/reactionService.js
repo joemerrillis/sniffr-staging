@@ -27,7 +27,7 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
       msg.body.trim() &&
       !msg.embedding_id
     ) {
-      fetch('https://YOUR-CHAT-EMBED-WORKER-URL', {
+      fetch('https://embed-chat-worker.joemerrillis.workers.dev', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
