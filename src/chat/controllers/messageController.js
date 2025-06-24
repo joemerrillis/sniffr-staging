@@ -1,6 +1,6 @@
 // src/chat/controllers/messageController.js
 
-import { sendMessage, listMessages, editMessage, deleteMessage } from '../services/chatService.js';
+import { sendMessage, listMessages, editMessage, deleteMessage } from '../services/messageService.js';
 import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
 
 
