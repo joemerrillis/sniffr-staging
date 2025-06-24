@@ -3,6 +3,5 @@ main = "embed-chat-worker.js"
 compatibility_date = "2024-06-01"
 
 [[vectorize]]
-bindings = [
-  { binding = "VECTORIZE_TEXT", index_name = "sniffr-chat-embeddings" }
-]
+binding = "VECTORIZE_TEXT"
+index_name = "sniffr-chat-embeddings"
