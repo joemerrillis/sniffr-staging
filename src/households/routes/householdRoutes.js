@@ -14,7 +14,18 @@ export default async function (fastify, opts) {
     schema: {
       tags: ['Households'],
       description: 'List all households for tenant.',
-      response: { 200: { type: 'object' } }
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: 'Household#' }
+            }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -25,7 +36,18 @@ export default async function (fastify, opts) {
     schema: {
       tags: ['Households'],
       description: 'List households for the current user.',
-      response: { 200: { type: 'object' } }
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: 'Household#' }
+            }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -37,7 +59,15 @@ export default async function (fastify, opts) {
       tags: ['Households'],
       description: 'Create a new household.',
       body: { $ref: 'CreateHousehold#' },
-      response: { 201: { $ref: 'Household#' } }
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'Household#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -48,7 +78,16 @@ export default async function (fastify, opts) {
     schema: {
       tags: ['Households'],
       description: 'Get details for a household.',
-      params: { id: { type: 'string', format: 'uuid' } }
+      params: { id: { type: 'string', format: 'uuid' } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'Household#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -66,6 +105,15 @@ export default async function (fastify, opts) {
           display_name: { type: ['string', 'null'] },
           primary_contact_id: { type: ['string', 'null'], format: 'uuid' },
           notes: { type: ['string', 'null'] }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'Household#' }
+          },
+          required: ['data']
         }
       }
     }
