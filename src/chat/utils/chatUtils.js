@@ -9,3 +9,6 @@ export function getUserId(request) {
 export function getTenantId(request) {
   return request.user?.tenant_id || request.headers['x-tenant-id'];
 }
+export function nowIso() {
+  return new Date().toISOString();
+}
