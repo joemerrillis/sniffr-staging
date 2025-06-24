@@ -1,5 +1,3 @@
-// src/chat/routes/reactionRoutes.js
-
 import { addReactionHandler, removeReactionHandler } from '../controllers/reactionController.js';
 
 export default async function (fastify, opts) {
@@ -18,6 +16,15 @@ export default async function (fastify, opts) {
           emoji: { type: 'string' }
         },
         required: ['user_id', 'emoji']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'ChatMessage#' }
+          },
+          required: ['data']
+        }
       }
     }
   });
@@ -37,6 +44,15 @@ export default async function (fastify, opts) {
           emoji: { type: 'string' }
         },
         required: ['user_id', 'emoji']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'ChatMessage#' }
+          },
+          required: ['data']
+        }
       }
     }
   });
