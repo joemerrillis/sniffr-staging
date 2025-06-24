@@ -11,6 +11,7 @@ import corePlugin from './src/core/index.js';
 import authPlugin from './src/auth/index.js';
 import usersPlugin from './src/users/index.js';
 import tenantsPlugin from './src/tenants/index.js';
+import householdsPlugin from './src/households/index.js';
 import domainsPlugin from './src/domains/index.js';
 import employeesPlugin from './src/employees/index.js';
 import dogsPlugin from './src/dogs/index.js';
@@ -121,6 +122,7 @@ await fastify.register(authPlugin);
 
 // --- Application modules (all with prefixes for isolation) ---
 await fastify.register(usersPlugin, { prefix: '/users' });
+await fastify.register(householdsPlugin, { prefix: '/households' });
 await fastify.register(tenantsPlugin, { prefix: '/tenants' });
 await fastify.register(domainsPlugin, { prefix: '/domains' });
 await fastify.register(employeesPlugin, { prefix: '/employees' });
