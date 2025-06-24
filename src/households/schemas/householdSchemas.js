@@ -6,7 +6,7 @@ const Household = {
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
-    tenant_id: { type: 'string', format: 'uuid' },
+    tenant_id: { type: 'string', 'null', format: 'uuid' },
     display_name: { type: ['string', 'null'] },
     primary_contact_id: { type: ['string', 'null'], format: 'uuid' },
     notes: { type: ['string', 'null'] },
@@ -20,7 +20,7 @@ const CreateHousehold = {
   $id: 'CreateHousehold',
   type: 'object',
   properties: {
-    tenant_id: { type: 'string', format: 'uuid' },
+    tenant_id: { type: 'string', 'null', format: 'uuid' },
     display_name: { type: ['string', 'null'] },
     primary_contact_id: { type: ['string', 'null'], format: 'uuid' },
     notes: { type: ['string', 'null'] }
