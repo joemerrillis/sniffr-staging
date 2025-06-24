@@ -2,7 +2,7 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
   // Fetch, append, and update
   const { data: msg, error: fetchErr } = await supabase
     .from('chat_messages')
-    .select('*') // Get full message for embedding context!
+    .select('*') // Get full message including embedding_id!
     .eq('id', message_id)
     .single();
   if (fetchErr) throw fetchErr;
@@ -18,10 +18,15 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
   if (error) throw error;
 
   // --- Begin: Embed on Reaction (fire and forget) ---
-  // Only embed if the message has not already been embedded
-  // (If you have an embedding_id column or similar, check for it here. Otherwise, embed always.)
   try {
-    if (msg.body && msg.body.trim()) {
+    // Only trigger embedding if:
+    // 1. Message body exists and is non-empty
+    // 2. Message is not already embedded
+    if (
+      msg.body &&
+      msg.body.trim() &&
+      !msg.embedding_id
+    ) {
       fetch('https://YOUR-CHAT-EMBED-WORKER-URL', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -31,7 +36,6 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
           meta: {
             chat_id: msg.chat_id,
             sender_id: msg.sender_id,
-            // Include any other metadata you want for RAG:
             dog_id: msg.dog_id || null,
             household_id: msg.household_id || null
             // ...more as needed
@@ -40,13 +44,13 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
       }).catch(err => console.error('[Chat Embed Worker]', err));
     }
   } catch (err) {
-    // Log but never block addReaction on embedding errors
     console.error('[Chat Embed Worker]', err);
   }
   // --- End: Embed on Reaction ---
 
   return data;
 }
+
 
 export async function removeReaction(supabase, message_id, user_id, emoji) {
   const { data: msg, error: fetchErr } = await supabase
