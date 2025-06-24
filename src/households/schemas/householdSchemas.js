@@ -6,26 +6,26 @@ const Household = {
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
-    tenant_id: { type: 'string', 'null', format: 'uuid' },
+    tenant_id: { type: ['string', 'null'], format: 'uuid' },
     display_name: { type: ['string', 'null'] },
     primary_contact_id: { type: ['string', 'null'], format: 'uuid' },
     notes: { type: ['string', 'null'] },
     created_at: { type: 'string', format: 'date-time' },
     updated_at: { type: 'string', format: 'date-time' }
   },
-  required: ['id', 'tenant_id', 'created_at', 'updated_at']
+  required: ['id', 'created_at', 'updated_at'] // remove 'tenant_id' from required!
 };
 
 const CreateHousehold = {
   $id: 'CreateHousehold',
   type: 'object',
   properties: {
-    tenant_id: { type: 'string', 'null', format: 'uuid' },
+    tenant_id: { type: ['string', 'null'], format: 'uuid' },
     display_name: { type: ['string', 'null'] },
     primary_contact_id: { type: ['string', 'null'], format: 'uuid' },
     notes: { type: ['string', 'null'] }
   },
-  required: ['tenant_id']
+  required: [] // You could leave empty or just ['display_name'] if you want
 };
 
 const HouseholdMember = {
