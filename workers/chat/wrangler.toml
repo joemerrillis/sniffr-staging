@@ -1,4 +1,8 @@
-name = "sniffr-chat-worker"
-main = "chat-worker.js"
-compatibility_date = "2025-06-24"
-account_id = "774b68e8a6ad8edd33820cd760f785d9"
+name = "embed-chat-worker"
+main = "embed-chat-worker.js"
+compatibility_date = "2024-06-01"
+
+[vectorize]
+bindings = [
+  { binding = "VECTORIZE_TEXT", index_name = "sniffr-chat-embeddings" }
+]
