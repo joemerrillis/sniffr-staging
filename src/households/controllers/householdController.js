@@ -13,11 +13,29 @@ export async function createHouseholdHandler(request, reply) {
     const supabase = getSupabase(request);
     const payload = request.body;
     const household = await createHousehold(supabase, payload);
+    // Add this debug log:
+    console.log('DEBUG: Supabase insert result in createHouseholdHandler:', household);
+
+    // Defensive: check for ID, fallback to fetch last household if missing
+    if (!household || !household.id) {
+      console.warn('WARN: No household.id in insert result, trying fallback fetch.');
+      const { data: fetched, error } = await supabase
+        .from('households')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      console.log('DEBUG: Fallback fetch result:', fetched, error);
+      return reply.code(201).send({ data: fetched });
+    }
+
     return reply.code(201).send({ data: household });
   } catch (err) {
+    console.error('ERROR in createHouseholdHandler:', err);
     return reply.code(400).send({ error: err.message });
   }
 }
+
 
 export async function getHouseholdHandler(request, reply) {
   try {
