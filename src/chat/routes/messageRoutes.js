@@ -1,5 +1,3 @@
-// src/chat/routes/messageRoutes.js
-
 import {
   listMessagesHandler,
   sendMessageHandler,
@@ -19,6 +17,18 @@ export default async function (fastify, opts) {
       querystring: {
         limit: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
         before: { type: ['string', 'null'], format: 'date-time' }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: 'ChatMessage#' }
+            }
+          },
+          required: ['data']
+        }
       }
     }
   });
@@ -32,7 +42,15 @@ export default async function (fastify, opts) {
       description: 'Send a message in a chat.',
       params: { id: { type: 'string', format: 'uuid' } },
       body: { $ref: 'CreateChatMessage#' },
-      response: { 201: { $ref: 'ChatMessage#' } }
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'ChatMessage#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -50,6 +68,15 @@ export default async function (fastify, opts) {
           new_body: { type: 'string' }
         },
         required: ['new_body']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'ChatMessage#' }
+          },
+          required: ['data']
+        }
       }
     }
   });
@@ -61,7 +88,16 @@ export default async function (fastify, opts) {
     schema: {
       tags: ['Chat'],
       description: 'Delete a message (soft delete).',
-      params: { id: { type: 'string', format: 'uuid' } }
+      params: { id: { type: 'string', format: 'uuid' } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'ChatMessage#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 }
