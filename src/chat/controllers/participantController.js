@@ -1,6 +1,6 @@
 // src/chat/controllers/participantController.js
 
-import { addParticipant, removeParticipant } from '../services/chatService.js';
+import { addParticipant, removeParticipant } from '../services/participantService.js';
 import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
 
 
