@@ -75,4 +75,3 @@ export async function updateEmbeddingIdHandler(request, reply) {
   }
   return reply.send({ ok: true, id, embedding_id });
 }
-}
