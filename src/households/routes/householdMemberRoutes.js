@@ -12,7 +12,19 @@ export default async function (fastify, opts) {
     schema: {
       tags: ['Households'],
       description: 'List members of a household.',
-      params: { id: { type: 'string', format: 'uuid' } }
+      params: { id: { type: 'string', format: 'uuid' } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: 'HouseholdMember#' }
+            }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -24,7 +36,16 @@ export default async function (fastify, opts) {
       tags: ['Households'],
       description: 'Add a member to a household.',
       params: { id: { type: 'string', format: 'uuid' } },
-      body: { $ref: 'AddHouseholdMember#' }
+      body: { $ref: 'AddHouseholdMember#' },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'HouseholdMember#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 
@@ -38,6 +59,21 @@ export default async function (fastify, opts) {
       params: {
         id: { type: 'string', format: 'uuid' },
         user_id: { type: 'string', format: 'uuid' }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean' }
+              },
+              required: ['success']
+            }
+          },
+          required: ['data']
+        }
       }
     }
   });
