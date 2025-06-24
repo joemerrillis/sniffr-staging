@@ -1,5 +1,3 @@
-// src/chat/routes/readRoutes.js
-
 import { markReadHandler } from '../controllers/readController.js';
 
 export default async function (fastify, opts) {
@@ -10,7 +8,16 @@ export default async function (fastify, opts) {
     schema: {
       tags: ['Chat'],
       description: 'Mark a message as read by the current user.',
-      params: { id: { type: 'string', format: 'uuid' } }
+      params: { id: { type: 'string', format: 'uuid' } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'ChatMessageRead#' }
+          },
+          required: ['data']
+        }
+      }
     }
   });
 }
