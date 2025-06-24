@@ -100,4 +100,22 @@ export default async function (fastify, opts) {
       }
     }
   });
+  fastify.route({
+  method: 'POST',
+  url: '/messages/:id/embedding',
+  handler: updateEmbeddingIdHandler,
+  schema: {
+    tags: ['Chat'],
+    description: 'Update embedding_id for a chat message.',
+    params: { id: { type: 'string', format: 'uuid' } },
+    body: {
+      type: 'object',
+      properties: {
+        embedding_id: { type: 'string' }
+      },
+      required: ['embedding_id']
+    }
+  }
+});
+
 }
