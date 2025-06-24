@@ -1,5 +1,3 @@
-// src/chat/routes/participantRoutes.js
-
 import { addParticipantHandler, removeParticipantHandler } from '../controllers/participantController.js';
 
 export default async function (fastify, opts) {
@@ -18,6 +16,15 @@ export default async function (fastify, opts) {
           role: { type: ['string', 'null'] }
         },
         required: ['user_id']
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            data: { $ref: 'ChatParticipant#' }
+          },
+          required: ['data']
+        }
       }
     }
   });
@@ -32,6 +39,21 @@ export default async function (fastify, opts) {
       params: {
         id: { type: 'string', format: 'uuid' },
         user_id: { type: 'string', format: 'uuid' }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                success: { type: 'boolean' }
+              },
+              required: ['success']
+            }
+          },
+          required: ['data']
+        }
       }
     }
   });
