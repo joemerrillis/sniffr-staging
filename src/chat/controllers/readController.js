@@ -1,7 +1,8 @@
 // src/chat/controllers/readController.js
 
 import { markRead } from '../services/chatService.js';
-import { getSupabase, getUserId } from '../../utils/chatUtils.js';
+import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
+
 
 // Mark message as read
 export async function markReadHandler(request, reply) {
