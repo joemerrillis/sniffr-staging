@@ -1,7 +1,8 @@
 // src/chat/controllers/chatController.js
 
 import { createChat, getChatsForUser, getChatById } from '../services/chatService.js';
-import { getSupabase, getUserId, getTenantId } from '../../utils/chatUtils.js';
+import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
+
 
 // List all chats for user
 export async function listChats(request, reply) {
