@@ -23,7 +23,8 @@
     "@fastify/multipart": "^6.0.0",
     "form-data": "^4.0.0",
     "replicate": "^1.0.1",
-    "@fastify/rapi-doc": "^5.1.0"
+    "fastify-rapi-doc": "^5.1.0"
+
   },
   "devDependencies": {
     "nodemon": "^2.0.22",
