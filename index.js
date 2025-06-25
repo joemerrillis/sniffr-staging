@@ -6,6 +6,9 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyMultipart from '@fastify/multipart';
 
+import fastifyStatic from '@fastify/static';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 
 // --- Feature Plugins ---
@@ -43,6 +46,16 @@ console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN);
 const fastify = Fastify({ logger: true });
 
 await fastify.register(fastifyMultipart);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+await fastify.register(fastifyStatic, {
+  root: path.join(__dirname, 'docs'),
+  prefix: '/docs/',    // all files served under /docs/*
+  decorateReply: false // don't add .sendFile to reply
+});
+
 
 // Initialize Replicate client
 const replicate = new Replicate({
