@@ -50,7 +50,7 @@ const __dirname = path.dirname(__filename);
 // ---- FIX: Serve static files at /docs/static ----
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'docs'),
-  prefix: '/docs/static/', // so your static docs are at /docs/static/*
+  prefix: '/rapi-doc/', // so your static docs are at /rapi-doc/*
   decorateReply: false
 });
 
