@@ -2,7 +2,8 @@ import {
   listMessagesHandler,
   sendMessageHandler,
   editMessageHandler,
-  deleteMessageHandler
+  deleteMessageHandler,
+  updateEmbeddingIdHandler 
 } from '../controllers/messageController.js';
 
 export default async function (fastify, opts) {
