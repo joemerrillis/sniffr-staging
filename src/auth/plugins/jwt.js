@@ -26,7 +26,8 @@ export default fp(async function jwtPlugin(fastify, opts) {
     '/auth',
     '/docs',
     '/dog-memories/test-upload',
-    '/dog-memories/upload'
+    '/dog-memories/upload',
+    '/rapi-doc/rapidoc'
   ];
 
   fastify.addHook('onRequest', async (request, reply) => {
