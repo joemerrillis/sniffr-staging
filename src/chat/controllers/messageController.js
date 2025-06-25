@@ -3,7 +3,7 @@
 import { sendMessage, listMessages, editMessage, deleteMessage } from '../services/messageService.js';
 import { getSupabase, getUserId, getTenantId } from '../utils/chatUtils.js';
 
-// Add at the top, or wherever your other exports are:
+// Update embedding_id handler
 export async function updateEmbeddingIdHandler(request, reply) {
   const { id } = request.params;
   const { embedding_id } = request.body;
@@ -25,7 +25,6 @@ export async function updateEmbeddingIdHandler(request, reply) {
   }
   return reply.send({ ok: true, id, embedding_id });
 }
-
 
 // List messages in a chat (paginated)
 export async function listMessagesHandler(request, reply) {
@@ -76,25 +75,4 @@ export async function deleteMessageHandler(request, reply) {
   } catch (err) {
     return reply.code(403).send({ error: err.message });
   }
-}
-export async function updateEmbeddingIdHandler(request, reply) {
-  const { id } = request.params;
-  const { embedding_id } = request.body;
-
-  if (!embedding_id) {
-    return reply.code(400).send({ error: 'embedding_id required' });
-  }
-
-  const supabase = request.server.supabase || request.supabase || request.app.supabase;
-  const { data, error } = await supabase
-    .from('chat_messages')
-    .update({ embedding_id })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    return reply.code(500).send({ error: error.message });
-  }
-  return reply.send({ ok: true, id, embedding_id });
 }
