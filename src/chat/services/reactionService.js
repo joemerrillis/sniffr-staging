@@ -82,6 +82,16 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
   return data;
 }
 
+// After receiving embedding from worker:
+const embeddingId = embedResult.id;
+
+await fetch(`${YOUR_API_BASE}/messages/${message_id}/embedding`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${yourServiceToken}` }, // if needed
+  body: JSON.stringify({ embedding_id: embeddingId })
+});
+
+
 export async function removeReaction(supabase, message_id, user_id, emoji) {
   console.log(`[removeReaction] Called for message_id: ${message_id}, user_id: ${user_id}, emoji: ${emoji}`);
 
