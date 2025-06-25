@@ -5,6 +5,7 @@ import Replicate from 'replicate';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyMultipart from '@fastify/multipart';
+import fastifyRapiDoc from '@fastify/rapi-doc';
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
@@ -90,6 +91,16 @@ await fastify.register(fastifySwaggerUi, {
     docExpansion: 'none',
     deepLinking: false
   }
+});
+
+// Register RapiDoc *after* Swagger, if you want both
+await fastify.register(fastifyRapiDoc, {
+  routePrefix: '/rapi-doc',
+  exposeRoute: true,
+  swagger: fastify.swagger(),  // this uses your already registered OpenAPI spec!
+  theme: 'dark',               // or 'light'
+  title: 'Sniffr API Docs',    // Custom page title
+  // MANY more options available!
 });
 
 // --- Core (Supabase client, error hooks, logging) ---
