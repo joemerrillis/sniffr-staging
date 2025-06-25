@@ -5,7 +5,9 @@ import Replicate from 'replicate';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyMultipart from '@fastify/multipart';
-import fastifyRapiDoc from '@fastify/rapi-doc';
+import fastifyRapiDoc from 'fastify-rapi-doc';
+
+
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
