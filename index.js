@@ -87,7 +87,7 @@ await fastify.register(fastifySwagger, {
 await fastify.register(fastifySwaggerUi, {
   routePrefix: '/docs',
   uiConfig: {
-    docExpansion: 'full',
+    docExpansion: 'none',
     deepLinking: false
   }
 });
