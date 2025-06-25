@@ -112,13 +112,29 @@ export default {
     console.log("Vectorize TEXT record:", record);
 
     // Store in Vectorize (dedicated text index)
-    try {
-      await env.VECTORIZE_TEXT.insert([record]);
-      console.log("Vectorize insert OK, id:", id);
-      return new Response(JSON.stringify({ ok: true, id }), { status: 201, headers: { "content-type": "application/json" } });
-    } catch (e) {
-      console.log("Vectorize insert failed:", e);
-      return new Response(JSON.stringify({ error: "Vectorize insert failed", details: e.message }), { status: 500 });
-    }
+try {
+  await env.VECTORIZE_TEXT.insert([record]);
+  console.log("Vectorize insert OK, id:", id);
+
+  // PATCH to update embedding_id in your API
+  try {
+    const apiRes = await fetch("https://test.sniffrpack.com/messages/" + id + "/embedding", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        // Add Authorization header here if needed!
+      },
+      body: JSON.stringify({ embedding_id: id })
+    });
+    const apiText = await apiRes.text();
+    console.log("PATCH embedding_id API response:", apiRes.status, apiText);
+  } catch (e) {
+    console.log("Failed to PATCH embedding_id back to API:", e);
   }
-};
+
+  return new Response(JSON.stringify({ ok: true, id }), { status: 201, headers: { "content-type": "application/json" } });
+} catch (e) {
+  console.log("Vectorize insert failed:", e);
+  return new Response(JSON.stringify({ error: "Vectorize insert failed", details: e.message }), { status: 500 });
+}
+
