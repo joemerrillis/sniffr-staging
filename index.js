@@ -10,7 +10,6 @@ import fastifyStatic from '@fastify/static';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
 import authPlugin from './src/auth/index.js';
@@ -38,10 +37,8 @@ import dogFriendsPlugin from './src/dogFriends/index.js';
 import visibilityPlugin from './src/dogVisibility/index.js';
 import chatPlugin from './src/chat/index.js';
 
-
 dotenv.config();
 console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN);
-
 
 const fastify = Fastify({ logger: true });
 
@@ -50,12 +47,12 @@ await fastify.register(fastifyMultipart);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ---- FIX: Serve static files at /docs/static ----
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'docs'),
-  prefix: '/docs/',    // all files served under /docs/*
-  decorateReply: false // don't add .sendFile to reply
+  prefix: '/docs/static/', // so your static docs are at /docs/static/*
+  decorateReply: false
 });
-
 
 // Initialize Replicate client
 const replicate = new Replicate({
@@ -66,16 +63,15 @@ async function getClipEmbeddingFromFile(filePath) {
   const file = fs.readFileSync(filePath);
   const base64 = file.toString('base64');
   const dataUri = `data:image/${path.extname(filePath).substring(1)};base64,${base64}`;
-
   const output = await replicate.run(
     "krthr/clip-embeddings:latest",
     {
       input: { image: "https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/<image_id>/<variant_name>" },
     }
   );
-
   return output.embedding;
 }
+
 // --- Register Swagger (OpenAPI) docs FIRST ---
 await fastify.register(fastifySwagger, {
   openapi: {
@@ -98,15 +94,15 @@ await fastify.register(fastifySwagger, {
     ]
   }
 });
+
 // --- Register Swagger UI ---
 await fastify.register(fastifySwaggerUi, {
-  routePrefix: '/docs',
+  routePrefix: '/docs', // this is still your main /docs page
   uiConfig: {
     docExpansion: 'none',
     deepLinking: false
   }
 });
-
 
 // --- Core (Supabase client, error hooks, logging) ---
 await fastify.register(corePlugin);
@@ -117,15 +113,12 @@ fastify.get('/healthz', async () => ({ status: 'ok' }));
 // Clip embedding endpoint
 fastify.post('/dogs/:id/embedding', async (req, reply) => {
   const { id } = req.params;
-  const { imagePath } = req.body; // or parse upload file
-
+  const { imagePath } = req.body;
   if (!imagePath) {
     return reply.code(400).send({ error: "Select a local imagePath<1MB to embed." });
   }
-
   try {
     const embedding = await getClipEmbeddingFromFile(imagePath);
-    // Save/use the embedding for dog ID ...
     return { dogId: id, embedding };
   } catch (err) {
     fastify.log.error(err);
@@ -161,8 +154,6 @@ await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
 await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
 await fastify.register(chatPlugin, { prefix: '/chats' });
 
-
-
 // --- GLOBAL ERROR HANDLER ---
 fastify.setErrorHandler((error, request, reply) => {
   request.log.error({ err: error }, '[GLOBAL ERROR HANDLER]');
@@ -188,8 +179,9 @@ const start = async () => {
     const port = Number(process.env.PORT) || 3000;
     await fastify.listen({ port, host: '0.0.0.0' });
     fastify.log.info(`🚀 Server listening on 0.0.0.0:${port}`);
-    fastify.log.info(`📚 Swagger UI at /docs/static/index.html`);
+    fastify.log.info(`📚 Swagger UI at /docs`);
     fastify.log.info(`❤️ Health check at /healthz`);
+    fastify.log.info(`📝 Static docs at /docs/static/rapidoc.html`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
