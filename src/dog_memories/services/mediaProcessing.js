@@ -21,10 +21,22 @@ export async function onPhotoUploaded({ memory }) {
   const dogNames = await getDogNamesFromIds(memory.dog_ids);
   const eventType = memory.event_type || null;
 
-  // Fire all workers async (do not await)
+  // (1) Fire embedding (fire-and-forget)
   callEmbeddingWorker(memory, dogNames);
-  callCaptionWorker(memory, dogNames, eventType);
-  callTagsWorker(memory, dogNames);
+
+  // (2) Fire designer, WAIT for result
+  let personalitySummary = null;
+  try {
+    personalitySummary = await callDesignerWorker(memory, dogNames, eventType);
+  } catch (e) {
+    console.error("[DesignerWorker] Error (proceeding without personality):", e);
+  }
+
+  // (3) Fire caption, passing personalitySummary
+  await callCaptionWorker(memory, dogNames, eventType, personalitySummary);
+
+  // (4) Fire tags, passing personalitySummary
+  await callTagsWorker(memory, dogNames, personalitySummary);
 }
 
 // -- WORKER CALL HELPERS --
@@ -71,7 +83,42 @@ async function callEmbeddingWorker(memory, dogNames) {
   }
 }
 
-async function callCaptionWorker(memory, dogNames, eventType) {
+async function callDesignerWorker(memory, dogNames, eventType) {
+  const designerUrl = process.env.CF_DESIGNER_URL;
+  if (!designerUrl) {
+    console.error("[DesignerWorker] No CF_DESIGNER_URL set");
+    return null;
+  }
+
+  const payload = {
+    image_url: memory.image_url,
+    dog_names: dogNames,
+    event_type: eventType,
+    meta: { memory_id: memory.id, dog_ids: memory.dog_ids }
+  };
+
+  console.log("[DesignerWorker] Sending payload:", JSON.stringify(payload));
+  try {
+    const res = await fetch(designerUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    console.log("[DesignerWorker] Response:", JSON.stringify(data));
+    // Assume it returns: { personalitySummary: "..." }
+    if (res.ok && typeof data.personalitySummary === "string") {
+      return data.personalitySummary;
+    }
+    return null;
+  } catch (e) {
+    console.error("[DesignerWorker] Error:", e);
+    return null;
+  }
+}
+
+async function callCaptionWorker(memory, dogNames, eventType, personalitySummary = null) {
   const captionUrl = process.env.CF_CAPTION_URL;
   if (!captionUrl) return console.error("[CaptionWorker] No CF_CAPTION_URL set");
 
@@ -79,7 +126,11 @@ async function callCaptionWorker(memory, dogNames, eventType) {
     image_url: memory.image_url,
     dog_names: dogNames,
     event_type: eventType,
-    meta: { memory_id: memory.id, dog_ids: memory.dog_ids }
+    meta: {
+      memory_id: memory.id,
+      dog_ids: memory.dog_ids,
+      personalitySummary // Pass to caption-worker
+    }
   };
 
   console.log("[CaptionWorker] Sending payload:", JSON.stringify(payload));
@@ -106,14 +157,18 @@ async function callCaptionWorker(memory, dogNames, eventType) {
   }
 }
 
-async function callTagsWorker(memory, dogNames) {
+async function callTagsWorker(memory, dogNames, personalitySummary = null) {
   const tagsUrl = process.env.CF_TAGS_URL;
   if (!tagsUrl) return console.error("[TagsWorker] No CF_TAGS_URL set");
 
   const payload = {
     image_url: memory.image_url,
     dog_names: dogNames,
-    meta: { memory_id: memory.id, dog_ids: memory.dog_ids }
+    meta: {
+      memory_id: memory.id,
+      dog_ids: memory.dog_ids,
+      personalitySummary // Pass to tags-worker
+    }
   };
 
   console.log("[TagsWorker] Sending payload:", JSON.stringify(payload));
