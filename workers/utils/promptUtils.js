@@ -5,16 +5,23 @@
  * @param {Array<string>} dogNames - Array of dog names, may be empty or contain "Unknown".
  * @returns {string} - Prompt for LLaVA.
  */
-export function buildTagsPrompt(dogNames = []) {
+export function buildTagsPrompt(dogNames = [], personality = "") {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
+  let namePart = "";
   if (knownNames.length === 1) {
-    return `List five short, comma-separated hashtags or descriptive words for this photo of a dog named ${knownNames[0]}.`;
+    namePart = `the dog named ${knownNames[0]}`;
   } else if (knownNames.length > 1) {
-    return `List five short, comma-separated hashtags or descriptive words for this photo of dogs named ${knownNames.join(' and ')}.`;
+    namePart = `the dogs named ${knownNames.join(' and ')}`;
   } else {
-    return `List five short, comma-separated hashtags or descriptive words for this photo of a dog or multiple dogs.`;
+    namePart = `the dog`;
   }
+  if (personality && personality.length > 0) {
+    return `List five short, comma-separated hashtags or descriptive words for this photo of ${namePart}. Consider this about the dog's personality: ${personality}`;
+  }
+  // Fallback if no personality
+  return `List five short, comma-separated hashtags or descriptive words for this photo of ${namePart}.`;
 }
+
 
 /**
  * Builds a caption prompt for the caption-worker.
