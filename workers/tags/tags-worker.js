@@ -25,6 +25,24 @@ export default {
     // --- DEBUG LOG: Input
     console.log("Input received:", { image_url, dog_names, meta });
 
+    // --- New: get dog_id for personality fetch ---
+    const dog_id = Array.isArray(meta?.dog_ids) && meta.dog_ids.length > 0 ? meta.dog_ids[0] : null;
+    let personalitySummary = "";
+    if (dog_id && env.CF_DESIGNER_URL) {
+      try {
+        const designerRes = await fetch(env.CF_DESIGNER_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ dog_id })
+        });
+        const designerJson = await designerRes.json();
+        personalitySummary = designerJson.personalitySummary || "";
+        console.log("Fetched personalitySummary:", personalitySummary);
+      } catch (e) {
+        console.log("Failed to fetch personality from designer-worker:", e);
+      }
+    }
+
     // Fetch image as base64 Data URI
     let imageBase64;
     try {
@@ -49,8 +67,8 @@ export default {
     const MODEL_VERSION = "80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb";
     const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
 
-    // Build your prompt using utility
-    const prompt = buildTagsPrompt(dog_names);
+    // Build your prompt using utility, passing personalitySummary
+    const prompt = buildTagsPrompt(dog_names, personalitySummary);
 
     // Call Replicate: POST to start the prediction
     let result;
