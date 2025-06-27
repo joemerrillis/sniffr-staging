@@ -50,7 +50,7 @@ export default {
     const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
 
     // Build your prompt using utility
-    const prompt = buildCaptionPrompt({ dogNames: dog_names, eventType: event_type });
+    const prompt = buildCaptionPrompt({ dogNames: dog_names, eventType: event_type, personalitySummary: meta?.personalitySummary });
 
     // Call Replicate: POST to start the prediction
     let result;
