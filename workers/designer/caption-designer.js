@@ -18,15 +18,14 @@ export default {
       return new Response(JSON.stringify({ error: "dog_id required" }), { status: 400 });
     }
 
-    // --- Example: Query vector DB for personality-rich chat logs about this dog
+    // --- Query vector DB for personality-rich chat logs about this dog
     let matches;
     try {
-      // Use a simple query for "describe personality" or "dog likes/dislikes"
       const query = "Describe the dog's personality, likes, dislikes, or funny stories";
       matches = await env.VECTORIZE_TEXT.query({
         topK: max,
-        vector: null, // You could embed the query, or use a filter by dog_id
-        filter: { dog_id },
+        vector: null,
+        filter: { dog_id }
       });
     } catch (e) {
       return new Response(JSON.stringify({ error: "Vector search failed", details: e.message }), { status: 500 });
@@ -35,16 +34,46 @@ export default {
     // --- Collect relevant texts
     const texts = (matches?.matches || []).map(m => m.metadata?.body || '').filter(Boolean);
 
-    // --- Summarize or just return snippets (basic version, LLM-powered summary could be next)
+    // --- Prepare a summary: join a few of the best lines into a single string
     const bullets = texts
       .slice(0, 8)
-      .map(t => "- " + t.replace(/\n/g, ' ').slice(0, 140)); // clean, truncate
+      .map(t => t.replace(/\n/g, ' ').slice(0, 160));
 
-    // Optionally: Call out to Replicate/OpenAI to get a summary if needed here.
+    let personalitySummary;
+    if (bullets.length > 0) {
+      personalitySummary = bullets.join(" ");
+    } else {
+      personalitySummary = "No known personality details yet. Try chatting more about this dog!";
+    }
+
+    // --- [Optional] Summarize using an LLM (e.g., Replicate/OpenAI)
+    /*
+    if (bullets.length > 0 && env.REPLICATE_API_TOKEN) {
+      // If you want to use an LLM, uncomment and adjust this
+      const prompt = `Summarize the following about the dog's personality for use in writing captions:\n\n${bullets.join("\n")}\n\nSummary:`;
+      const replicateRes = await fetch("https://api.replicate.com/v1/predictions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${env.REPLICATE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          version: "<your-text-generation-model-id>",
+          input: { prompt }
+        }),
+      });
+      const replicateJson = await replicateRes.json();
+      // Parse and set personalitySummary accordingly
+      if (replicateJson.output && typeof replicateJson.output === 'string') {
+        personalitySummary = replicateJson.output.trim();
+      }
+    }
+    */
 
     return new Response(JSON.stringify({
       dog_id,
-      personality_snippets: bullets,
+      personalitySummary,
+      personality_snippets: bullets, // for debug/curiosity/future
       raw_texts: texts
     }), {
       status: 200,
