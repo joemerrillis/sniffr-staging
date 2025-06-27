@@ -18,13 +18,14 @@ export function buildTagsPrompt(dogNames = []) {
 
 /**
  * Builds a caption prompt for the caption-worker.
- * If the event_type is 'walk', prompt for an adventure-style caption.
+ * Optionally includes a personality summary (from designer worker).
  * @param {Object} options
  *   - dogNames: Array<string> (optional)
  *   - eventType: string (e.g., 'walk', 'boarding', ...)
+ *   - personalitySummary: string (optional, e.g. "Goofy, obsessed with squirrels, loves belly rubs")
  * @returns {string} - Prompt for LLaVA.
  */
-export function buildCaptionPrompt({ dogNames = [], eventType } = {}) {
+export function buildCaptionPrompt({ dogNames = [], eventType, personalitySummary } = {}) {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
   let namePart = "";
 
@@ -36,10 +37,16 @@ export function buildCaptionPrompt({ dogNames = [], eventType } = {}) {
     namePart = `the dog`;
   }
 
+  // Add the personality info if provided
+  let personalityPart = "";
+  if (personalitySummary && personalitySummary.trim()) {
+    personalityPart = ` Channel this personality in the dog's voice: ${personalitySummary.trim()}.`;
+  }
+
   if (eventType === "walk") {
-    return `Write a lively, story-like one-sentence caption for this photo of ${namePart} on an outdoor adventure walk. Capture the excitement, energy, or curiosity of being out and about.`;
+    return `Write a lively, story-like one-sentence caption for this photo of ${namePart} on an outdoor adventure walk. Capture the excitement, energy, or curiosity of being out and about.${personalityPart}`;
   } else {
     // Default: normal caption
-    return `Write a vivid, emotionally engaging one-sentence Instagram-style caption for this photo of ${namePart}. Keep it short and fun.`;
+    return `Write a vivid, emotionally engaging one-sentence Instagram-style caption for this photo of ${namePart}.${personalityPart} Keep it short and fun.`;
   }
 }
