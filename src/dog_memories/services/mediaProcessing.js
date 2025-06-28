@@ -26,15 +26,14 @@ async function getDogNamesFromIds(dogIds) {
 
 // --- Helper: get most recent embedding_id from chat_messages for this dog ---
 async function getMostRecentEmbeddingIdForDog(dogId) {
-  const { data, error } = await supabase
-    .from('chat_messages')
-    .select('embedding_id')
-    .eq('dog_id', dogId)
-    .not('embedding_id', 'is', null)
-    .not('reactions', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+const { data, error } = await supabase
+  .from('chat_messages')
+  .select('*')
+  .filter('dog_ids', 'cs', `{"${dogId}"}`)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+
 
   if (error) {
     console.error("[getMostRecentEmbeddingIdForDog] Supabase error:", error);
