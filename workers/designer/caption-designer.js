@@ -18,23 +18,42 @@ export default {
       return new Response(JSON.stringify({ error: "dog_id required" }), { status: 400 });
     }
 
-    // --- Query vector DB for personality-rich chat logs about this dog
+    // --- (1) Find most recent message with reaction and embedding
+    let queryVector = null;
+    try {
+      // Look up most recent message for this dog with an embedding
+      // NOTE: You can't directly query your Supabase DB from this worker;
+      // you may want to pass the embedding_id in the POST, or pre-fetch it.
+      // For demo, try to find the most recent *vector* for this dog in Vectorize:
+      // (If you have the embedding_id, use get(embedding_id) below.)
+      const matches = await env.VECTORIZE_TEXT.query({
+        topK: 1,
+        filter: { dog_id },
+      });
+      if (matches?.matches?.[0]?.values) {
+        queryVector = matches.matches[0].values;
+      }
+    } catch (e) {
+      // It is OK if no vector found; just fallback to keyword filter.
+      queryVector = null;
+    }
+
+    // --- (2) Query for personality-rich chat logs for this dog, using queryVector if available
     let matches;
     try {
-      const query = "Describe the dog's personality, likes, dislikes, or funny stories";
       matches = await env.VECTORIZE_TEXT.query({
         topK: max,
-        vector: null,
+        vector: queryVector || null,
         filter: { dog_id }
       });
     } catch (e) {
       return new Response(JSON.stringify({ error: "Vector search failed", details: e.message }), { status: 500 });
     }
 
-    // --- Collect relevant texts
+    // --- (3) Collect relevant texts
     const texts = (matches?.matches || []).map(m => m.metadata?.body || '').filter(Boolean);
 
-    // --- Prepare a summary: join a few of the best lines into a single string
+    // --- (4) Prepare a summary: join a few of the best lines into a single string
     const bullets = texts
       .slice(0, 8)
       .map(t => t.replace(/\n/g, ' ').slice(0, 160));
@@ -46,34 +65,12 @@ export default {
       personalitySummary = "No known personality details yet. Try chatting more about this dog!";
     }
 
-    // --- [Optional] Summarize using an LLM (e.g., Replicate/OpenAI)
-    /*
-    if (bullets.length > 0 && env.REPLICATE_API_TOKEN) {
-      // If you want to use an LLM, uncomment and adjust this
-      const prompt = `Summarize the following about the dog's personality for use in writing captions:\n\n${bullets.join("\n")}\n\nSummary:`;
-      const replicateRes = await fetch("https://api.replicate.com/v1/predictions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${env.REPLICATE_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          version: "<your-text-generation-model-id>",
-          input: { prompt }
-        }),
-      });
-      const replicateJson = await replicateRes.json();
-      // Parse and set personalitySummary accordingly
-      if (replicateJson.output && typeof replicateJson.output === 'string') {
-        personalitySummary = replicateJson.output.trim();
-      }
-    }
-    */
+    // --- [Optional] Summarize using LLM (as before, see commented section) ---
 
     return new Response(JSON.stringify({
       dog_id,
       personalitySummary,
-      personality_snippets: bullets, // for debug/curiosity/future
+      personality_snippets: bullets,
       raw_texts: texts
     }), {
       status: 200,
