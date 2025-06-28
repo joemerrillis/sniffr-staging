@@ -1,6 +1,9 @@
 import fetch from 'node-fetch';
 import { updateDogMemory } from '../models/dogMemoryModel.js';
 import { getDogById } from '../../dogs/models/dogModel.js';
+import { createSupabaseClient } from '../../core/utils/supabaseClient.js'; // <-- adjust path if needed
+
+const supabase = createSupabaseClient();
 
 // Helper to get all dog names, returns an array
 async function getDogNamesFromIds(dogIds) {
@@ -17,6 +20,25 @@ async function getDogNamesFromIds(dogIds) {
   return names.length ? names : ["Unknown"];
 }
 
+// --- Helper: get most recent embedding_id from chat_messages for this dog ---
+async function getMostRecentEmbeddingIdForDog(dogId) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('embedding_id')
+    .eq('dog_id', dogId)
+    .not('embedding_id', 'is', null)
+    .not('reactions', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    console.error("[getMostRecentEmbeddingIdForDog] Supabase error:", error);
+    return null;
+  }
+  return data?.embedding_id || null;
+}
+
 export async function onPhotoUploaded({ memory }) {
   const dogNames = await getDogNamesFromIds(memory.dog_ids);
   const eventType = memory.event_type || null;
@@ -24,18 +46,25 @@ export async function onPhotoUploaded({ memory }) {
   // (1) Fire embedding (fire-and-forget)
   callEmbeddingWorker(memory, dogNames);
 
-  // (2) Fire designer, WAIT for result
+  // (2) Find single dog_id, and its most recent embedding_id
   let personalitySummary = null;
+  const dogId = Array.isArray(memory.dog_ids) ? memory.dog_ids[0] : memory.dog_ids;
+  let embeddingId = null;
+  if (dogId) {
+    embeddingId = await getMostRecentEmbeddingIdForDog(dogId);
+  }
+
+  // (3) Fire designer, WAIT for result, passing embeddingId
   try {
-    personalitySummary = await callDesignerWorker(memory);
+    personalitySummary = await callDesignerWorker(memory, dogId, embeddingId);
   } catch (e) {
     console.error("[DesignerWorker] Error (proceeding without personality):", e);
   }
 
-  // (3) Fire caption, passing personalitySummary
+  // (4) Fire caption, passing personalitySummary
   await callCaptionWorker(memory, dogNames, eventType, personalitySummary);
 
-  // (4) Fire tags, passing personalitySummary
+  // (5) Fire tags, passing personalitySummary
   await callTagsWorker(memory, dogNames, personalitySummary);
 }
 
@@ -48,7 +77,7 @@ async function callEmbeddingWorker(memory, dogNames) {
   const payload = {
     image_url: memory.image_url,
     dog_names: dogNames,
-    dog_name: dogNames[0] || "Unknown", // <--- Must be string
+    dog_name: dogNames[0] || "Unknown",
     meta: {
       memory_id: memory.id,
       dog_ids: memory.dog_ids,
@@ -83,15 +112,13 @@ async function callEmbeddingWorker(memory, dogNames) {
   }
 }
 
-async function callDesignerWorker(memory) {
+async function callDesignerWorker(memory, dogId, embeddingId) {
   const designerUrl = process.env.CF_DESIGNER_URL;
   if (!designerUrl) {
     console.error("[DesignerWorker] No CF_DESIGNER_URL set");
     return null;
   }
 
-  // Extract single dog_id (if array, grab the first one)
-  const dogId = Array.isArray(memory.dog_ids) ? memory.dog_ids[0] : memory.dog_ids;
   if (!dogId) {
     console.error("[DesignerWorker] No dog_id found in memory.");
     return null;
@@ -99,6 +126,7 @@ async function callDesignerWorker(memory) {
 
   const payload = {
     dog_id: dogId,
+    embedding_id: embeddingId,
     max: 10
   };
 
