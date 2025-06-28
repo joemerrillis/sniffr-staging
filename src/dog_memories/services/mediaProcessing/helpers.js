@@ -1,7 +1,7 @@
 // src/dog_memories/services/mediaProcessing/helpers.js
 
 import { createClient } from '@supabase/supabase-js';
-import { getDogById } from '../../dogs/models/dogModel.js';
+import { getDogById } from '../../models/dogModel.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
