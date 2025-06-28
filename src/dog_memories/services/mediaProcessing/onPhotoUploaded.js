@@ -2,8 +2,6 @@
 
 import {
   getDogNamesFromIds,
-  getMostRecentEmbeddingIdForDog,
-  getEmbeddingVectorById
 } from './helpers.js';
 
 import {
@@ -20,17 +18,13 @@ export async function onPhotoUploaded({ memory }) {
   // 1. Fire embedding (fire-and-forget)
   callEmbeddingWorker(memory, dogNames);
 
-  // 2. Find single dog_id, get most recent embedding_id
-  let personalitySummary = null;
+  // 2. Get the dog ID (for single-dog logic)
   const dogId = Array.isArray(memory.dog_ids) ? memory.dog_ids[0] : memory.dog_ids;
-  let embeddingId = null;
-  if (dogId) {
-    embeddingId = await getMostRecentEmbeddingIdForDog(dogId);
-  }
 
-  // 3. Fire designer, WAIT for result, passing embedding vector
+  // 3. Fire designer, WAIT for result, passing only dogId (no embedding/vector needed)
+  let personalitySummary = null;
   try {
-    personalitySummary = await callDesignerWorker(memory, dogId, embeddingId, getEmbeddingVectorById);
+    personalitySummary = await callDesignerWorker(memory, dogId);
   } catch (e) {
     console.error("[DesignerWorker] Error (proceeding without personality):", e);
   }
