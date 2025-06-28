@@ -1,5 +1,5 @@
 name = "caption-designer"
-main = "caption-designer.js"
+main = "sniffr-caption-designer.js"
 compatibility_date = "2024-06-28"
 vectorize = [
   { binding = "VECTORIZE_TEXT", index_name = "sniffr-chat-embeddings" }
