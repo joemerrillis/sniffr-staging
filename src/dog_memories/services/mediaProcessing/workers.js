@@ -46,7 +46,7 @@ export async function callEmbeddingWorker(memory, dogNames) {
 }
 
 // DESIGN WORKER (personality)
-export async function callDesignerWorker(memory, dogId, embeddingId, getEmbeddingVectorById) {
+export async function callDesignerWorker(memory, dogId, embeddingId) {
   const designerUrl = process.env.CF_DESIGNER_URL;
   if (!designerUrl) {
     console.error("[DesignerWorker] No CF_DESIGNER_URL set");
