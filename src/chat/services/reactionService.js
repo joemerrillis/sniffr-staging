@@ -15,6 +15,39 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
   }
   console.log('[addReaction] Retrieved message:', msg);
 
+  // --- Dynamically look up dog_ids if missing ---
+  let dogIds = msg.dog_ids;
+  if (!dogIds || !dogIds.length) {
+    // Step 1: Get the chat to find service_id
+    const { data: chat, error: chatErr } = await supabase
+      .from('chats')
+      .select('service_id')
+      .eq('id', msg.chat_id)
+      .single();
+    if (!chatErr && chat && chat.service_id) {
+      // Step 2: Get dog_ids via service_dog table
+      const { data: serviceDogs, error: sdErr } = await supabase
+        .from('service_dog')
+        .select('dog_id')
+        .eq('service_id', chat.service_id);
+      if (!sdErr && serviceDogs && serviceDogs.length) {
+        dogIds = serviceDogs.map(d => d.dog_id);
+        await supabase
+          .from('chat_messages')
+          .update({ dog_ids: dogIds })
+          .eq('id', message_id);
+        msg.dog_ids = dogIds;
+        console.log(`[addReaction] Set dog_ids for message ${message_id}:`, dogIds);
+      } else {
+        dogIds = [];
+        console.log(`[addReaction] Could not find dogs for service_id ${chat.service_id}`);
+      }
+    } else {
+      dogIds = [];
+      console.log(`[addReaction] Could not find chat or service_id for chat_id ${msg.chat_id}`);
+    }
+  }
+
   const reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
   if (reactions.find(r => r.user_id === user_id && r.emoji === emoji)) {
     console.log('[addReaction] Reaction already exists for this user/emoji—skipping update and embedding.');
@@ -44,8 +77,9 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
         updatedMsg.body.trim() &&
         !updatedMsg.embedding_id
       ) {
-        const dogIds = updatedMsg.dog_ids || [];
-        const mainDogId = Array.isArray(dogIds) ? dogIds[0] : dogIds;
+        // Always grab the latest dog_ids before embedding!
+        const dogIdsForEmbed = updatedMsg.dog_ids && updatedMsg.dog_ids.length ? updatedMsg.dog_ids : dogIds || [];
+        const mainDogId = Array.isArray(dogIdsForEmbed) ? dogIdsForEmbed[0] : dogIdsForEmbed;
 
         const embedPayload = {
           message_id: updatedMsg.id,
@@ -54,7 +88,7 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
             chat_id: updatedMsg.chat_id,
             sender_id: updatedMsg.sender_id,
             dog_id: mainDogId || null,
-            dog_ids: dogIds,
+            dog_ids: dogIdsForEmbed,
             household_id: updatedMsg.household_id || null
             // ...more as needed
           }
