@@ -1,9 +1,13 @@
 import fetch from 'node-fetch';
+import { createClient } from '@supabase/supabase-js'; // ← ADD THIS LINE!
 import { updateDogMemory } from '../models/dogMemoryModel.js';
 import { getDogById } from '../../dogs/models/dogModel.js';
-import { createSupabaseClient } from '../../core/utils/supabaseClient.js'; // <-- adjust path if needed
 
-const supabase = createSupabaseClient();
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
 
 // Helper to get all dog names, returns an array
 async function getDogNamesFromIds(dogIds) {
