@@ -1,10 +1,12 @@
+// src/chat/services/reactionService.js
+
 export async function addReaction(supabase, message_id, user_id, emoji) {
   console.log(`[addReaction] Called for message_id: ${message_id}, user_id: ${user_id}, emoji: ${emoji}`);
 
   // Fetch, append, and update
   const { data: msg, error: fetchErr } = await supabase
     .from('chat_messages')
-    .select('*') // Get full message including embedding_id!
+    .select('*')
     .eq('id', message_id)
     .single();
   if (fetchErr) {
@@ -34,33 +36,28 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
   }
   console.log('[addReaction] Message after updating reactions:', updatedMsg);
 
-// --- Begin: Fire-and-forget embedding in background ---
-(async () => {
-  try {
-    if (
-      updatedMsg.body &&
-      updatedMsg.body.trim() &&
-      !updatedMsg.embedding_id
-    ) {
-      // 👇 Define these BEFORE the embedPayload!
-      const dogIds = updatedMsg.dog_ids || [];
-      const mainDogId = Array.isArray(dogIds) ? dogIds[0] : dogIds;
+  // --- Begin: Fire-and-forget embedding in background ---
+  (async () => {
+    try {
+      if (
+        updatedMsg.body &&
+        updatedMsg.body.trim() &&
+        !updatedMsg.embedding_id
+      ) {
+        const dogIds = updatedMsg.dog_ids || [];
+        const mainDogId = Array.isArray(dogIds) ? dogIds[0] : dogIds;
 
-      const embedPayload = {
-        message_id: updatedMsg.id,
-        body: updatedMsg.body,
-        meta: {
-          chat_id: updatedMsg.chat_id,
-          sender_id: updatedMsg.sender_id,
-          dog_id: mainDogId || null,
-          dog_ids: dogIds,
-          household_id: updatedMsg.household_id || null
-          // ...more as needed
-        }
-      };
-      // ...rest of your embedding logic...
-
-
+        const embedPayload = {
+          message_id: updatedMsg.id,
+          body: updatedMsg.body,
+          meta: {
+            chat_id: updatedMsg.chat_id,
+            sender_id: updatedMsg.sender_id,
+            dog_id: mainDogId || null,
+            dog_ids: dogIds,
+            household_id: updatedMsg.household_id || null
+            // ...more as needed
+          }
         };
         console.log('[EMBED CALL] Triggering chat embedding with payload:', embedPayload);
 
