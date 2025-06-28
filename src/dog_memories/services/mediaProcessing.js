@@ -27,7 +27,7 @@ export async function onPhotoUploaded({ memory }) {
   // (2) Fire designer, WAIT for result
   let personalitySummary = null;
   try {
-    personalitySummary = await callDesignerWorker(memory, dogNames, eventType);
+    personalitySummary = await callDesignerWorker(memory);
   } catch (e) {
     console.error("[DesignerWorker] Error (proceeding without personality):", e);
   }
@@ -83,18 +83,23 @@ async function callEmbeddingWorker(memory, dogNames) {
   }
 }
 
-async function callDesignerWorker(memory, dogNames, eventType) {
+async function callDesignerWorker(memory) {
   const designerUrl = process.env.CF_DESIGNER_URL;
   if (!designerUrl) {
     console.error("[DesignerWorker] No CF_DESIGNER_URL set");
     return null;
   }
 
+  // Extract single dog_id (if array, grab the first one)
+  const dogId = Array.isArray(memory.dog_ids) ? memory.dog_ids[0] : memory.dog_ids;
+  if (!dogId) {
+    console.error("[DesignerWorker] No dog_id found in memory.");
+    return null;
+  }
+
   const payload = {
-    image_url: memory.image_url,
-    dog_names: dogNames,
-    event_type: eventType,
-    meta: { memory_id: memory.id, dog_ids: memory.dog_ids }
+    dog_id: dogId,
+    max: 10
   };
 
   console.log("[DesignerWorker] Sending payload:", JSON.stringify(payload));
