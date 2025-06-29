@@ -5,6 +5,10 @@ export const DaycareSession = {
     id:                  { type: 'string', format: 'uuid' },
     tenant_id:           { type: 'string', format: 'uuid' },
     user_id:             { type: 'string', format: 'uuid' },
+    dog_ids: {           // <-- ADDED
+      type: 'array',
+      items: { type: 'string', format: 'uuid' }
+    },
     service_date:        { type: 'string', format: 'date' },
     drop_off_time:       { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     expected_pick_up_time:{ type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
@@ -29,6 +33,10 @@ export const CreateDaycareSession = {
   properties: {
     tenant_id:           { type: 'string', format: 'uuid' },
     user_id:             { type: 'string', format: 'uuid' },
+    dog_ids: {           // <-- ADDED
+      type: 'array',
+      items: { type: 'string', format: 'uuid' }
+    },
     service_date:        { type: 'string', format: 'date' },
     drop_off_time:       { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     expected_pick_up_time:{ type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
@@ -48,6 +56,10 @@ export const UpdateDaycareSession = {
   $id: 'UpdateDaycareSession',
   type: 'object',
   properties: {
+    dog_ids: {           // <-- ADDED
+      type: 'array',
+      items: { type: 'string', format: 'uuid' }
+    },
     drop_off_time:         { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     expected_pick_up_time: { type: 'string', pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
     pick_up_time:          { type: ['string', 'null'], pattern: '^([0-1]?\\d|2[0-3]):([0-5]\\d)$' },
@@ -59,53 +71,4 @@ export const UpdateDaycareSession = {
     proposed_changes:      { type: ['object', 'null'] }
     // All fields optional for PATCH!
   }
-};
-
-// --- Envelope and Response Objects ---
-export const DaycareSessionEnvelope = {
-  $id: 'DaycareSessionEnvelope',
-  type: 'object',
-  properties: {
-    daycare_session: { $ref: 'DaycareSession#' },
-    pending_service: { type: ['object', 'null'] },
-    breakdown: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', format: 'uuid' },
-          name: { type: 'string' },
-          rule_type: { type: 'string' },
-          description: { type: 'string' },
-          adjustment: { type: 'number' },
-          price_so_far: { type: 'number' }
-        },
-        required: ['id','name','rule_type','description','adjustment','price_so_far']
-      }
-    },
-    requiresApproval: { type: 'boolean' }
-  },
-  required: ['daycare_session']
-};
-
-// Optionally, for list endpoints:
-export const DaycareSessionsEnvelope = {
-  $id: 'DaycareSessionsEnvelope',
-  type: 'object',
-  properties: {
-    sessions: {
-      type: 'array',
-      items: { $ref: 'DaycareSession#' }
-    }
-  },
-  required: ['sessions']
-};
-
-// --- Bundle Export ---
-export const daycareSessionSchemas = {
-  DaycareSession,
-  CreateDaycareSession,
-  UpdateDaycareSession,
-  DaycareSessionEnvelope,
-  DaycareSessionsEnvelope
 };
