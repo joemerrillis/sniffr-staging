@@ -2,27 +2,29 @@
 
 import needsApproval from '../helpers/needsApproval.js';
 import { previewPrice } from '../../pricingRules/services/pricingEngine.js';
+import { getDogIdsForRequest } from '../../helpers/dogSelector.js';
 
 export default async function createDaycareSession(payload, server) {
   const { tenant_id, user_id, service_date, drop_off_time, expected_pick_up_time } = payload;
   let { dog_ids, ...rest } = payload;
 
-  // 1. Determine dog_ids to use
-  if (!dog_ids || !Array.isArray(dog_ids) || !dog_ids.length) {
-    const { data: ownedDogs, error: dogErr } = await server.supabase
-      .from('dog_owners')
-      .select('dog_id')
-      .eq('user_id', user_id);
-    if (dogErr) throw new Error('Could not fetch user dogs.');
-    dog_ids = ownedDogs ? ownedDogs.map(d => d.dog_id) : [];
-    if (!dog_ids.length) throw new Error('No dogs found for user.');
+  // 1. Determine dog_ids using the helper
+  let resolvedDogIds = [];
+  try {
+    resolvedDogIds = await getDogIdsForRequest({
+      user_id,
+      supabase: server.supabase,
+      explicitDogIds: dog_ids,
+    });
+  } catch (err) {
+    throw new Error('No dogs found for user, or multiple dogs with none specified.');
   }
 
   // 2. Price preview
   const pricingResult = await previewPrice(server, 'daycare_session', {
     tenant_id,
     service_date,
-    dog_ids,
+    dog_ids: resolvedDogIds,
   });
 
   if (pricingResult.error) throw new Error(pricingResult.error);
@@ -30,7 +32,7 @@ export default async function createDaycareSession(payload, server) {
   const breakdown = pricingResult.breakdown || [];
 
   // 3. Approval logic
-  const requiresApproval = await needsApproval(server, tenant_id, dog_ids, service_date);
+  const requiresApproval = await needsApproval(server, tenant_id, resolvedDogIds, service_date);
 
   // 4. Insert daycare session (no dog_ids column!)
   const { data, error } = await server.supabase
@@ -52,8 +54,8 @@ export default async function createDaycareSession(payload, server) {
 
   // 5. Insert service_dogs rows (link all dogs to this session)
   let insertedServiceDogs = [];
-  if (dog_ids.length) {
-    const dogRows = dog_ids.map(dog_id => ({
+  if (resolvedDogIds.length) {
+    const dogRows = resolvedDogIds.map(dog_id => ({
       service_type: 'daycare',
       service_id: data.id,
       dog_id,
@@ -77,7 +79,7 @@ export default async function createDaycareSession(payload, server) {
         service_date,
         service_type: 'daycare',
         daycare_request_id: data.id,
-        dog_ids,
+        dog_ids: resolvedDogIds,
         details: {
           service_date,
           drop_off_time,
@@ -95,7 +97,7 @@ export default async function createDaycareSession(payload, server) {
   }
 
   return {
-    daycare_session: { ...data, dogs: dog_ids },
+    daycare_session: { ...data, dogs: resolvedDogIds },
     pending_service,
     service_dogs: insertedServiceDogs,
     breakdown,
