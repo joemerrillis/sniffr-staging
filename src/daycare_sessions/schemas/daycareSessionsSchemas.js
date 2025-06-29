@@ -72,3 +72,50 @@ export const UpdateDaycareSession = {
     // All fields optional for PATCH!
   }
 };
+// --- Envelope and Response Objects ---
+export const DaycareSessionEnvelope = {
+  $id: 'DaycareSessionEnvelope',
+  type: 'object',
+  properties: {
+    daycare_session: { $ref: 'DaycareSession#' },
+    pending_service: { type: ['object', 'null'] },
+    breakdown: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          rule_type: { type: 'string' },
+          description: { type: 'string' },
+          adjustment: { type: 'number' },
+          price_so_far: { type: 'number' }
+        },
+        required: ['id','name','rule_type','description','adjustment','price_so_far']
+      }
+    },
+    requiresApproval: { type: 'boolean' }
+  },
+  required: ['daycare_session']
+};
+
+// Optionally, for list endpoints:
+export const DaycareSessionsEnvelope = {
+  $id: 'DaycareSessionsEnvelope',
+  type: 'object',
+  properties: {
+    sessions: {
+      type: 'array',
+      items: { $ref: 'DaycareSession#' }
+    }
+  },
+  required: ['sessions']
+};
+// --- Bundle Export ---
+export const daycareSessionSchemas = {
+  DaycareSession,
+  CreateDaycareSession,
+  UpdateDaycareSession,
+  DaycareSessionEnvelope,
+  DaycareSessionsEnvelope
+};
