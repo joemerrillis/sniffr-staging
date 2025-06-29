@@ -27,7 +27,7 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
     if (!chatErr && chat && chat.service_id) {
       // Step 2: Get dog_ids via service_dog table
       const { data: serviceDogs, error: sdErr } = await supabase
-        .from('service_dog')
+        .from('service_dogs')
         .select('dog_id')
         .eq('service_id', chat.service_id);
       if (!sdErr && serviceDogs && serviceDogs.length) {
