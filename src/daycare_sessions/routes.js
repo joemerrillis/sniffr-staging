@@ -21,11 +21,12 @@ export default async function routes(fastify, opts) {
           type: 'object',
           properties: {
             tenant_id: { type: 'string', format: 'uuid' },
-           dog_ids: {
-  type: 'array',
-  items: { type: 'string', format: 'uuid' }
-},
-
+            dog_id: { type: 'string', format: 'uuid' },
+            dog_ids: {
+              type: 'array',
+              items: { type: 'string', format: 'uuid' }
+            }
+          },
         },
         response: {
           200: {
@@ -72,7 +73,7 @@ export default async function routes(fastify, opts) {
     retrieve
   );
 
-  // POST /daycare_sessions (envelope response!)
+  // POST /daycare_sessions (envelope response! includes dog_ids)
   fastify.post(
     '/',
     {
