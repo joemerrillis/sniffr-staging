@@ -25,13 +25,15 @@ export async function addReaction(supabase, message_id, user_id, emoji) {
       .eq('id', msg.chat_id)
       .single();
     if (!chatErr && chat && chat.service_id) {
-      // Step 2: Get dog_ids via service_dog table
+      console.log(`[addReaction] Found service_id for chat: ${chat.service_id}`);
+      // Step 2: Get dog_ids via service_dogs table (NOT the row PK, but the service FK!)
       const { data: serviceDogs, error: sdErr } = await supabase
         .from('service_dogs')
         .select('dog_id')
         .eq('service_id', chat.service_id);
       if (!sdErr && serviceDogs && serviceDogs.length) {
         dogIds = serviceDogs.map(d => d.dog_id);
+        // Store the found dog_ids on the message!
         await supabase
           .from('chat_messages')
           .update({ dog_ids: dogIds })
