@@ -15,6 +15,13 @@ export default {
     if (!dog_id) {
       return new Response(JSON.stringify({ error: "dog_id required" }), { status: 400 });
     }
+let matchesAll = null;
+try {
+  matchesAll = await env.VECTORIZE_TEXT.query({ topK: 5 }); // no filter!
+  console.log("[DesignerWorker] ALL EMBEDDINGS SAMPLE:", JSON.stringify(matchesAll));
+} catch (e) {
+  console.error("[DesignerWorker] Error fetching all embeddings:", e);
+}
 
     // --- (1) Find most recent chat embedding for this dog
     let queryVector = null;
