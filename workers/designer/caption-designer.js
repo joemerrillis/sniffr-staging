@@ -1,5 +1,3 @@
-// workers/designer/caption-designer.js
-
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== "POST") {
@@ -23,7 +21,7 @@ export default {
     try {
       const matches = await env.VECTORIZE_TEXT.query({
         topK: 1,
-        filter: { dog_id },
+        filter: { dog_ids: dog_id },  // <--- CHANGE HERE
       });
       if (
         matches?.matches?.[0]?.values &&
@@ -33,7 +31,6 @@ export default {
         queryVector = matches.matches[0].values;
       }
     } catch (e) {
-      // Log for debugging, but allow fallback to non-vector search
       console.error("[DesignerWorker] Error fetching recent vector:", e);
       queryVector = null;
     }
@@ -43,7 +40,7 @@ export default {
     try {
       const vectorQuery = {
         topK: max,
-        filter: { dog_id }
+        filter: { dog_ids: dog_id }  // <--- CHANGE HERE TOO
       };
       if (queryVector) {
         vectorQuery.vector = queryVector;
