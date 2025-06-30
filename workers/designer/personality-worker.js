@@ -86,10 +86,12 @@ export default {
       return new Response(JSON.stringify({ error: "Vector search failed", details: e.message }), { status: 500 });
     }
 
-    // --- (3) Collect relevant texts
+    // --- (3) Collect relevant texts and raw metadata
     const texts = (matches?.matches || [])
       .map(m => m.metadata?.body || '')
       .filter(Boolean);
+
+    const rawMatches = matches?.matches || [];
 
     // --- (4) Make a summary
     const bullets = texts
@@ -104,7 +106,8 @@ export default {
       dog_id,
       personalitySummary,
       personality_snippets: bullets,
-      raw_texts: texts
+      raw_texts: texts,
+      raw_matches: rawMatches // <--- this is the new field
     }), {
       status: 200,
       headers: { "content-type": "application/json" }
