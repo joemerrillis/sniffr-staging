@@ -46,15 +46,15 @@ export async function callEmbeddingWorker(memory, dogNames) {
 }
 
 // DESIGN WORKER (personality)
-export async function callDesignerWorker(memory, dogId, embeddingId) {
-  const designerUrl = process.env.CF_DESIGNER_URL;
-  if (!designerUrl) {
-    console.error("[DesignerWorker] No CF_DESIGNER_URL set");
+export async function callPersonalityWorker(memory, dogId, embeddingId) {
+  const personalityUrl = process.env.CF_PERSONALITY_URL;
+  if (!personalityUrl) {
+    console.error("[PersonalityWorker] No CF_PERSONALITY_URL set");
     return null;
   }
 
   if (!dogId) {
-    console.error("[DesignerWorker] No dog_id found in memory.");
+    console.error("[PersonalityWorker] No dog_id found in memory.");
     return null;
   }
 
@@ -63,7 +63,7 @@ export async function callDesignerWorker(memory, dogId, embeddingId) {
     embeddingVector = await getEmbeddingVectorById(embeddingId);
   }
   if (!embeddingVector || !Array.isArray(embeddingVector) || embeddingVector.length !== 768) {
-    console.error("[DesignerWorker] Invalid or missing embedding vector, skipping personality search.");
+    console.error("[PersonalityWorker] Invalid or missing embedding vector, skipping personality search.");
     return null;
   }
 
@@ -73,23 +73,23 @@ export async function callDesignerWorker(memory, dogId, embeddingId) {
     max: 10
   };
 
-  console.log("[DesignerWorker] Sending payload:", JSON.stringify(payload));
+  console.log("[PersonalityWorker] Sending payload:", JSON.stringify(payload));
   try {
-    const res = await fetch(designerUrl, {
+    const res = await fetch(personalityUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
 
-    console.log("[DesignerWorker] Response:", JSON.stringify(data));
+    console.log("[PersonalityWorker] Response:", JSON.stringify(data));
     // Assume { personalitySummary: "..." }
     if (res.ok && typeof data.personalitySummary === "string") {
       return data.personalitySummary;
     }
     return null;
   } catch (e) {
-    console.error("[DesignerWorker] Error:", e);
+    console.error("[PersonalityWorker] Error:", e);
     return null;
   }
 }
