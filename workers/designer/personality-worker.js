@@ -51,7 +51,7 @@ export default {
       try {
         const matches = await env.VECTORIZE_TEXT.query({
           topK: 1,
-          filter: { dog_ids: dog_id }
+          filter: { dog_id }
         });
         if (
           matches?.matches?.[0]?.values &&
@@ -72,7 +72,7 @@ export default {
     try {
       const vectorQuery = {
         topK: max,
-        filter: { dog_ids: dog_id }
+        filter: { dog_id }
       };
       if (queryVector) {
         vectorQuery.vector = queryVector;
