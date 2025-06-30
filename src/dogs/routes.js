@@ -178,7 +178,7 @@ export default async function dogsRoutes(fastify, opts) {
   }, async (req, reply) => {
     const { id } = req.params;
     const { max } = req.body || {};
-    const PERSONALITY_WORKER_URL = "https://sniffr-caption-designer.YOURSUBDOMAIN.workers.dev"; // <--- Replace with your actual URL!
+    const PERSONALITY_WORKER_URL = "https://sniffr-personality-worker.joemerrillis.workers.dev"; // <--- Replace with your actual URL!
     const res = await fetch(PERSONALITY_WORKER_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
