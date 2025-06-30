@@ -6,7 +6,7 @@ import {
 
 import {
   callEmbeddingWorker,
-  callDesignerWorker,
+  callPersonalityWorker,
   callCaptionWorker,
   callTagsWorker
 } from './workers.js';
@@ -24,7 +24,7 @@ export async function onPhotoUploaded({ memory }) {
   // 3. Fire designer, WAIT for result, passing only dogId (no embedding/vector needed)
   let personalitySummary = null;
   try {
-    personalitySummary = await callDesignerWorker(memory, dogId);
+    personalitySummary = await callPersonalityWorker(memory, dogId);
   } catch (e) {
     console.error("[DesignerWorker] Error (proceeding without personality):", e);
   }
