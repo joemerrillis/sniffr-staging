@@ -155,13 +155,12 @@ export default async function dogsRoutes(fastify, opts) {
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-body: {
-  type: 'object',
-  properties: {
-    max: { type: 'integer', minimum: 1, maximum: 30, default: 10 },
-    embedding_id: { type: 'string', description: 'Optionally use a specific embedding as the search vector' }
-  }
-}
+      body: {
+        type: 'object',
+        properties: {
+          max: { type: 'integer', minimum: 1, maximum: 30, default: 10 },
+          embedding_id: { type: 'string', description: 'Optionally use a specific embedding as the search vector' }
+        }
       },
       response: {
         200: {
@@ -171,21 +170,21 @@ body: {
             personalitySummary: { type: 'string' },
             personality_snippets: { type: 'array', items: { type: 'string' } },
             raw_texts: { type: 'array', items: { type: 'string' } },
-            raw_matches: { type: 'array', items: { type: 'object' } } // Use "raw_matches" if your worker returns this!
+            raw_matches: { type: 'array', items: { type: 'object' } }
           }
         }
       }
     }
   }, async (req, reply) => {
     const { id } = req.params;
-    const { max } = req.body || {};
+    const { max, embedding_id } = req.body || {};
     const PERSONALITY_WORKER_URL = "https://sniffr-personality-worker.joemerrillis.workers.dev";
 
-    req.log.info(`[PersonalityRoute] Called for dog_id: ${id}, max: ${max}`);
+    req.log.info(`[PersonalityRoute] Called for dog_id: ${id}, max: ${max}, embedding_id: ${embedding_id}`);
     req.log.info(`[PersonalityRoute] Worker URL: ${PERSONALITY_WORKER_URL}`);
 
     try {
-      const fetchBody = { dog_id: id, max };
+      const fetchBody = { dog_id: id, max, embedding_id };
       req.log.info(`[PersonalityRoute] Fetch body: ${JSON.stringify(fetchBody)}`);
 
       const res = await fetch(PERSONALITY_WORKER_URL, {
