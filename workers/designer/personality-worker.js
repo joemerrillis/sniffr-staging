@@ -27,7 +27,6 @@ export default {
         console.log(`[PersonalityWorker] Using queryById with embedding_id: ${embedding_id}, dog_id: ${dog_id}, max: ${max}`);
         matches = await env.VECTORIZE_TEXT.queryById(embedding_id, {
           topK: max,
-          filter: { dog_id },
           returnValues: true,
           returnMetadata: "all"
         });
