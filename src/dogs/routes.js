@@ -145,4 +145,49 @@ export default async function dogsRoutes(fastify, opts) {
       }
     }
   }, exportOwnerMedia);
+
+  // === NEW: Dog Personality Route ===
+  fastify.post('/:id/personality', {
+    schema: {
+      description: 'Query and return a dog’s personality profile based on embedded chat history.',
+      tags: ['Dogs'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      body: {
+        type: 'object',
+        properties: {
+          max: { type: 'integer', minimum: 1, maximum: 30, default: 10 }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            dog_id: { type: 'string' },
+            personalitySummary: { type: 'string' },
+            personality_snippets: { type: 'array', items: { type: 'string' } },
+            raw_texts: { type: 'array', items: { type: 'string' } },
+            meta: { type: 'array', items: { type: 'object' } }
+          }
+        }
+      }
+    }
+  }, async (req, reply) => {
+    const { id } = req.params;
+    const { max } = req.body || {};
+    const PERSONALITY_WORKER_URL = "https://sniffr-caption-designer.YOURSUBDOMAIN.workers.dev"; // <--- Replace with your actual URL!
+    const res = await fetch(PERSONALITY_WORKER_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dog_id: id, max }),
+    });
+    if (!res.ok) {
+      return reply.code(500).send({ error: "Personality worker failed", details: await res.text() });
+    }
+    const result = await res.json();
+    return reply.send(result);
+  });
 }
