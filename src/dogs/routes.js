@@ -155,11 +155,13 @@ export default async function dogsRoutes(fastify, opts) {
         properties: { id: { type: 'string', format: 'uuid' } },
         required: ['id']
       },
-      body: {
-        type: 'object',
-        properties: {
-          max: { type: 'integer', minimum: 1, maximum: 30, default: 10 }
-        }
+body: {
+  type: 'object',
+  properties: {
+    max: { type: 'integer', minimum: 1, maximum: 30, default: 10 },
+    embedding_id: { type: 'string', description: 'Optionally use a specific embedding as the search vector' }
+  }
+}
       },
       response: {
         200: {
