@@ -10,87 +10,6 @@ import {
 } from './controllers/dogsController.js';
 
 export default async function dogsRoutes(fastify, opts) {
-  fastify.get('/', { /* ...as before... */ }, list);
-
-  fastify.get('/:id', { /* ...as before... */ }, retrieve);
-
-  fastify.post('/', { /* ...as before... */ }, create);
-
-  fastify.patch('/:id', { /* ...as before... */ }, modify);
-
-  fastify.delete('/:id', { /* ...as before... */ }, remove);
-
-  fastify.post('/:id/photo-upload-url', { /* ...as before... */ }, photoUploadUrl);
-
-  fastify.get('/owners/:ownerId/media/export', { /* ...as before... */ }, exportOwnerMedia);
-
-  // === NEW: Dog Personality Route with logging ===
-  fastify.post('/:id/personality', {
-    schema: {
-      description: 'Query and return a dog’s personality profile based on embedded chat history.',
-      tags: ['Dogs'],
-      params: {
-        type: 'object',
-        properties: { id: { type: 'string', format: 'uuid' } },
-        required: ['id']
-      },
-      body: {
-        type: 'object',
-        properties: {
-          max: { type: 'integer', minimum: 1, maximum: 30, default: 10 }
-        }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            dog_id: { type: 'string' },
-            personalitySummary: { type: 'string' },
-            personality_snippets: { type: 'array', items: { type: 'string' } },
-            raw_texts: { type: 'array', items: { type: 'string' } },
-            raw_matches: { type: 'array', items: { type: 'object' } }  // <--- meta renamed to raw_matches to match worker!
-          }
-        }
-      }
-    }
-  }, async (req, reply) => {
-    const { id } = req.params;
-    const { max } = req.body || {};
-    const PERSONALITY_WORKER_URL = "https://sniffr-personality-worker.joemerrillis.workers.dev";
-    req.log.info(`[PersonalityRoute] Called for dog_id: ${id}, max: ${max}`);
-    req.log.info(`[PersonalityRoute] Worker URL: ${PERSONALITY_WORKER_URL}`);
-
-    try {
-      const fetchBody = { dog_id: id, max };
-      req.log.info(`[PersonalityRoute] Fetch body: ${JSON.stringify(fetchBody)}`);
-
-      const res = await fetch(PERSONALITY_WORKER_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(fetchBody),
-      });
-
-      req.log.info(`[PersonalityRoute] Worker status: ${res.status}`);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        req.log.error(`[PersonalityRoute] Worker failed: ${errorText}`);
-        return reply.code(500).send({ error: "Personality worker failed", details: errorText });
-      }
-
-      const result = await res.json();
-      req.log.info(`[PersonalityRoute] Worker result: ${JSON.stringify(result)}`);
-      return reply.send(result);
-
-    } catch (err) {
-      req.log.error(`[PersonalityRoute] Exception: ${err.stack || err}`);
-      return reply.code(500).send({ error: "Internal server error", details: err.message });
-    }
-  });
-}
-
-
-export default async function dogsRoutes(fastify, opts) {
   fastify.get('/', {
     schema: {
       description: 'List all dogs.',
@@ -168,7 +87,6 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, modify);
 
-  // ** THE CRUCIAL FIX IS RIGHT HERE **
   fastify.delete('/:id', {
     schema: {
       description: 'Delete dog.',
@@ -179,7 +97,7 @@ export default async function dogsRoutes(fastify, opts) {
         required: ['id']
       },
       response: {
-        204: {} // No schema at all. No type, no properties, not even description.
+        204: {}
       }
     }
   }, remove);
@@ -227,3 +145,68 @@ export default async function dogsRoutes(fastify, opts) {
     }
   }, exportOwnerMedia);
 
+  // === NEW: Dog Personality Route ===
+  fastify.post('/:id/personality', {
+    schema: {
+      description: 'Query and return a dog’s personality profile based on embedded chat history.',
+      tags: ['Dogs'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      body: {
+        type: 'object',
+        properties: {
+          max: { type: 'integer', minimum: 1, maximum: 30, default: 10 }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            dog_id: { type: 'string' },
+            personalitySummary: { type: 'string' },
+            personality_snippets: { type: 'array', items: { type: 'string' } },
+            raw_texts: { type: 'array', items: { type: 'string' } },
+            raw_matches: { type: 'array', items: { type: 'object' } } // Use "raw_matches" if your worker returns this!
+          }
+        }
+      }
+    }
+  }, async (req, reply) => {
+    const { id } = req.params;
+    const { max } = req.body || {};
+    const PERSONALITY_WORKER_URL = "https://sniffr-personality-worker.joemerrillis.workers.dev";
+
+    req.log.info(`[PersonalityRoute] Called for dog_id: ${id}, max: ${max}`);
+    req.log.info(`[PersonalityRoute] Worker URL: ${PERSONALITY_WORKER_URL}`);
+
+    try {
+      const fetchBody = { dog_id: id, max };
+      req.log.info(`[PersonalityRoute] Fetch body: ${JSON.stringify(fetchBody)}`);
+
+      const res = await fetch(PERSONALITY_WORKER_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(fetchBody),
+      });
+
+      req.log.info(`[PersonalityRoute] Worker status: ${res.status}`);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        req.log.error(`[PersonalityRoute] Worker failed: ${errorText}`);
+        return reply.code(500).send({ error: "Personality worker failed", details: errorText });
+      }
+
+      const result = await res.json();
+      req.log.info(`[PersonalityRoute] Worker result: ${JSON.stringify(result)}`);
+      return reply.send(result);
+
+    } catch (err) {
+      req.log.error(`[PersonalityRoute] Exception: ${err.stack || err}`);
+      return reply.code(500).send({ error: "Internal server error", details: err.message });
+    }
+  });
+}
