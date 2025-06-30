@@ -11,48 +11,77 @@ export default {
       return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
     }
 
-    const { dog_id, max = 10 } = data;
+    // Accept both dog_id and optional embedding_id (for fine-tuned context)
+    const { dog_id, embedding_id, max = 10 } = data;
     if (!dog_id) {
       return new Response(JSON.stringify({ error: "dog_id required" }), { status: 400 });
     }
-let matchesAll = null;
-try {
-  matchesAll = await env.VECTORIZE_TEXT.query({ topK: 5 }); // no filter!
-  console.log("[DesignerWorker] ALL EMBEDDINGS SAMPLE:", JSON.stringify(matchesAll));
-} catch (e) {
-  console.error("[DesignerWorker] Error fetching all embeddings:", e);
-}
 
-    // --- (1) Find most recent chat embedding for this dog
-    let queryVector = null;
+    // --- Debug: Print ALL embeddings (sample)
     try {
-      const matches = await env.VECTORIZE_TEXT.query({
-        topK: 1,
-        filter: { dog_ids: dog_id },  // <--- CHANGE HERE
-      });
-      if (
-        matches?.matches?.[0]?.values &&
-        Array.isArray(matches.matches[0].values) &&
-        matches.matches[0].values.length === 768
-      ) {
-        queryVector = matches.matches[0].values;
-      }
+      const matchesAll = await env.VECTORIZE_TEXT.query({ topK: 5 });
+      console.log("[PersonalityWorker] ALL EMBEDDINGS SAMPLE:", JSON.stringify(matchesAll));
     } catch (e) {
-      console.error("[DesignerWorker] Error fetching recent vector:", e);
-      queryVector = null;
+      console.error("[PersonalityWorker] Error fetching all embeddings:", e);
     }
 
-    // --- (2) Semantic search for personality-rich messages
+    // --- (1) Find the most recent or specific embedding for this dog
+    let queryVector = null;
+    if (embedding_id) {
+      try {
+        // Try to load a *specific* embedding vector by ID
+        const match = await env.VECTORIZE_TEXT.query({
+          topK: 1,
+          filter: { id: embedding_id }
+        });
+        if (
+          match?.matches?.[0]?.values &&
+          Array.isArray(match.matches[0].values) &&
+          match.matches[0].values.length === 768
+        ) {
+          queryVector = match.matches[0].values;
+          console.log(`[PersonalityWorker] Found embedding vector for embedding_id: ${embedding_id}`);
+        }
+      } catch (e) {
+        console.error(`[PersonalityWorker] Could not load vector for embedding_id ${embedding_id}:`, e);
+      }
+    }
+    // If no embedding_id or couldn't find, just use most recent for the dog
+    if (!queryVector) {
+      try {
+        const matches = await env.VECTORIZE_TEXT.query({
+          topK: 1,
+          filter: { dog_ids: dog_id }
+        });
+        if (
+          matches?.matches?.[0]?.values &&
+          Array.isArray(matches.matches[0].values) &&
+          matches.matches[0].values.length === 768
+        ) {
+          queryVector = matches.matches[0].values;
+          console.log(`[PersonalityWorker] Found recent vector for dog_id: ${dog_id}`);
+        }
+      } catch (e) {
+        console.error("[PersonalityWorker] Error fetching recent vector for dog:", e);
+        queryVector = null;
+      }
+    }
+
+    // --- (2) Semantic search for personality-rich messages (by dog, using vector if found)
     let matches;
     try {
       const vectorQuery = {
         topK: max,
-        filter: { dog_ids: dog_id }  // <--- CHANGE HERE TOO
+        filter: { dog_ids: dog_id }
       };
       if (queryVector) {
         vectorQuery.vector = queryVector;
+        console.log("[PersonalityWorker] Using semantic vector search for dog_id:", dog_id);
+      } else {
+        console.log("[PersonalityWorker] Using pure filter search for dog_id:", dog_id);
       }
       matches = await env.VECTORIZE_TEXT.query(vectorQuery);
+      console.log("[PersonalityWorker] Vector search results:", JSON.stringify(matches));
     } catch (e) {
       return new Response(JSON.stringify({ error: "Vector search failed", details: e.message }), { status: 500 });
     }
