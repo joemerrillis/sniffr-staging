@@ -9,3 +9,10 @@ vectorize = [
 binding = "DB"
 database_name = "sniffr-db"
 database_id = "3bfee506-815a-4249-bf4f-95886e459234"
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+
+
