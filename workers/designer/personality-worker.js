@@ -52,9 +52,13 @@ console.log(`[PersonalityWorker] queryById result count: ${matches?.matches?.len
       }), { status: 500 });
     }
 
-    // --- Collect relevant text & all metadata
-    const rawMatches = matches?.matches || [];
-    const texts = rawMatches.map(m => m.metadata?.body || '').filter(Boolean);
+    const rawMatches = (matches?.matches || []).map(m => {
+  // Remove the "values" (the 768-dim vector)
+  const { values, ...meta } = m;
+  return meta;
+});
+const texts = rawMatches.map(m => m.metadata?.body || '').filter(Boolean);
+
 
     // --- Build a human summary (for now: just concatenate, as before)
     const bullets = texts.slice(0, 8).map(t => t.replace(/\n/g, ' ').slice(0, 160));
