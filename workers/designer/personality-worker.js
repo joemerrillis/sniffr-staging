@@ -23,14 +23,16 @@ export default {
 
     try {
       if (embedding_id) {
-        // --- Use queryById if an embedding_id is provided!
-        console.log(`[PersonalityWorker] Using queryById with embedding_id: ${embedding_id}, dog_id: ${dog_id}, max: ${max}`);
-        matches = await env.VECTORIZE_TEXT.queryById(embedding_id, {
-          topK: max,
-          returnValues: true,
-          returnMetadata: "all"
-        });
-        console.log(`[PersonalityWorker] queryById result count: ${matches?.matches?.length || 0}`);
+       // --- Use queryById if an embedding_id is provided!
+console.log(`[PersonalityWorker] Using queryById with embedding_id: ${embedding_id}, dog_id: ${dog_id}, max: ${max}`);
+matches = await env.VECTORIZE_TEXT.queryById(embedding_id, {
+  topK: max,
+  filter: { dog_id }, // Now this will work!
+  returnValues: true,
+  returnMetadata: "all"
+});
+console.log(`[PersonalityWorker] queryById result count: ${matches?.matches?.length || 0}`);
+
       } else {
         // --- Fallback: basic filtered query (no semantic search)
         console.log(`[PersonalityWorker] No embedding_id. Using basic filter query with dog_id: ${dog_id}, max: ${max}`);
