@@ -48,6 +48,6 @@ export const walkReportsSchemas = {
   WalkReportDetailed: {
     $id: 'WalkReportDetailed',
     type: 'object',
-    // You can elaborate for /:id/details endpoint if you want
+    properties: {}, // <-- You can fill this in later, but must be an object
   }
 };
