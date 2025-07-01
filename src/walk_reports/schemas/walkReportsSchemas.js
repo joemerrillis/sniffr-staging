@@ -25,9 +25,11 @@ export const walkReportsSchemas = {
       survey_json: { type: ['object', 'null'], additionalProperties: true },
       visibility: { type: ['string', 'null'] },
       created_at: { type: 'string', format: 'date-time' },
-      updated_at: { type: 'string', format: 'date-time' },
+      updated_at: { type: 'string', format: 'date-time' }
     },
-    required: ['id', 'walk_id', 'dog_id', 'walker_id', 'client_id', 'created_at'],
+    required: [
+      'id', 'walk_id', 'dog_id', 'walker_id', 'client_id', 'created_at', 'updated_at'
+    ],
     additionalProperties: true
   },
   CreateWalkReport: {
