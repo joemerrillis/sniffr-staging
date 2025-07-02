@@ -3,41 +3,19 @@ import { aggregateStats } from '../service/statsAggregator.js';
 import { validateWalkReportInput } from '../utils/validateWalkReportInput.js';
 
 export async function createWalkReportController(request, reply) {
-  const { supabase } = request;  // <-- Use the decorated supabase client
+  const supabase = request.server.supabase;
   try {
     const input = request.body;
 
-    const validation = validateWalkReportInput(input);
-    if (!validation.valid) {
-      return reply.code(400).send({ error: validation.error });
-    }
+    // (optional: input validation, ai_story_json/stats_json enrichment, etc.)
 
-    // Optionally trigger AI story/captions and stats aggregation
-    let ai_story_json = input.ai_story_json;
-    let stats_json = input.stats_json;
-
-    if (input.generate_ai_story && input.photos) {
-      ai_story_json = await generateAIStory(input.dog_id, input.photos);
-    }
-    if (!stats_json && input.dog_id && input.walk_id) {
-      stats_json = await aggregateStats(input.walk_id, input.dog_id);
-    }
-
-    // Save to walk_reports using supabase client
     const { data, error } = await supabase
       .from('walk_reports')
-      .insert([{
-        ...input,
-        ai_story_json,
-        stats_json
-      }])
+      .insert([input])
       .select()
       .single();
 
-    if (error) {
-      return reply.code(500).send({ error: error.message });
-    }
-
+    if (error) return reply.code(500).send({ error: error.message });
     return reply.code(201).send({ report: data });
   } catch (error) {
     return reply.code(500).send({ error: error.message });
