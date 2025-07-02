@@ -132,30 +132,30 @@ fastify.post('/dogs/:id/embedding', async (req, reply) => {
 await fastify.register(authPlugin);
 
 // --- Application modules (all with prefixes for isolation) ---
-//await fastify.register(usersPlugin, { prefix: '/users' });
-//await fastify.register(householdsPlugin, { prefix: '/households' });
-//await fastify.register(tenantsPlugin, { prefix: '/tenants' });
-//await fastify.register(domainsPlugin, { prefix: '/domains' });
-//await fastify.register(employeesPlugin, { prefix: '/employees' });
-//await fastify.register(dogsPlugin, { prefix: '/dogs' });
-//await fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
-//await fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
-//await fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
-//await fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
-//await fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
-//await fastify.register(boardingsPlugin, { prefix: '/boardings' });
-//await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
-//await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
-//await fastify.register(purchasesPlugin, { prefix: '/purchases' });
-//await fastify.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
-//await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
-//await fastify.register(availabilityPlugin, { prefix: '/availability' });
-//await fastify.register(walksPlugin, { prefix: '/walks' });
-//await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
-//await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
-//await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
-//await fastify.register(chatPlugin, { prefix: '/chats' });
-//await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
+await fastify.register(usersPlugin, { prefix: '/users' });
+await fastify.register(householdsPlugin, { prefix: '/households' });
+await fastify.register(tenantsPlugin, { prefix: '/tenants' });
+await fastify.register(domainsPlugin, { prefix: '/domains' });
+await fastify.register(employeesPlugin, { prefix: '/employees' });
+await fastify.register(dogsPlugin, { prefix: '/dogs' });
+await fastify.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
+await fastify.register(clientWalkersPlugin, { prefix: '/client-walkers' });
+await fastify.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
+await fastify.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
+await fastify.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
+await fastify.register(boardingsPlugin, { prefix: '/boardings' });
+await fastify.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
+await fastify.register(pendingServicesPlugin, { prefix: '/pending-services' });
+await fastify.register(purchasesPlugin, { prefix: '/purchases' });
+await fastify.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
+await fastify.register(schedulingPlugin, { prefix: '/scheduling' });
+await fastify.register(availabilityPlugin, { prefix: '/availability' });
+await fastify.register(walksPlugin, { prefix: '/walks' });
+await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
+await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
+await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
+await fastify.register(chatPlugin, { prefix: '/chats' });
+await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
 await fastify.register(dogEventsPlugin, { prefix: '/dog-events' });
 
 // --- GLOBAL ERROR HANDLER ---
