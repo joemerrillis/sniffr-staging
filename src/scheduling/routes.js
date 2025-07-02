@@ -1,5 +1,3 @@
-// src/scheduling/routes.js
-
 import {
   WalksScheduleEnvelope,
   WalkSchedule
