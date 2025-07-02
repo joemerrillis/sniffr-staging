@@ -1,7 +1,7 @@
 export const dogEventsSchemas = {};
 
-dogEventsSchemas.DogEvents = {
-  $id: 'DogEvents',
+dogEventsSchemas.DogEvent = {
+  $id: 'DogEvent',
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
