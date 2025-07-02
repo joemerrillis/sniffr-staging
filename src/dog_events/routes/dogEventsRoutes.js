@@ -127,4 +127,20 @@ export default async function dogEventsRoutes(fastify, opts) {
     updateDogEventController
   );
 
-  fastify.del
+  fastify.delete(
+    '/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        response: { 200: { type: 'object', properties: { deleted: { type: 'boolean' } } } },
+        tags: ['DogEvents'],
+        summary: 'Delete a dog event'
+      }
+    },
+    deleteDogEventController
+  );
+}
