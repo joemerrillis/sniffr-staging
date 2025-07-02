@@ -6,5 +6,6 @@ export default fp(async function walkReportsPlugin(fastify, opts) {
   for (const schema of Object.values(walkReportsSchemas)) {
     try { fastify.addSchema(schema); } catch (e) {}
   }
-  fastify.register(walkReportsRoutes);
+  fastify.register(walkReportsRoutes, opts);
+
 });
