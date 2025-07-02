@@ -36,7 +36,7 @@ import dogMemoriesPlugin from './src/dog_memories/index.js';
 import dogFriendsPlugin from './src/dogFriends/index.js';
 import visibilityPlugin from './src/dogVisibility/index.js';
 import chatPlugin from './src/chat/index.js';
-//import walkReportsPlugin from './src/walk_reports/index.js';
+import walkReportsPlugin from './src/walk_reports/index.js';
 import dogEventsPlugin from './src/dog_events/index.js';
 
 dotenv.config();
@@ -155,7 +155,7 @@ await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
 await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
 await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
 await fastify.register(chatPlugin, { prefix: '/chats' });
-// await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
+await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
 await fastify.register(dogEventsPlugin, { prefix: '/dog-events' });
 
 // --- GLOBAL ERROR HANDLER ---
