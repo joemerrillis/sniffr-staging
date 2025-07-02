@@ -155,7 +155,7 @@ await fastify.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
 await fastify.register(dogFriendsPlugin, { prefix: '/dog-friends' });
 await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
 await fastify.register(chatPlugin, { prefix: '/chats' });
-await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
+// await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
 await fastify.register(dogEventsPlugin, { prefix: '/dog-events' });
 
 // --- GLOBAL ERROR HANDLER ---
