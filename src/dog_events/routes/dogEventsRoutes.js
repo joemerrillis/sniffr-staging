@@ -27,7 +27,7 @@ export default async function dogEventsRoutes(fastify, opts) {
     {
       schema: {
         body: dogEventsSchemas.CreateDogEvent,
-        response: { 201: dogEventsSchemas.DogEvent },
+        response: { 201: dogEventsSchemas.DogEvents_DogEvent },
         tags: ['DogEvents'],
         summary: 'Create a new dog event'
       }
@@ -56,7 +56,7 @@ export default async function dogEventsRoutes(fastify, opts) {
         response: {
           200: {
             type: 'array',
-            items: dogEventsSchemas.DogEvent
+            items: dogEventsSchemas.DogEvents_DogEvent
           }
         },
         tags: ['DogEvents'],
@@ -76,7 +76,7 @@ export default async function dogEventsRoutes(fastify, opts) {
           required: ['id']
         },
         response: {
-          200: dogEventsSchemas.DogEvent
+          200: dogEventsSchemas.DogEvents_DogEvent
         },
         tags: ['DogEvents'],
         summary: 'Retrieve a single dog event'
@@ -97,7 +97,7 @@ export default async function dogEventsRoutes(fastify, opts) {
         response: {
           200: {
             type: 'array',
-            items: dogEventsSchemas.DogEvent
+            items: dogEventsSchemas.DogEvents_DogEvent
           }
         },
         tags: ['DogEvents'],
@@ -118,7 +118,7 @@ export default async function dogEventsRoutes(fastify, opts) {
         },
         body: dogEventsSchemas.UpdateDogEvent,
         response: {
-          200: dogEventsSchemas.DogEvent
+          200: dogEventsSchemas.DogEvents_DogEvent
         },
         tags: ['DogEvents'],
         summary: 'Update a dog event'
@@ -127,20 +127,4 @@ export default async function dogEventsRoutes(fastify, opts) {
     updateDogEventController
   );
 
-  fastify.delete(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
-        },
-        response: { 200: { type: 'object', properties: { deleted: { type: 'boolean' } } } },
-        tags: ['DogEvents'],
-        summary: 'Delete a dog event'
-      }
-    },
-    deleteDogEventController
-  );
-}
+  fastify.del
