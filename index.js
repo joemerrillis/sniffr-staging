@@ -36,7 +36,7 @@ import dogMemoriesPlugin from './src/dog_memories/index.js';
 import dogFriendsPlugin from './src/dogFriends/index.js';
 import visibilityPlugin from './src/dogVisibility/index.js';
 import chatPlugin from './src/chat/index.js';
-import walkReportsPlugin from './src/walk_reports/index.js';
+//import walkReportsPlugin from './src/walk_reports/index.js';
 import dogEventsPlugin from './src/dog_events/index.js';
 
 dotenv.config();
