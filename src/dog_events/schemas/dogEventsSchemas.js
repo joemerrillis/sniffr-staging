@@ -1,3 +1,5 @@
+console.trace('dogEventsSchemas loaded');
+
 export const dogEventsSchemas = {};
 
 dogEventsSchemas.DogEvents_DogEvent = {
