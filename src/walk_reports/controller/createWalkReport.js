@@ -1,9 +1,9 @@
-import { createWalkReport } from '../service/walkReportService.js';
 import { generateAIStory } from '../service/aiStoryService.js';
 import { aggregateStats } from '../service/statsAggregator.js';
 import { validateWalkReportInput } from '../utils/validateWalkReportInput.js';
 
 export async function createWalkReportController(request, reply) {
+  const { supabase } = request;  // <-- Use the decorated supabase client
   try {
     const input = request.body;
 
@@ -23,13 +23,22 @@ export async function createWalkReportController(request, reply) {
       stats_json = await aggregateStats(input.walk_id, input.dog_id);
     }
 
-    const newReport = await createWalkReport({
-      ...input,
-      ai_story_json,
-      stats_json,
-    });
+    // Save to walk_reports using supabase client
+    const { data, error } = await supabase
+      .from('walk_reports')
+      .insert([{
+        ...input,
+        ai_story_json,
+        stats_json
+      }])
+      .select()
+      .single();
 
-    return reply.code(201).send(newReport);
+    if (error) {
+      return reply.code(500).send({ error: error.message });
+    }
+
+    return reply.code(201).send({ report: data });
   } catch (error) {
     return reply.code(500).send({ error: error.message });
   }
