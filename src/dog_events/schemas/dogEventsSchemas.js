@@ -1,7 +1,7 @@
 export const dogEventsSchemas = {};
 
-dogEventsSchemas.DogEvent = {
-  $id: 'DogEvent',
+dogEventsSchemas.DogEvents_DogEvent = {
+  $id: 'DogEvents_DogEvent',
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
@@ -25,7 +25,7 @@ dogEventsSchemas.DogEvent = {
 };
 
 dogEventsSchemas.CreateDogEvent = {
-  $id: 'CreateDogEvent',
+  $id: 'DogEvents_CreateDogEvent',
   type: 'object',
   properties: {
     report_id: { type: ['string', 'null'], format: 'uuid' },
@@ -44,7 +44,7 @@ dogEventsSchemas.CreateDogEvent = {
 };
 
 dogEventsSchemas.UpdateDogEvent = {
-  $id: 'UpdateDogEvent',
+  $id: 'DogEvents_UpdateDogEvent',
   type: 'object',
   properties: {
     tags: { type: ['array', 'null'], items: { type: 'string' } },
@@ -56,12 +56,12 @@ dogEventsSchemas.UpdateDogEvent = {
 };
 
 dogEventsSchemas.BulkCreateDogEvents = {
-  $id: 'BulkCreateDogEvents',
+  $id: 'DogEvents_BulkCreateDogEvents',
   type: 'object',
   properties: {
     events: {
       type: 'array',
-      items: dogEventsSchemas.CreateDogEvent // <--- direct object, not $ref
+      items: dogEventsSchemas.CreateDogEvent
     }
   },
   required: ['events'],
@@ -69,18 +69,18 @@ dogEventsSchemas.BulkCreateDogEvents = {
 };
 
 dogEventsSchemas.BulkCreateDogEventsResponse = {
-  $id: 'BulkCreateDogEventsResponse',
+  $id: 'DogEvents_BulkCreateDogEventsResponse',
   type: 'object',
   properties: {
     created: {
       type: 'array',
-      items: dogEventsSchemas.DogEvent // <--- direct object, not $ref
+      items: dogEventsSchemas.DogEvents_DogEvent
     }
   }
 };
 
 dogEventsSchemas.ListDogEventsQuery = {
-  $id: 'ListDogEventsQuery',
+  $id: 'DogEvents_ListDogEventsQuery',
   type: 'object',
   properties: {
     dog_id: { type: 'string', format: 'uuid' },
