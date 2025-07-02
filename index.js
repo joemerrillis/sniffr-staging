@@ -40,7 +40,7 @@ import walkReportsPlugin from './src/walk_reports/index.js';
 import dogEventsPlugin from './src/dog_events/index.js';
 
 dotenv.config();
-console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN);
+
 
 const fastify = Fastify({ logger: true });
 
