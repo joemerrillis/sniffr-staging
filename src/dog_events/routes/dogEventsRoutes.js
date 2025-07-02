@@ -27,7 +27,7 @@ export default async function dogEventsRoutes(fastify, opts) {
     {
       schema: {
         body: dogEventsSchemas.CreateDogEvent,
-        response: { 201: dogEventsSchemas.DogEvents_DogEvent },
+        response: { 201: dogEventsSchemas.SingleDogEventEnvelope },
         tags: ['DogEvents'],
         summary: 'Create a new dog event'
       }
@@ -54,10 +54,7 @@ export default async function dogEventsRoutes(fastify, opts) {
       schema: {
         querystring: dogEventsSchemas.ListDogEventsQuery,
         response: {
-          200: {
-            type: 'array',
-            items: dogEventsSchemas.DogEvents_DogEvent
-          }
+          200: dogEventsSchemas.DogEventsEnvelope
         },
         tags: ['DogEvents'],
         summary: 'List all dog events'
@@ -76,7 +73,7 @@ export default async function dogEventsRoutes(fastify, opts) {
           required: ['id']
         },
         response: {
-          200: dogEventsSchemas.DogEvents_DogEvent
+          200: dogEventsSchemas.SingleDogEventEnvelope
         },
         tags: ['DogEvents'],
         summary: 'Retrieve a single dog event'
@@ -95,10 +92,7 @@ export default async function dogEventsRoutes(fastify, opts) {
           required: ['dog_id']
         },
         response: {
-          200: {
-            type: 'array',
-            items: dogEventsSchemas.DogEvents_DogEvent
-          }
+          200: dogEventsSchemas.DogEventsEnvelope
         },
         tags: ['DogEvents'],
         summary: 'List all events for a specific dog'
@@ -118,7 +112,7 @@ export default async function dogEventsRoutes(fastify, opts) {
         },
         body: dogEventsSchemas.UpdateDogEvent,
         response: {
-          200: dogEventsSchemas.DogEvents_DogEvent
+          200: dogEventsSchemas.SingleDogEventEnvelope
         },
         tags: ['DogEvents'],
         summary: 'Update a dog event'
