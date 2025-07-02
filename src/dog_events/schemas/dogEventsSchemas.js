@@ -1,5 +1,3 @@
-console.trace('dogEventsSchemas loaded');
-
 export const dogEventsSchemas = {};
 
 dogEventsSchemas.DogEvents_DogEvent = {
@@ -10,12 +8,9 @@ dogEventsSchemas.DogEvents_DogEvent = {
     report_id: { type: ['string', 'null'], format: 'uuid' },
     dog_id: { type: 'string', format: 'uuid' },
     user_id: { type: ['string', 'null'], format: 'uuid' },
-    source: { type: 'string' }, // walker, owner, system, trainer, etc
-    event_type: { type: 'string' }, // walk, home, daycare, etc
-    tags: {
-      type: ['array', 'null'],
-      items: { type: 'string' }
-    },
+    source: { type: 'string' },
+    event_type: { type: 'string' },
+    tags: { type: ['array', 'null'], items: { type: 'string' } },
     memory_id: { type: ['string', 'null'], format: 'uuid' },
     context: { type: ['object', 'null'], additionalProperties: true },
     note: { type: ['string', 'null'] },
@@ -70,14 +65,33 @@ dogEventsSchemas.BulkCreateDogEvents = {
   additionalProperties: true
 };
 
+dogEventsSchemas.DogEventsEnvelope = {
+  $id: 'DogEventsEnvelope',
+  type: 'object',
+  properties: {
+    events: {
+      type: 'array',
+      items: { $ref: 'DogEvents_DogEvent#' }
+    }
+  }
+};
+
 dogEventsSchemas.BulkCreateDogEventsResponse = {
-  $id: 'DogEvents_BulkCreateDogEventsResponse',
+  $id: 'BulkCreateDogEventsResponse',
   type: 'object',
   properties: {
     created: {
       type: 'array',
-      items: dogEventsSchemas.DogEvents_DogEvent
+      items: { $ref: 'DogEvents_DogEvent#' }
     }
+  }
+};
+
+dogEventsSchemas.SingleDogEventEnvelope = {
+  $id: 'SingleDogEventEnvelope',
+  type: 'object',
+  properties: {
+    event: { $ref: 'DogEvents_DogEvent#' }
   }
 };
 
