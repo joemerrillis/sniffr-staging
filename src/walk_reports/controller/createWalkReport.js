@@ -3,6 +3,13 @@ import { generateAIStory } from '../service/aiStoryService.js';     // <-- your 
 import { aggregateStats } from '../service/statsAggregator.js';
 
 export async function createWalkReportController(request, reply) {
+  export async function createWalkReportController(request, reply) {
+  console.log('[walk_reports] typeof request.server.supabase:', typeof request.server.supabase);
+  console.log('[walk_reports] request.server.supabase:', request.server.supabase);
+  console.log('[walk_reports] request.server.supabase.from:', request.server.supabase?.from);
+  // ...rest of function
+
+
   const supabase = request.server.supabase;
   try {
     const input = request.body;
