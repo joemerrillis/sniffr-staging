@@ -1,3 +1,5 @@
+// src/walk_reports/routes/walkReportsRoutes.js
+
 import {
   createWalkReportController,
 } from '../controller/createWalkReport.js';
@@ -16,13 +18,14 @@ import {
 import { walkReportsSchemas } from '../schemas/walkReportsSchemas.js';
 
 export default async function walkReportsRoutes(fastify, opts) {
+  // Create a walk report
   fastify.post(
     '/',
     {
       schema: {
         body: walkReportsSchemas.CreateWalkReport,
         response: {
-          201: walkReportsSchemas.WalkReport
+          201: walkReportsSchemas.WalkReportEnvelope
         },
         tags: ['WalkReports'],
         summary: 'Create a new walk report'
@@ -31,42 +34,7 @@ export default async function walkReportsRoutes(fastify, opts) {
     createWalkReportController
   );
 
-  fastify.get(
-    '/',
-    {
-      schema: {
-        response: {
-          200: {
-            type: 'array',
-            items: walkReportsSchemas.WalkReport
-          }
-        },
-        tags: ['WalkReports'],
-        summary: 'List all walk reports'
-      }
-    },
-    listWalkReportsController
-  );
-
-  fastify.get(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
-        },
-        response: {
-          200: walkReportsSchemas.WalkReport
-        },
-        tags: ['WalkReports'],
-        summary: 'Retrieve a single walk report'
-      }
-    },
-    getWalkReportController
-  );
-
+  // Update a walk report
   fastify.patch(
     '/:id',
     {
@@ -78,15 +46,60 @@ export default async function walkReportsRoutes(fastify, opts) {
         },
         body: walkReportsSchemas.UpdateWalkReport,
         response: {
-          200: walkReportsSchemas.WalkReport
+          200: walkReportsSchemas.WalkReportEnvelope
         },
         tags: ['WalkReports'],
-        summary: 'Update a walk report'
+        summary: 'Update an existing walk report'
       }
     },
     updateWalkReportController
   );
 
+  // Get a walk report by ID
+  fastify.get(
+    '/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        response: {
+          200: walkReportsSchemas.WalkReportEnvelope
+        },
+        tags: ['WalkReports'],
+        summary: 'Get walk report by ID'
+      }
+    },
+    getWalkReportController
+  );
+
+  // List walk reports (optionally filter)
+  fastify.get(
+    '/',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            walk_id: { type: 'string', format: 'uuid' },
+            dog_id: { type: 'string', format: 'uuid' },
+            walker_id: { type: 'string', format: 'uuid' },
+            user_id: { type: 'string', format: 'uuid' }
+          }
+        },
+        response: {
+          200: walkReportsSchemas.WalkReportsEnvelope
+        },
+        tags: ['WalkReports'],
+        summary: 'List walk reports'
+      }
+    },
+    listWalkReportsController
+  );
+
+  // Delete a walk report
   fastify.delete(
     '/:id',
     {
@@ -96,9 +109,17 @@ export default async function walkReportsRoutes(fastify, opts) {
           properties: { id: { type: 'string', format: 'uuid' } },
           required: ['id']
         },
-        response: { 200: { type: 'object', properties: { deleted: { type: 'boolean' } } } },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              deleted: { type: 'boolean' }
+            },
+            required: ['deleted']
+          }
+        },
         tags: ['WalkReports'],
-        summary: 'Delete a walk report'
+        summary: 'Delete walk report'
       }
     },
     deleteWalkReportController
