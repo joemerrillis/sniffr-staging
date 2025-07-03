@@ -1,7 +1,7 @@
-import supabase from '../../core/supabase.js';
+// NO import of supabase here!
 
 // Example: aggregate stats for a walk and dog from dog_events
-export async function aggregateStats(walk_id, dog_id) {
+export async function aggregateStats(supabase, walk_id, dog_id) {
   const { data: events, error } = await supabase
     .from('dog_events')
     .select('*')
