@@ -1,36 +1,38 @@
 // src/walk_reports/service/walkReportService.js
 
-// Remove: import supabase from '../../core/supabase.js';
+// All functions receive the fastify-decorated `supabase` as first parameter!
 
 export async function createWalkReport(supabase, data) {
-  const { data: report, error } = await supabase
+  // Insert the walk report and return the inserted row (first in array)
+  const { data: rows, error } = await supabase
     .from('walk_reports')
     .insert([data])
-    .select()
-    .single();
+    .select();
+
   if (error) throw new Error(error.message);
-  return report;
+  return rows && rows[0]; // Return first inserted row for envelope
 }
 
 export async function updateWalkReport(supabase, id, updates) {
-  const { data: report, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('walk_reports')
     .update(updates)
     .eq('id', id)
-    .select()
-    .single();
+    .select();
+
   if (error) throw new Error(error.message);
-  return report;
+  return rows && rows[0]; // Return first updated row
 }
 
 export async function getWalkReportById(supabase, id) {
-  const { data: report, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('walk_reports')
     .select('*')
-    .eq('id', id)
-    .single();
+    .eq('id', id);
+
   if (error) throw new Error(error.message);
-  return report;
+  if (!rows || rows.length === 0) return null;
+  return rows[0];
 }
 
 export async function listWalkReports(supabase, filters = {}) {
@@ -40,31 +42,32 @@ export async function listWalkReports(supabase, filters = {}) {
   });
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return data;
+  return data || [];
 }
 
 export async function deleteWalkReport(supabase, id) {
-  const { data, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('walk_reports')
     .delete()
     .eq('id', id)
-    .select()
-    .single();
+    .select();
+
   if (error) throw new Error(error.message);
-  return data;
+  return rows && rows[0]; // Return deleted row (if any)
 }
 
 // Fetch with joined events/memories for detailed report
 export async function getWalkReportWithDetails(supabase, id) {
-  const { data: report, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('walk_reports')
     .select(`
       *,
       dog_events (*),
       dog_memories (*)
     `)
-    .eq('id', id)
-    .single();
+    .eq('id', id);
+
   if (error) throw new Error(error.message);
-  return report;
+  if (!rows || rows.length === 0) return null;
+  return rows[0];
 }
