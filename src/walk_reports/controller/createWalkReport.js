@@ -3,7 +3,7 @@ import { generateAIStory } from '../service/aiStoryService.js';
 import { aggregateStats } from '../service/statsAggregator.js';
 import { createWalkReport } from '../service/walkReportService.js';
 
-export default async function createWalkReportController(request, reply) {
+export async function createWalkReportController(request, reply) {
   const supabase = request.server.supabase;
 
   try {
