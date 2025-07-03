@@ -1,5 +1,5 @@
 export async function listWalkReportsController(request, reply) {
-  const { supabase } = request;
+  const supabase = request.server?.supabase || request.supabase; // Handles both possible bindings
   try {
     const filters = request.query || {};
 
@@ -13,6 +13,8 @@ export async function listWalkReportsController(request, reply) {
 
     const { data, error } = await query;
 
+    console.log('[walk_reports] list controller:', { filters, error, count: data?.length });
+
     if (error) {
       return reply.code(500).send({ error: error.message });
     }
@@ -20,6 +22,7 @@ export async function listWalkReportsController(request, reply) {
     // Envelope pattern: always return { reports: [...] }
     return reply.send({ reports: data || [] });
   } catch (error) {
+    console.error('[walk_reports] list controller UNHANDLED ERROR:', error);
     return reply.code(500).send({ error: error.message });
   }
 }
