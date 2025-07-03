@@ -31,7 +31,7 @@ export const walkReportsSchemas = {
       updated_at:  { type: 'string', format: 'date-time' }
     },
     required: [
-      'id', 'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
+       'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
     ],
     additionalProperties: true
   },
