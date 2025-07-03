@@ -10,7 +10,7 @@ export const walkReportsSchemas = {
         items: { type: 'string', format: 'uuid' }
       },
       walker_id:  { type: 'string', format: 'uuid' },
-      user_id:    { type: 'string', format: 'uuid' }, // replaces client_id
+      user_id:    { type: 'string', format: 'uuid' },
       summary:    { type: ['string', 'null'] },
       ai_story_json: {
         type: ['array', 'null'],
@@ -31,7 +31,7 @@ export const walkReportsSchemas = {
       updated_at:  { type: 'string', format: 'date-time' }
     },
     required: [
-       'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
+      'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
     ],
     additionalProperties: true
   },
@@ -45,7 +45,7 @@ export const walkReportsSchemas = {
         items: { type: 'string', format: 'uuid' }
       },
       walker_id: { type: 'string', format: 'uuid' },
-      user_id:   { type: 'string', format: 'uuid' }, // replaces client_id
+      user_id:   { type: 'string', format: 'uuid' },
       summary:   { type: ['string', 'null'] },
       ai_story_json: {
         type: ['array', 'null'],
