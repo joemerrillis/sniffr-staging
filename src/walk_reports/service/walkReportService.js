@@ -1,6 +1,8 @@
-import supabase from '../../core/supabase.js';
+// src/walk_reports/service/walkReportService.js
 
-export async function createWalkReport(data) {
+// Remove: import supabase from '../../core/supabase.js';
+
+export async function createWalkReport(supabase, data) {
   const { data: report, error } = await supabase
     .from('walk_reports')
     .insert([data])
@@ -10,7 +12,7 @@ export async function createWalkReport(data) {
   return report;
 }
 
-export async function updateWalkReport(id, updates) {
+export async function updateWalkReport(supabase, id, updates) {
   const { data: report, error } = await supabase
     .from('walk_reports')
     .update(updates)
@@ -21,7 +23,7 @@ export async function updateWalkReport(id, updates) {
   return report;
 }
 
-export async function getWalkReportById(id) {
+export async function getWalkReportById(supabase, id) {
   const { data: report, error } = await supabase
     .from('walk_reports')
     .select('*')
@@ -31,7 +33,7 @@ export async function getWalkReportById(id) {
   return report;
 }
 
-export async function listWalkReports(filters = {}) {
+export async function listWalkReports(supabase, filters = {}) {
   let query = supabase.from('walk_reports').select('*');
   Object.entries(filters).forEach(([key, value]) => {
     if (value) query = query.eq(key, value);
@@ -41,7 +43,7 @@ export async function listWalkReports(filters = {}) {
   return data;
 }
 
-export async function deleteWalkReport(id) {
+export async function deleteWalkReport(supabase, id) {
   const { data, error } = await supabase
     .from('walk_reports')
     .delete()
@@ -53,7 +55,7 @@ export async function deleteWalkReport(id) {
 }
 
 // Fetch with joined events/memories for detailed report
-export async function getWalkReportWithDetails(id) {
+export async function getWalkReportWithDetails(supabase, id) {
   const { data: report, error } = await supabase
     .from('walk_reports')
     .select(`
