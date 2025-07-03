@@ -1,90 +1,78 @@
 import { validateWalkReportInput } from '../utils/validateWalkReportInput.js';
-import { generateAIStory } from '../service/aiStoryService.js'; // <-- your AI worker interface
+import { generateAIStory } from '../service/aiStoryService.js';
 import { aggregateStats } from '../service/statsAggregator.js';
 
 export async function createWalkReportController(request, reply) {
-  // --- Diagnostic logs for supabase instance ---
-  console.log('[walk_reports] typeof request.server.supabase:', typeof request.server.supabase);
-  console.log('[walk_reports] request.server.supabase:', request.server.supabase);
-  console.log('[walk_reports] request.server.supabase.from:', request.server.supabase?.from);
-
   const supabase = request.server.supabase;
   try {
     const input = request.body;
-    console.log('[walk_reports] Incoming payload:', input);
+    const { walk_id, summary, ai_story_json, stats_json, survey_json, visibility, photos, generate_ai_story } = input;
 
-    // Step 1: Validate input
-    const validation = validateWalkReportInput(input);
-    console.log('[walk_reports] Validation result:', validation);
+    // --- 1. Lookup walk to get user_id (owner) and dog_ids ---
+    const { data: walk, error: walkError } = await supabase
+      .from('walks')
+      .select('user_id, dog_ids')
+      .eq('id', walk_id)
+      .single();
+    if (walkError || !walk) {
+      return reply.code(400).send({ error: 'Invalid walk_id: could not find walk.' });
+    }
+
+    // --- 2. Get current walker_id (from session/auth, or pass in payload for now) ---
+    // Ideally, walker_id should be request.user.id if you use JWT auth
+    // Fallback to input.walker_id for now if needed
+    const walker_id = (request.user && request.user.id) || input.walker_id;
+    if (!walker_id) {
+      return reply.code(400).send({ error: 'walker_id is required (from auth or payload).' });
+    }
+
+    // --- 3. Validate payload (skip dog_id/client_id checks, enforce walk_id/walker_id) ---
+    const validation = validateWalkReportInput(input); // Update this util if needed!
     if (!validation.valid) {
-      console.log('[walk_reports] Validation failed, returning 400');
       return reply.code(400).send({ error: validation.error });
     }
 
-    // --- NEW: Look up dog_ids from walks table using walk_id ---
-    let dog_ids = [];
-    if (input.walk_id) {
-      const { data: walk, error: walkError } = await supabase
-        .from('walks')
-        .select('dog_ids')
-        .eq('id', input.walk_id)
-        .single();
+    // --- 4. AI/Stats: Generate as needed ---
+    let aiStory = ai_story_json;
+    let stats = stats_json;
 
-      if (walkError) {
-        console.error('[walk_reports] Walk lookup error:', walkError);
-        return reply.code(400).send({ error: "Invalid walk_id: " + walkError.message });
-      }
-      if (!walk || !walk.dog_ids) {
-        console.error('[walk_reports] No dogs found for walk:', input.walk_id);
-        return reply.code(400).send({ error: "No dogs found for that walk." });
-      }
-      dog_ids = walk.dog_ids;
-      console.log('[walk_reports] Resolved dog_ids:', dog_ids);
+    if (generate_ai_story && photos) {
+      aiStory = await generateAIStory(walk.dog_ids[0], photos); // pick 1st dog, or update as needed
+    }
+    if (!stats && walk.dog_ids && walk_id) {
+      // Optionally: aggregate stats for all dogs, or just first
+      stats = await aggregateStats(supabase, walk_id, walk.dog_ids[0]);
     }
 
-    // Step 2: Optionally run AI worker to caption photos and stats
-    let ai_story_json = input.ai_story_json;
-    let stats_json = input.stats_json;
-
-    // --- AI WORKER STUB: Generate story captions if requested ---
-    if (input.generate_ai_story && input.photos) {
-      console.log('[walk_reports] Calling AI worker to generate captions...');
-      ai_story_json = await generateAIStory(dog_ids?.[0], input.photos); // Use first dog_id if present
-      console.log('[walk_reports] AI story result:', ai_story_json);
-    }
-
-    // --- AI WORKER STUB: Aggregate stats (optional) ---
-    if (!stats_json && dog_ids.length && input.walk_id) {
-      console.log('[walk_reports] Calling stats aggregator...');
-      stats_json = await aggregateStats(supabase, input.walk_id, dog_ids[0]); // aggregate for first dog_id
-      console.log('[walk_reports] Stats aggregation result:', stats_json);
-    }
-
-    // Step 3: Write to DB
-    const reportPayload = {
-      ...input,
-      dog_ids,        // Set from resolved walk
-      ai_story_json,
-      stats_json,
+    // --- 5. Build final data object ---
+    const reportData = {
+      walk_id,
+      user_id: walk.user_id,      // Owner/client (from walks)
+      walker_id,                  // Walker
+      dog_ids: walk.dog_ids,      // Dogs in the walk
+      summary: summary || null,
+      ai_story_json: aiStory || null,
+      stats_json: stats || null,
+      survey_json: survey_json || null,
+      visibility: visibility || null,
+      photos: photos || null,
+      created_at: new Date().toISOString(), // optional
+      updated_at: new Date().toISOString()
     };
-    console.log('[walk_reports] Writing to walk_reports:', reportPayload);
 
+    // --- 6. Insert report ---
     const { data, error } = await supabase
       .from('walk_reports')
-      .insert([reportPayload])
+      .insert([reportData])
       .select()
       .single();
 
-    console.log('[walk_reports] Supabase insert result:', { data, error });
-
     if (error) {
-      console.error('[walk_reports] Supabase insert error:', error);
-      return reply.code(500).send({ error: error.message, details: error });
+      return reply.code(500).send({ error: error.message });
     }
+
     return reply.code(201).send({ report: data });
   } catch (error) {
-    // Full error details!
-    console.error('[walk_reports] UNHANDLED ERROR:', error);
-    return reply.code(500).send({ error: error.message, full: error });
+    return reply.code(500).send({ error: error.message, details: error });
   }
 }
