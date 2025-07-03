@@ -1,23 +1,32 @@
-export async function deleteWalkReportController(request, reply) {
-  const { supabase } = request;
+import { generateAIStory } from '../service/aiStoryService.js';
+import { aggregateStats } from '../service/statsAggregator.js';
+
+export async function updateWalkReportController(request, reply) {
+  const supabase = request.server.supabase;
   try {
     const id = request.params.id;
+    let updates = request.body;
 
-    // Attempt to delete the walk report by id
-    const { error, count } = await supabase
+    // --- AI WORKER STUB: Optionally re-run AI if photos are updated ---
+    if (updates.generate_ai_story && updates.photos) {
+      updates.ai_story_json = await generateAIStory(updates.dog_id, updates.photos);
+    }
+
+    // --- AI WORKER STUB: Re-aggregate stats if needed ---
+    if (updates.recalculate_stats && updates.dog_id && updates.walk_id) {
+      updates.stats_json = await aggregateStats(updates.walk_id, updates.dog_id);
+    }
+
+    const { data, error } = await supabase
       .from('walk_reports')
-      .delete()
+      .update(updates)
       .eq('id', id)
-      .select('id', { count: 'exact', head: true });
+      .select()
+      .single();
 
-    if (error) {
-      return reply.code(500).send({ error: error.message });
-    }
-    // If no rows were deleted, report 404
-    if (count === 0) {
-      return reply.code(404).send({ error: 'Walk report not found.' });
-    }
-    return reply.send({ deleted: true });
+    if (error && error.code !== 'PGRST116') return reply.code(500).send({ error: error.message });
+    if (!data) return reply.code(404).send({ error: 'Walk report not found.' });
+    return reply.send({ report: data });
   } catch (error) {
     return reply.code(500).send({ error: error.message });
   }
