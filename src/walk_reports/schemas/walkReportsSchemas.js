@@ -1,4 +1,28 @@
+// src/walk_reports/schemas/walkReportsSchemas.js
+
 export const walkReportsSchemas = {
+  // Envelope for responses: { report: { ... } }
+  WalkReportEnvelope: {
+    $id: 'WalkReportEnvelope',
+    type: 'object',
+    properties: {
+      report: { $ref: 'WalkReport#' }
+    },
+    required: ['report'],
+    additionalProperties: false
+  },
+  WalkReportsEnvelope: {
+    $id: 'WalkReportsEnvelope',
+    type: 'object',
+    properties: {
+      reports: {
+        type: 'array',
+        items: { $ref: 'WalkReport#' }
+      }
+    },
+    required: ['reports'],
+    additionalProperties: false
+  },
   WalkReport: {
     $id: 'WalkReport',
     type: 'object',
@@ -10,7 +34,7 @@ export const walkReportsSchemas = {
         items: { type: 'string', format: 'uuid' }
       },
       walker_id:  { type: 'string', format: 'uuid' },
-      user_id:    { type: 'string', format: 'uuid' },
+      user_id:    { type: 'string', format: 'uuid' }, // replaces client_id
       summary:    { type: ['string', 'null'] },
       ai_story_json: {
         type: ['array', 'null'],
@@ -27,11 +51,12 @@ export const walkReportsSchemas = {
       stats_json:  { type: ['object', 'null'], additionalProperties: true },
       survey_json: { type: ['object', 'null'], additionalProperties: true },
       visibility:  { type: ['string', 'null'] },
-      created_at:  { type: 'string', format: 'date-time' },
-      updated_at:  { type: 'string', format: 'date-time' }
+      photos:      { type: ['object', 'null'], additionalProperties: true },
+      created_at:  { type: ['string', 'null'], format: 'date-time' },
+      updated_at:  { type: ['string', 'null'], format: 'date-time' }
     },
     required: [
-      'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
+       'id', 'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
     ],
     additionalProperties: true
   },
@@ -45,7 +70,7 @@ export const walkReportsSchemas = {
         items: { type: 'string', format: 'uuid' }
       },
       walker_id: { type: 'string', format: 'uuid' },
-      user_id:   { type: 'string', format: 'uuid' },
+      user_id:   { type: 'string', format: 'uuid' }, // replaces client_id
       summary:   { type: ['string', 'null'] },
       ai_story_json: {
         type: ['array', 'null'],
@@ -61,7 +86,8 @@ export const walkReportsSchemas = {
       },
       stats_json:  { type: ['object', 'null'], additionalProperties: true },
       survey_json: { type: ['object', 'null'], additionalProperties: true },
-      visibility:  { type: ['string', 'null'] }
+      visibility:  { type: ['string', 'null'] },
+      photos:      { type: ['object', 'null'], additionalProperties: true }
     },
     required: ['walk_id', 'dog_ids', 'walker_id', 'user_id'],
     additionalProperties: true
@@ -85,7 +111,8 @@ export const walkReportsSchemas = {
       },
       stats_json:  { type: ['object', 'null'], additionalProperties: true },
       survey_json: { type: ['object', 'null'], additionalProperties: true },
-      visibility:  { type: ['string', 'null'] }
+      visibility:  { type: ['string', 'null'] },
+      photos:      { type: ['object', 'null'], additionalProperties: true }
     },
     additionalProperties: true
   }
