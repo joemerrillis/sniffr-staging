@@ -21,6 +21,27 @@ export async function createWalkReportController(request, reply) {
       return reply.code(400).send({ error: validation.error });
     }
 
+    // --- NEW: Look up dog_ids from walks table using walk_id ---
+    let dog_ids = [];
+    if (input.walk_id) {
+      const { data: walk, error: walkError } = await supabase
+        .from('walks')
+        .select('dog_ids')
+        .eq('id', input.walk_id)
+        .single();
+
+      if (walkError) {
+        console.error('[walk_reports] Walk lookup error:', walkError);
+        return reply.code(400).send({ error: "Invalid walk_id: " + walkError.message });
+      }
+      if (!walk || !walk.dog_ids) {
+        console.error('[walk_reports] No dogs found for walk:', input.walk_id);
+        return reply.code(400).send({ error: "No dogs found for that walk." });
+      }
+      dog_ids = walk.dog_ids;
+      console.log('[walk_reports] Resolved dog_ids:', dog_ids);
+    }
+
     // Step 2: Optionally run AI worker to caption photos and stats
     let ai_story_json = input.ai_story_json;
     let stats_json = input.stats_json;
@@ -28,22 +49,29 @@ export async function createWalkReportController(request, reply) {
     // --- AI WORKER STUB: Generate story captions if requested ---
     if (input.generate_ai_story && input.photos) {
       console.log('[walk_reports] Calling AI worker to generate captions...');
-      ai_story_json = await generateAIStory(input.dog_id, input.photos);
+      ai_story_json = await generateAIStory(dog_ids?.[0], input.photos); // Use first dog_id if present
       console.log('[walk_reports] AI story result:', ai_story_json);
     }
 
     // --- AI WORKER STUB: Aggregate stats (optional) ---
-    if (!stats_json && input.dog_id && input.walk_id) {
+    if (!stats_json && dog_ids.length && input.walk_id) {
       console.log('[walk_reports] Calling stats aggregator...');
-      stats_json = await aggregateStats(supabase, input.walk_id, input.dog_id); // <-- FIXED LINE
+      stats_json = await aggregateStats(supabase, input.walk_id, dog_ids[0]); // aggregate for first dog_id
       console.log('[walk_reports] Stats aggregation result:', stats_json);
     }
 
     // Step 3: Write to DB
-    console.log('[walk_reports] Writing to walk_reports:', { ...input, ai_story_json, stats_json });
+    const reportPayload = {
+      ...input,
+      dog_ids,        // Set from resolved walk
+      ai_story_json,
+      stats_json,
+    };
+    console.log('[walk_reports] Writing to walk_reports:', reportPayload);
+
     const { data, error } = await supabase
       .from('walk_reports')
-      .insert([{ ...input, ai_story_json, stats_json }])
+      .insert([reportPayload])
       .select()
       .single();
 
