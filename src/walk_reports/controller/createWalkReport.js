@@ -35,7 +35,7 @@ export async function createWalkReportController(request, reply) {
     // --- AI WORKER STUB: Aggregate stats (optional) ---
     if (!stats_json && input.dog_id && input.walk_id) {
       console.log('[walk_reports] Calling stats aggregator...');
-      stats_json = await aggregateStats(input.walk_id, input.dog_id);
+      stats_json = await aggregateStats(supabase, input.walk_id, input.dog_id); // <-- FIXED LINE
       console.log('[walk_reports] Stats aggregation result:', stats_json);
     }
 
