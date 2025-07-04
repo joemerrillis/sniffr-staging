@@ -1,72 +1,58 @@
-import supabase from '../../core/supabase.js';
+// src/dog_events/service/dogEventService.js
 
-export async function createDogEvent(data) {
-  const { data: event, error } = await supabase
-    .from('dog_events')
-    .insert([data])
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return event;
-}
-
-export async function bulkCreateDogEvents(events) {
+export async function createDogEvent(supabase, event) {
   const { data, error } = await supabase
     .from('dog_events')
-    .insert(events)
+    .insert([event])
     .select();
   if (error) throw new Error(error.message);
-  return data;
+  return data[0];
 }
 
-export async function updateDogEvent(id, updates) {
-  const { data: event, error } = await supabase
+export async function updateDogEvent(supabase, id, updates) {
+  const { data, error } = await supabase
     .from('dog_events')
     .update(updates)
     .eq('id', id)
-    .select()
-    .single();
+    .select();
   if (error) throw new Error(error.message);
-  return event;
+  return data[0];
 }
 
-export async function getDogEventById(id) {
-  const { data: event, error } = await supabase
+export async function getDogEventById(supabase, id) {
+  const { data, error } = await supabase
     .from('dog_events')
     .select('*')
-    .eq('id', id)
-    .single();
+    .eq('id', id);
   if (error) throw new Error(error.message);
-  return event;
+  return data[0];
 }
 
-export async function listDogEvents(filters = {}) {
+export async function listDogEvents(supabase, filters = {}) {
   let query = supabase.from('dog_events').select('*');
-  if (filters.dog_id) query = query.eq('dog_id', filters.dog_id);
-  if (filters.event_type) query = query.eq('event_type', filters.event_type);
-  if (filters.source) query = query.eq('source', filters.source);
-  if (filters.tag) query = query.contains('tags', [filters.tag]);
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) query = query.eq(key, value);
+  });
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return data;
+  return data || [];
 }
 
-export async function listDogEventsForDog(dog_id) {
+export async function deleteDogEvent(supabase, id) {
+  const { data, error } = await supabase
+    .from('dog_events')
+    .delete()
+    .eq('id', id)
+    .select();
+  if (error) throw new Error(error.message);
+  return data[0];
+}
+
+export async function listDogEventsForDog(supabase, dog_id) {
   const { data, error } = await supabase
     .from('dog_events')
     .select('*')
     .eq('dog_id', dog_id);
   if (error) throw new Error(error.message);
-  return data;
-}
-
-export async function deleteDogEvent(id) {
-  const { data, error } = await supabase
-    .from('dog_events')
-    .delete()
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return data;
+  return data || [];
 }
