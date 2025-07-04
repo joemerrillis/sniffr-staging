@@ -1,12 +1,16 @@
 import { updateDogEvent } from '../service/dogEventService.js';
 
 export async function updateDogEventController(request, reply) {
+  const supabase = request.server.supabase;
   try {
     const id = request.params.id;
-    const updated = await updateDogEvent(id, request.body);
+    const updates = request.body;
+    console.log('[dog_events] Updating dog event:', { id, updates });
+    const updated = await updateDogEvent(supabase, id, updates);
     if (!updated) return reply.code(404).send({ error: 'Dog event not found.' });
-    return reply.send(updated);
+    return reply.send({ event: updated });
   } catch (error) {
-    return reply.code(400).send({ error: error.message });
+    console.error('[dog_events] Update error:', error);
+    return reply.code(500).send({ error: error.message });
   }
 }
