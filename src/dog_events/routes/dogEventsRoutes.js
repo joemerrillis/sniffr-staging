@@ -9,10 +9,10 @@ import {
 } from '../controller/getDogEvent.js';
 import {
   listDogEventsController,
-} from '../controller/listDogEventsForDogController.js';
+} from '../controller/listDogEvents.js';
 import {
   listDogEventsForDogController,
-} from '../controller/listDogEventsForDogController.js';
+} from '../controller/listDogEventsForDog.js';
 import {
   deleteDogEventController,
 } from '../controller/deleteDogEvent.js';
