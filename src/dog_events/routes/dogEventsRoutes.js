@@ -8,8 +8,9 @@ import {
   getDogEventController,
 } from '../controller/getDogEvent.js';
 import {
-  listDogEventsController,
-} from '../controller/listDogEvents.js';
+ import { 
+  listDogEventsForDogController,
+} from '../controller/listDogEventsForDog.js';
 import {
   deleteDogEventController,
 } from '../controller/deleteDogEvent.js';
