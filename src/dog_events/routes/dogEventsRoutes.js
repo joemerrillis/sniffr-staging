@@ -36,7 +36,7 @@ export default async function dogEventsRoutes(fastify, opts) {
   fastify.post('/', {
     schema: {
       tags: ['DogEvents'],
-      body: dogEventsSchemas.DogEvent,
+      body: dogEventsSchemas.CreateDogEvent,
       response: { 201: dogEventsSchemas.SingleDogEventEnvelope }
     }
   }, createDogEventController);
