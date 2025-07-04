@@ -20,9 +20,9 @@ import { dogEventsSchemas } from '../schemas/dogEventsSchemas.js';
 
 export default async function dogEventsRoutes(fastify, opts) {
   // Register response envelopes
-  fastify.addSchema(dogEventsSchemas.DogEvent);
-  fastify.addSchema(dogEventsSchemas.DogEventsEnvelope);
-  fastify.addSchema(dogEventsSchemas.SingleDogEventEnvelope);
+ //  fastify.addSchema(dogEventsSchemas.DogEvent);
+  // fastify.addSchema(dogEventsSchemas.DogEventsEnvelope);
+  // fastify.addSchema(dogEventsSchemas.SingleDogEventEnvelope);
 
   // List all events
   fastify.get('/', {
