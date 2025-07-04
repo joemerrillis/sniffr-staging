@@ -1,107 +1,46 @@
-export const dogEventsSchemas = {};
+// src/dog_events/schemas/dogEventsSchemas.js
 
-dogEventsSchemas.DogEvents_DogEvent = {
-  $id: 'DogEvents_DogEvent',
-  type: 'object',
-  properties: {
-    id: { type: 'string', format: 'uuid' },
-    report_id: { type: ['string', 'null'], format: 'uuid' },
-    dog_id: { type: 'string', format: 'uuid' },
-    user_id: { type: ['string', 'null'], format: 'uuid' },
-    source: { type: 'string' },
-    event_type: { type: 'string' },
-    tags: { type: ['array', 'null'], items: { type: 'string' } },
-    memory_id: { type: ['string', 'null'], format: 'uuid' },
-    context: { type: ['object', 'null'], additionalProperties: true },
-    note: { type: ['string', 'null'] },
-    visibility: { type: ['string', 'null'] },
-    created_at: { type: 'string', format: 'date-time' }
+export const dogEventsSchemas = {
+  DogEvent: {
+    $id: 'DogEvent',
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      report_id: { type: ['string', 'null'], format: 'uuid' },   // FK walk_reports.id
+      dog_id: { type: 'string', format: 'uuid' },                // FK dogs.id
+      user_id: { type: ['string', 'null'], format: 'uuid' },     // FK users.id (walker or admin)
+      source: { type: 'string' },
+      event_type: { type: 'string' },
+      tags: {
+        type: 'array',
+        items: { type: 'string' }
+      },
+      memory_id: { type: ['string', 'null'], format: 'uuid' },   // FK dog_memories.id
+      context: { type: ['object', 'null'], additionalProperties: true },
+      note: { type: ['string', 'null'] },
+      visibility: { type: ['string', 'null'], default: 'private' },
+      created_at: { type: ['string', 'null'], format: 'date-time' }
+    },
+    required: ['id', 'report_id', 'dog_id', 'source', 'event_type', 'tags'],
+    additionalProperties: true,
   },
-  required: ['id', 'dog_id', 'source', 'event_type', 'created_at'],
-  additionalProperties: true
-};
 
-dogEventsSchemas.CreateDogEvent = {
-  $id: 'DogEvents_CreateDogEvent',
-  type: 'object',
-  properties: {
-    report_id: { type: ['string', 'null'], format: 'uuid' },
-    dog_id: { type: 'string', format: 'uuid' },
-    user_id: { type: ['string', 'null'], format: 'uuid' },
-    source: { type: 'string' },
-    event_type: { type: 'string' },
-    tags: { type: ['array', 'null'], items: { type: 'string' } },
-    memory_id: { type: ['string', 'null'], format: 'uuid' },
-    context: { type: ['object', 'null'], additionalProperties: true },
-    note: { type: ['string', 'null'] },
-    visibility: { type: ['string', 'null'] }
-  },
-  required: ['dog_id', 'source', 'event_type'],
-  additionalProperties: true
-};
-
-dogEventsSchemas.UpdateDogEvent = {
-  $id: 'DogEvents_UpdateDogEvent',
-  type: 'object',
-  properties: {
-    tags: { type: ['array', 'null'], items: { type: 'string' } },
-    note: { type: ['string', 'null'] },
-    context: { type: ['object', 'null'], additionalProperties: true },
-    visibility: { type: ['string', 'null'] }
-  },
-  additionalProperties: true
-};
-
-dogEventsSchemas.BulkCreateDogEvents = {
-  $id: 'DogEvents_BulkCreateDogEvents',
-  type: 'object',
-  properties: {
-    events: {
-      type: 'array',
-      items: dogEventsSchemas.CreateDogEvent
+  DogEventsEnvelope: {
+    $id: 'DogEventsEnvelope',
+    type: 'object',
+    properties: {
+      events: {
+        type: 'array',
+        items: { $ref: 'DogEvent#' }
+      }
     }
   },
-  required: ['events'],
-  additionalProperties: true
-};
 
-dogEventsSchemas.DogEventsEnvelope = {
-  $id: 'DogEventsEnvelope',
-  type: 'object',
-  properties: {
-    events: {
-      type: 'array',
-      items: { $ref: 'DogEvents_DogEvent#' }
+  SingleDogEventEnvelope: {
+    $id: 'SingleDogEventEnvelope',
+    type: 'object',
+    properties: {
+      event: { $ref: 'DogEvent#' }
     }
-  }
-};
-
-dogEventsSchemas.BulkCreateDogEventsResponse = {
-  $id: 'BulkCreateDogEventsResponse',
-  type: 'object',
-  properties: {
-    created: {
-      type: 'array',
-      items: { $ref: 'DogEvents_DogEvent#' }
-    }
-  }
-};
-
-dogEventsSchemas.SingleDogEventEnvelope = {
-  $id: 'SingleDogEventEnvelope',
-  type: 'object',
-  properties: {
-    event: { $ref: 'DogEvents_DogEvent#' }
-  }
-};
-
-dogEventsSchemas.ListDogEventsQuery = {
-  $id: 'DogEvents_ListDogEventsQuery',
-  type: 'object',
-  properties: {
-    dog_id: { type: 'string', format: 'uuid' },
-    event_type: { type: 'string' },
-    source: { type: 'string' },
-    tag: { type: 'string' }
   }
 };
