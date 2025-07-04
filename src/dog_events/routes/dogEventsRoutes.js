@@ -1,4 +1,4 @@
-import { 
+import {
   createDogEventController,
 } from '../controller/createDogEvent.js';
 import {
@@ -14,127 +14,83 @@ import {
   deleteDogEventController,
 } from '../controller/deleteDogEvent.js';
 import {
-  bulkCreateDogEventsController,
-} from '../controller/bulkCreateDogEvents.js';
-import {
   listDogEventsForDogController,
 } from '../controller/listDogEventsForDog.js';
 import { dogEventsSchemas } from '../schemas/dogEventsSchemas.js';
 
 export default async function dogEventsRoutes(fastify, opts) {
-  fastify.post(
-    '/',
-    {
-      schema: {
-        body: dogEventsSchemas.CreateDogEvent,
-        response: { 201: dogEventsSchemas.SingleDogEventEnvelope },
-        tags: ['DogEvents'],
-        summary: 'Create a new dog event'
-      }
-    },
-    createDogEventController
-  );
+  // Register response envelopes
+  fastify.addSchema(dogEventsSchemas.DogEvent);
+  fastify.addSchema(dogEventsSchemas.DogEventsEnvelope);
+  fastify.addSchema(dogEventsSchemas.SingleDogEventEnvelope);
 
-  fastify.post(
-    '/bulk',
-    {
-      schema: {
-        body: dogEventsSchemas.BulkCreateDogEvents,
-        response: { 201: dogEventsSchemas.BulkCreateDogEventsResponse },
-        tags: ['DogEvents'],
-        summary: 'Bulk create dog events'
-      }
-    },
-    bulkCreateDogEventsController
-  );
+  // List all events
+  fastify.get('/', {
+    schema: {
+      tags: ['DogEvents'],
+      response: { 200: dogEventsSchemas.DogEventsEnvelope }
+    }
+  }, listDogEventsController);
 
-  fastify.get(
-    '/',
-    {
-      schema: {
-        querystring: dogEventsSchemas.ListDogEventsQuery,
-        response: {
-          200: dogEventsSchemas.DogEventsEnvelope
-        },
-        tags: ['DogEvents'],
-        summary: 'List all dog events'
-      }
-    },
-    listDogEventsController
-  );
+  // Create event
+  fastify.post('/', {
+    schema: {
+      tags: ['DogEvents'],
+      body: dogEventsSchemas.DogEvent,
+      response: { 201: dogEventsSchemas.SingleDogEventEnvelope }
+    }
+  }, createDogEventController);
 
-  fastify.get(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
-        },
-        response: {
-          200: dogEventsSchemas.SingleDogEventEnvelope
-        },
-        tags: ['DogEvents'],
-        summary: 'Retrieve a single dog event'
-      }
-    },
-    getDogEventController
-  );
+  // Get event by id
+  fastify.get('/:id', {
+    schema: {
+      tags: ['DogEvents'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      response: { 200: dogEventsSchemas.SingleDogEventEnvelope }
+    }
+  }, getDogEventController);
 
-  fastify.get(
-    '/dog/:dog_id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: { dog_id: { type: 'string', format: 'uuid' } },
-          required: ['dog_id']
-        },
-        response: {
-          200: dogEventsSchemas.DogEventsEnvelope
-        },
-        tags: ['DogEvents'],
-        summary: 'List all events for a specific dog'
-      }
-    },
-    listDogEventsForDogController
-  );
+  // Update event by id
+  fastify.patch('/:id', {
+    schema: {
+      tags: ['DogEvents'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      body: dogEventsSchemas.DogEvent,
+      response: { 200: dogEventsSchemas.SingleDogEventEnvelope }
+    }
+  }, updateDogEventController);
 
-  fastify.patch(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
-        },
-        body: dogEventsSchemas.UpdateDogEvent,
-        response: {
-          200: dogEventsSchemas.SingleDogEventEnvelope
-        },
-        tags: ['DogEvents'],
-        summary: 'Update a dog event'
-      }
-    },
-    updateDogEventController
-  );
+  // Delete event
+  fastify.delete('/:id', {
+    schema: {
+      tags: ['DogEvents'],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      response: { 200: { type: 'object', properties: { deleted: { type: 'boolean' } }, required: ['deleted'] } }
+    }
+  }, deleteDogEventController);
 
-  fastify.delete(
-    '/:id',
-    {
-      schema: {
-        params: {
-          type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id']
-        },
-        response: { 200: { type: 'object', properties: { deleted: { type: 'boolean' } } } },
-        tags: ['DogEvents'],
-        summary: 'Delete a dog event'
-      }
-    },
-    deleteDogEventController
-  );
+  // List all events for a specific dog
+  fastify.get('/dog/:dog_id', {
+    schema: {
+      tags: ['DogEvents'],
+      params: {
+        type: 'object',
+        properties: { dog_id: { type: 'string', format: 'uuid' } },
+        required: ['dog_id']
+      },
+      response: { 200: dogEventsSchemas.DogEventsEnvelope }
+    }
+  }, listDogEventsForDogController);
 }
