@@ -8,15 +8,14 @@ import {
   getDogEventController,
 } from '../controller/getDogEvent.js';
 import {
- import { 
+  listDogEventsController,
+} from '../controller/listDogEvents.js';
+import {
   listDogEventsForDogController,
 } from '../controller/listDogEventsForDog.js';
 import {
   deleteDogEventController,
 } from '../controller/deleteDogEvent.js';
-import {
-  listDogEventsForDogController,
-} from '../controller/listDogEventsForDog.js';
 import { dogEventsSchemas } from '../schemas/dogEventsSchemas.js';
 
 export default async function dogEventsRoutes(fastify, opts) {
