@@ -12,7 +12,7 @@ import {
 } from '../controller/listDogEventsForDogController.js';
 import {
   listDogEventsForDogController,
-} from '../controller/listDogEventsForDog.js';
+} from '../controller/listDogEventsForDogController.js';
 import {
   deleteDogEventController,
 } from '../controller/deleteDogEvent.js';
