@@ -134,7 +134,6 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
       raw_matches: rawMatches
     };
 
-    console.log("[PersonalityWorker] Response object:", JSON.stringify(responseResult));
     return new Response(JSON.stringify(responseResult), {
       status: 200,
       headers: { "content-type": "application/json" }
