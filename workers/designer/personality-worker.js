@@ -52,8 +52,8 @@ export default {
     // Pick up to 10 snippets for LLM summary
     summaryInputTexts = texts.slice(0, 10);
 
-    // --- Strip .values from match objects for logging/response
-    const safeRawMatches = rawMatches.map(({ values, ...rest }) => rest);
+    // --- DEEP STRIP .values from all matches for log/response
+    const safeRawMatches = stripValuesDeep(rawMatches);
 
     if (!summaryInputTexts.length) {
       const result = {
@@ -81,7 +81,7 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
 
     let personalitySummary = "";
     try {
-      // LOG: Show Replicate payload
+      // LOG: Show Replicate payload (does not contain vectors)
       const replicatePayload = {
         input: {
           prompt: promptText,
@@ -126,7 +126,7 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
       personalitySummary,
       personality_snippets: bullets,
       raw_texts: texts,
-      raw_matches: safeRawMatches // full metadata for debug/inspection, but no values!
+      raw_matches: safeRawMatches
     };
 
     console.log("[PersonalityWorker] Sending result (summary length: " + personalitySummary.length + ")");
@@ -136,4 +136,20 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
       headers: { "content-type": "application/json" }
     });
   }
-};
+}
+
+// --- Deep strip of .values field everywhere (arrays and objects)
+function stripValuesDeep(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(stripValuesDeep);
+  }
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const key in obj) {
+      if (key === 'values') continue;
+      out[key] = stripValuesDeep(obj[key]);
+    }
+    return out;
+  }
+  return obj;
+}
