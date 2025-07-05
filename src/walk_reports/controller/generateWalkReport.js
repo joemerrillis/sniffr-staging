@@ -2,7 +2,6 @@
 
 import walkReportsService from '../services/walkReportsService.js';
 import chatService from '../../chat/services/chatService.js';
-import { callWorker } from '../../utils/callWorker.js';
 
 // Other controllers here...
 
