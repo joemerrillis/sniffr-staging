@@ -1,4 +1,5 @@
-import { generateAIStory } from '../service/aiStoryService.js';
+// src/walk_reports/controller/updateWalkReport.js
+
 import { aggregateStats } from '../service/statsAggregator.js';
 
 export async function updateWalkReportController(request, reply) {
@@ -9,17 +10,14 @@ export async function updateWalkReportController(request, reply) {
 
     console.log('[walk_reports] update controller: received update', { id, updates });
 
-    // --- AI WORKER STUB: Optionally re-run AI if photos are updated ---
-    if (updates.generate_ai_story && updates.photos) {
-      console.log('[walk_reports] update: Running AI story worker...');
-      updates.ai_story_json = await generateAIStory(updates.dog_id, updates.photos);
-    }
-
-    // --- AI WORKER STUB: Re-aggregate stats if needed ---
+    // Optionally re-aggregate stats if requested
     if (updates.recalculate_stats && updates.dog_id && updates.walk_id) {
       console.log('[walk_reports] update: Re-aggregating stats...');
-      updates.stats_json = await aggregateStats(updates.walk_id, updates.dog_id);
+      updates.stats_json = await aggregateStats(supabase, updates.walk_id, updates.dog_id);
     }
+
+    // Remove keys used only to trigger logic, not meant for DB update
+    delete updates.recalculate_stats;
 
     const { data, error } = await supabase
       .from('walk_reports')
