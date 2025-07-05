@@ -1,24 +1,12 @@
 // src/walk_reports/routes/walkReportsRoutes.js
 
-import {
-  createWalkReportController,
-} from '../controller/createWalkReport.js';
-import {
-  updateWalkReportController,
-} from '../controller/updateWalkReport.js';
-import {
-  getWalkReportController,
-} from '../controller/getWalkReport.js';
-import {
-  listWalkReportsController,
-} from '../controller/listWalkReports.js';
-import {
-  deleteWalkReportController,
-} from '../controller/deleteWalkReport.js';
+import { createWalkReportController } from '../controller/createWalkReport.js';
+import { updateWalkReportController } from '../controller/updateWalkReport.js';
+import { getWalkReportController } from '../controller/getWalkReport.js';
+import { listWalkReportsController } from '../controller/listWalkReports.js';
+import { deleteWalkReportController } from '../controller/deleteWalkReport.js';
 import { walkReportsSchemas } from '../schemas/walkReportsSchemas.js';
-import { 
- generateWalkReportController // <--- New controller for /generate
-} from './controllers/walkReportsController.js';
+import { generateWalkReportController } from '../controller/generateWalkReport.js';
 
 export default async function walkReportsRoutes(fastify, opts) {
   // Create a walk report
@@ -127,17 +115,24 @@ export default async function walkReportsRoutes(fastify, opts) {
     },
     deleteWalkReportController
   );
-    // NEW: /walk-reports/:id/generate
-  fastify.post('/walk-reports/:id/generate', {
-    handler: generateWalkReportController,
-    schema: {
-      summary: 'Generate captions/tags/story for a walk report',
-      params: { id: { type: 'string', format: 'uuid' } },
-      response: { 200: { type: 'object', properties: { report: { type: 'object' } } } }
-    },
-    tags: ['WalkReports'],
-  });
 
-  done();
-}
+  // NEW: Generate captions/tags/story for a walk report
+  fastify.post(
+    '/:id/generate',
+    {
+      schema: {
+        summary: 'Generate captions/tags/story for a walk report',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        response: {
+          200: walkReportsSchemas.WalkReportEnvelope
+        },
+        tags: ['WalkReports']
+      }
+    },
+    generateWalkReportController
+  );
 }
