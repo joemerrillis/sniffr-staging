@@ -2,6 +2,14 @@
 
 import { getMostRecentEmbeddingIdsForDogs } from '../../chat/services/chatEmbeddingService.js';
 
+import {
+  callPersonalityWorker,
+  callCaptionWorker,
+  callTagWorker,
+  callEmbeddingWorker // if needed
+} from './workers.js';
+
+
 const walkReportsService = {
   async getReportById(supabase, reportId) {
     const { data, error } = await supabase
