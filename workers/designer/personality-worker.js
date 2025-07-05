@@ -39,11 +39,9 @@ export default {
       return new Response(JSON.stringify({ error: "Vector search failed", details: e.message }), { status: 500 });
     }
 
-    // --- Collect relevant texts & all metadata
     const rawMatches = matches?.matches || [];
     const texts = rawMatches.map(m => m.metadata?.body || '').filter(Boolean);
 
-    // Pick up to 10 snippets for LLM summary
     summaryInputTexts = texts.slice(0, 10);
 
     if (!summaryInputTexts.length) {
@@ -61,7 +59,7 @@ export default {
       });
     }
 
-    // --- Summarize with Replicate Claude 3.5 Haiku
+    // --- Summarize with Replicate Claude 3.5 Haiku ---
     const replicateApiToken = env.REPLICATE_API_TOKEN; // Set as environment variable!
     const systemPrompt = `
 You are a skilled dog walker in Jersey City. Your job is to write personality profiles based off of 10 chat logs. Each quote is from a separate entry, and all quotes refer to the same dog. Provide an overall personality summary.
@@ -71,29 +69,56 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
 
     let personalitySummary = "";
     try {
+      // Step 1: POST to /predictions
       const replicatePayload = {
-        input: {
-          prompt: promptText,
-          system_prompt: systemPrompt,
-          max_tokens: 512
-        }
+        prompt: promptText,
+        max_tokens: 512,
+        system_prompt: systemPrompt
       };
+      const replicateResp = await fetch(
+        "https://api.replicate.com/v1/models/anthropic/claude-3.5-haiku/predictions",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Token ${replicateApiToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ input: replicatePayload })
+        }
+      );
+      const prediction = await replicateResp.json();
+      const predictionId = prediction.id;
 
-      const replicateResp = await fetch("https://api.replicate.com/v1/models/anthropic/claude-3.5-haiku/predictions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Token ${replicateApiToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(replicatePayload)
-      });
+      // Step 2: Poll for result
+      let result = prediction;
+      let tries = 0;
+      while (
+        result.status !== "succeeded" &&
+        result.status !== "failed" &&
+        tries < 20
+      ) {
+        await new Promise(res => setTimeout(res, 1200));
+        const pollResp = await fetch(
+          `https://api.replicate.com/v1/predictions/${predictionId}`,
+          {
+            headers: {
+              "Authorization": `Token ${replicateApiToken}`,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+        result = await pollResp.json();
+        tries++;
+      }
 
-      const replicateResult = await replicateResp.json();
-
-      if (replicateResult?.output && Array.isArray(replicateResult.output) && replicateResult.output.length > 0) {
-        personalitySummary = replicateResult.output.join('').trim();
+      if (result.status === "succeeded") {
+        if (Array.isArray(result.output)) {
+          personalitySummary = result.output.join("").trim();
+        } else {
+          personalitySummary = (result.output || "").trim();
+        }
       } else {
-        personalitySummary = "Summary model returned no usable output.";
+        personalitySummary = "Summary model did not complete successfully.";
       }
     } catch (e) {
       personalitySummary = "Could not generate summary (model error).";
@@ -101,17 +126,16 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
 
     // --- Compose response
     const bullets = summaryInputTexts.map(t => t.replace(/\n/g, ' ').slice(0, 160));
-    const result = {
+    const responseResult = {
       dog_id,
       personalitySummary,
       personality_snippets: bullets,
       raw_texts: texts,
-      raw_matches: rawMatches // full metadata for debug/inspection
+      raw_matches: rawMatches
     };
 
-    // --- Only log the final result object
-    console.log("[PersonalityWorker] Response object:", JSON.stringify(result));
-    return new Response(JSON.stringify(result), {
+    console.log("[PersonalityWorker] Response object:", JSON.stringify(responseResult));
+    return new Response(JSON.stringify(responseResult), {
       status: 200,
       headers: { "content-type": "application/json" }
     });
