@@ -1,5 +1,6 @@
+// src/walk_reports/controller/createWalkReport.js
+
 import { validateWalkReportInput } from '../utils/validateWalkReportInput.js';
-import { generateAIStory } from '../service/aiStoryService.js';
 import { aggregateStats } from '../service/statsAggregator.js';
 import { createWalkReport } from '../service/walkReportService.js';
 
@@ -18,14 +19,8 @@ export async function createWalkReportController(request, reply) {
       return reply.code(400).send({ error: validation.error });
     }
 
-    // --- AI and stats worker stubs
-    let ai_story_json = input.ai_story_json;
+    // --- Optional stats worker (leave as-is for stats collection at creation)
     let stats_json = input.stats_json;
-
-    if (input.generate_ai_story && input.photos) {
-      ai_story_json = await generateAIStory(input.dog_ids?.[0], input.photos);
-      console.log('[walk_reports] Generated AI story:', ai_story_json);
-    }
     if (!stats_json && input.dog_ids?.length && input.walk_id) {
       stats_json = await aggregateStats(supabase, input.walk_id, input.dog_ids[0]);
       console.log('[walk_reports] Aggregated stats:', stats_json);
@@ -38,7 +33,7 @@ export async function createWalkReportController(request, reply) {
       walker_id: input.walker_id,
       user_id: input.user_id,
       summary: input.summary || null,
-      ai_story_json: ai_story_json || null,
+      ai_story_json: null,         // No AI story at create time
       stats_json: stats_json || null,
       survey_json: input.survey_json || null,
       visibility: input.visibility || null,
