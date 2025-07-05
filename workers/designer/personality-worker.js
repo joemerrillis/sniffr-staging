@@ -8,7 +8,6 @@ export default {
     try {
       data = await request.json();
     } catch (e) {
-      console.log("[PersonalityWorker] Invalid JSON in request body:", e);
       return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
     }
 
@@ -23,25 +22,20 @@ export default {
 
     try {
       if (embedding_id) {
-        console.log(`[PersonalityWorker] Using queryById with embedding_id: ${embedding_id}, dog_id: ${dog_id}, max: ${max}`);
         matches = await env.VECTORIZE_TEXT.queryById(embedding_id, {
           topK: max,
           returnValues: true,
           returnMetadata: "all"
         });
-        console.log(`[PersonalityWorker] queryById result count: ${matches?.matches?.length || 0}`);
       } else {
-        console.log(`[PersonalityWorker] No embedding_id. Using filter query for dog_id: ${dog_id}, max: ${max}`);
         matches = await env.VECTORIZE_TEXT.query({
           topK: max,
           filter: { dog_id },
           returnValues: true,
           returnMetadata: "all"
         });
-        console.log(`[PersonalityWorker] filter query result count: ${matches?.matches?.length || 0}`);
       }
     } catch (e) {
-      console.log("[PersonalityWorker] Error during vector query:", e);
       return new Response(JSON.stringify({ error: "Vector search failed", details: e.message }), { status: 500 });
     }
 
@@ -52,19 +46,15 @@ export default {
     // Pick up to 10 snippets for LLM summary
     summaryInputTexts = texts.slice(0, 10);
 
-    // --- DEEP STRIP .values from all matches for log/response
-    const safeRawMatches = stripValuesDeep(rawMatches);
-
     if (!summaryInputTexts.length) {
       const result = {
         dog_id,
         personalitySummary: "No known personality details yet. Try chatting more about this dog!",
         personality_snippets: [],
         raw_texts: [],
-        raw_matches: safeRawMatches
+        raw_matches: rawMatches
       };
-      console.log("[PersonalityWorker] No matches found, sending default result.");
-      console.log("[PersonalityWorker] Final result object:", JSON.stringify(result));
+      console.log("[PersonalityWorker] Response object:", JSON.stringify(result));
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { "content-type": "application/json" }
@@ -81,7 +71,6 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
 
     let personalitySummary = "";
     try {
-      // LOG: Show Replicate payload (does not contain vectors)
       const replicatePayload = {
         input: {
           prompt: promptText,
@@ -89,7 +78,6 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
           max_tokens: 512
         }
       };
-      console.log("[PersonalityWorker] About to call Replicate with payload:", JSON.stringify(replicatePayload));
 
       const replicateResp = await fetch("https://api.replicate.com/v1/models/anthropic/claude-3.5-haiku/predictions", {
         method: "POST",
@@ -100,23 +88,15 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
         body: JSON.stringify(replicatePayload)
       });
 
-      console.log("[PersonalityWorker] Replicate API HTTP status:", replicateResp.status);
-
       const replicateResult = await replicateResp.json();
-      console.log("[PersonalityWorker] Replicate raw response:", JSON.stringify(replicateResult));
 
-      // Replicate returns output as an array of strings
       if (replicateResult?.output && Array.isArray(replicateResult.output) && replicateResult.output.length > 0) {
         personalitySummary = replicateResult.output.join('').trim();
       } else {
         personalitySummary = "Summary model returned no usable output.";
-        console.log("[PersonalityWorker] Replicate output was empty or invalid:", replicateResult.output);
       }
-      console.log("[PersonalityWorker] Received summary from Replicate:", personalitySummary);
-
     } catch (e) {
       personalitySummary = "Could not generate summary (model error).";
-      console.log("[PersonalityWorker] Error calling Replicate:", e, e.stack);
     }
 
     // --- Compose response
@@ -126,30 +106,14 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
       personalitySummary,
       personality_snippets: bullets,
       raw_texts: texts,
-      raw_matches: safeRawMatches
+      raw_matches: rawMatches // full metadata for debug/inspection
     };
 
-    console.log("[PersonalityWorker] Sending result (summary length: " + personalitySummary.length + ")");
-    console.log("[PersonalityWorker] Final result object:", JSON.stringify(result));
+    // --- Only log the final result object
+    console.log("[PersonalityWorker] Response object:", JSON.stringify(result));
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { "content-type": "application/json" }
     });
   }
-}
-
-// --- Deep strip of .values field everywhere (arrays and objects)
-function stripValuesDeep(obj) {
-  if (Array.isArray(obj)) {
-    return obj.map(stripValuesDeep);
-  }
-  if (obj && typeof obj === 'object') {
-    const out = {};
-    for (const key in obj) {
-      if (key === 'values') continue;
-      out[key] = stripValuesDeep(obj[key]);
-    }
-    return out;
-  }
-  return obj;
-}
+};
