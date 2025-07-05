@@ -28,12 +28,11 @@ export async function generateWalkReportController(request, reply) {
   const embedding_id = recentEmbeddedChat.embedding_id;
 
   // 4. Call personality_worker with embedding_id and dog_id(s)
-  const personalityProfile = await callWorker('personality_worker', {
-    embedding_id,
-    dog_id: dogIds[0], // Assuming single-dog walk for now; if multi-dog, you can loop later
-    dog_ids: dogIds,
-    // Optionally pass dog names if you fetch them
-  });
+const personalityProfile = await callPersonalityWorker({
+  embedding_id,
+  dog_id: dogIds[0],
+  dog_ids: dogIds,
+});
 
   // 5. Get all dog_memories for the report (from report.photos: array of dog_memories IDs)
   const photoObjs = [];
