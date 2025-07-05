@@ -52,15 +52,19 @@ export default {
     // Pick up to 10 snippets for LLM summary
     summaryInputTexts = texts.slice(0, 10);
 
+    // --- Strip .values from match objects for logging/response
+    const safeRawMatches = rawMatches.map(({ values, ...rest }) => rest);
+
     if (!summaryInputTexts.length) {
       const result = {
         dog_id,
         personalitySummary: "No known personality details yet. Try chatting more about this dog!",
         personality_snippets: [],
         raw_texts: [],
-        raw_matches: rawMatches
+        raw_matches: safeRawMatches
       };
       console.log("[PersonalityWorker] No matches found, sending default result.");
+      console.log("[PersonalityWorker] Final result object:", JSON.stringify(result));
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { "content-type": "application/json" }
@@ -122,7 +126,7 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
       personalitySummary,
       personality_snippets: bullets,
       raw_texts: texts,
-      raw_matches: rawMatches // full metadata for debug/inspection
+      raw_matches: safeRawMatches // full metadata for debug/inspection, but no values!
     };
 
     console.log("[PersonalityWorker] Sending result (summary length: " + personalitySummary.length + ")");
