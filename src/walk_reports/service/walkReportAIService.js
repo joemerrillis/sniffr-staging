@@ -1,9 +1,12 @@
 // src/walk_reports/services/walkReportAIService.js
 
 import { getMostRecentEmbeddingIdsForDogs } from '../../chat/services/chatEmbeddingService.js';
-import { callPersonalityWorker } from '../../workers/callPersonalityWorker.js';
-import { callCaptionWorker } from '../../workers/callCaptionWorker.js';
-import { callTagWorker } from '../../workers/callTagWorker.js';
+
+import {
+  callPersonalityWorker,
+  callCaptionWorker,
+  callTagsWorker
+} from './workers.js';
 
 const walkReportsService = {
   async getReportById(supabase, reportId) {
