@@ -16,6 +16,9 @@ import {
   deleteWalkReportController,
 } from '../controller/deleteWalkReport.js';
 import { walkReportsSchemas } from '../schemas/walkReportsSchemas.js';
+import { 
+ generateWalkReportController // <--- New controller for /generate
+} from './controllers/walkReportsController.js';
 
 export default async function walkReportsRoutes(fastify, opts) {
   // Create a walk report
@@ -124,4 +127,17 @@ export default async function walkReportsRoutes(fastify, opts) {
     },
     deleteWalkReportController
   );
+    // NEW: /walk-reports/:id/generate
+  fastify.post('/walk-reports/:id/generate', {
+    handler: generateWalkReportController,
+    schema: {
+      summary: 'Generate captions/tags/story for a walk report',
+      params: { id: { type: 'string', format: 'uuid' } },
+      response: { 200: { type: 'object', properties: { report: { type: 'object' } } } }
+    },
+    tags: ['WalkReports'],
+  });
+
+  done();
+}
 }
