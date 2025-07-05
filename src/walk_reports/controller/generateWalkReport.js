@@ -1,7 +1,7 @@
 // walk_reports/controller/walkReportsController.js
 
 import walkReportsService from '../services/walkReportsService.js';
-import chatService from '../../chat/services/chatService.js';
+import { getMostRecentEmbeddingIdsForDogs } from '../../chat/services/chatEmbeddingService.js';
 
 // Other controllers here...
 
