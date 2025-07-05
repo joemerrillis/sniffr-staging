@@ -1,50 +1,22 @@
-// src/walk_reports/services/walkReportAIService.js
+// src/walk_reports/service/walkReportAIService.js
 
 import { getMostRecentEmbeddingIdsForDogs } from '../../chat/services/chatEmbeddingService.js';
-
 import {
   callPersonalityWorker,
   callCaptionWorker,
-  callTagWorker,
-  callEmbeddingWorker // if needed
+  callTagWorker
 } from './workers.js';
 
+import {
+  getWalkReportById,
+  updateWalkReport,
+  getDogMemoryById
+} from './walkReportService.js';
 
-const walkReportsService = {
-  async getReportById(supabase, reportId) {
-    const { data, error } = await supabase
-      .from('walk_reports')
-      .select('*')
-      .eq('id', reportId)
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async updateReport(supabase, reportId, updates) {
-    const { data, error } = await supabase
-      .from('walk_reports')
-      .update(updates)
-      .eq('id', reportId)
-      .select('*')
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async getDogMemoryById(supabase, memoryId) {
-    const { data, error } = await supabase
-      .from('dog_memories')
-      .select('*')
-      .eq('id', memoryId)
-      .single();
-    if (error) return null;
-    return data;
-  },
-
+const walkReportAIService = {
   async generateReport(supabase, reportId) {
     // 1. Fetch the walk report
-    const report = await this.getReportById(supabase, reportId);
+    const report = await getWalkReportById(supabase, reportId);
     if (!report) throw new Error('Report not found');
 
     // 2. Gather dog_ids from the report
@@ -56,17 +28,13 @@ const walkReportsService = {
       throw new Error('No embedded chat with reaction found for any dog in this walk.');
     }
 
-    // 4. For each dog, call the personality worker
+    // 4. For each dog, call the personality worker (returns summary string)
     const personalities = [];
     for (const { dog_id, embedding_id } of embeddingInfos) {
       if (!embedding_id) continue; // Skip dogs with no embedding
       try {
-        const profile = await callPersonalityWorker({
-          embedding_id,
-          dog_id,
-          dog_ids: [dog_id]
-        });
-        personalities.push({ dog_id, profile });
+        const personalitySummary = await callPersonalityWorker(dog_id, embedding_id);
+        personalities.push({ dog_id, personalitySummary });
       } catch (err) {
         console.error(`Personality worker failed for dog ${dog_id}:`, err);
       }
@@ -80,19 +48,20 @@ const walkReportsService = {
     if (Array.isArray(report.photos)) {
       for (const memoryId of report.photos) {
         // Fetch the photo (dog_memories row)
-        const photo = await this.getDogMemoryById(supabase, memoryId);
+        const photo = await getDogMemoryById(supabase, memoryId);
         if (!photo) continue;
 
         // Get profiles for all dogs in this photo
         const photoDogProfiles = personalities
           .filter(p => (photo.dog_ids || []).includes(p.dog_id))
-          .map(p => p.profile);
+          .map(p => p.personalitySummary);
 
         // Combine all names for this photo (flatten)
-        const dog_names = photoDogProfiles.map(p => p.names).flat();
+        // (If you have getDogNamesFromIds, use it here for real names)
+        const dog_names = photo.dog_ids ? photo.dog_ids : [];
 
-        // Pick the first profile for captions/tags (or improve to combine if you want)
-        const primaryProfile = photoDogProfiles[0] || {};
+        // Pick the first profile for captions/tags (or merge/adjust as needed)
+        const primaryProfile = photoDogProfiles[0] || null;
 
         // Call caption worker
         const caption = await callCaptionWorker(
@@ -106,7 +75,6 @@ const walkReportsService = {
         const tags = await callTagWorker(
           photo,
           dog_names,
-          null, // eventType, if you have it
           primaryProfile
         );
 
@@ -120,16 +88,11 @@ const walkReportsService = {
     }
 
     // 6. (Optionally) Generate a story/summary for the walk using all personality profiles and images
-    // NOTE: Replace this with your call to walk_summary_worker if you break it out later!
-    const ai_story_json = await callPersonalityWorker({
-      mode: "story",
-      dog_ids: dogIds,
-      personality_profiles: personalities.map(p => p.profile),
-      images: photoObjs,
-    });
+    // NOTE: Replace this with a walk_summary_worker if you split out summary logic.
+    const ai_story_json = null; // Stub until you have a summary worker
 
     // 7. Save generated captions/tags/summary back to the walk report
-    const updatedReport = await this.updateReport(supabase, reportId, {
+    const updatedReport = await updateWalkReport(supabase, reportId, {
       photos: photoObjs,
       ai_story_json,
       updated_at: new Date().toISOString(),
@@ -140,4 +103,4 @@ const walkReportsService = {
   }
 };
 
-export default walkReportsService;
+export default walkReportAIService;
