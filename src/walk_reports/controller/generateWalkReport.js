@@ -1,9 +1,10 @@
-// walk_reports/controller/walkReportsController.js
+// src/walk_reports/controller/generateWalkReportController.js
 
 import walkReportsService from '../services/walkReportsService.js';
 import { getMostRecentEmbeddingIdsForDogs } from '../../chat/services/chatEmbeddingService.js';
-
-// Other controllers here...
+import { callPersonalityWorker } from '../../workers/callPersonalityWorker.js';
+import { callCaptionWorker } from '../../workers/callCaptionWorker.js';
+import { callTagWorker } from '../../workers/callTagWorker.js';
 
 export async function generateWalkReportController(request, reply) {
   const supabase = request.server.supabase;
@@ -13,47 +14,68 @@ export async function generateWalkReportController(request, reply) {
   const report = await walkReportsService.getReportById(supabase, reportId);
   if (!report) return reply.code(404).send({ error: 'Report not found' });
 
-  // 2. Gather dog_ids and walker_id from the report
+  // 2. Gather dog_ids from the report
   const dogIds = report.dog_ids || [];
-  const walkerId = report.walker_id;
 
-  // 3. Get all recent chat messages for this dog that have an embedding_id (i.e., were reacted to)
-  // We'll use the latest one for the embedding_id
-  const recentEmbeddedChat = await chatService.getMostRecentEmbeddedChatForDog(supabase, dogIds);
-
-  if (!recentEmbeddedChat || !recentEmbeddedChat.embedding_id) {
-    return reply.code(400).send({ error: 'No embedded chat with reaction found for this dog.' });
+  // 3. Get the most recent chat embedding_id for each dog in the walk
+  const embeddingInfos = await getMostRecentEmbeddingIdsForDogs(supabase, dogIds);
+  if (!embeddingInfos.length || embeddingInfos.every(e => !e.embedding_id)) {
+    return reply.code(400).send({ error: 'No embedded chat with reaction found for any dog in this walk.' });
   }
 
-  const embedding_id = recentEmbeddedChat.embedding_id;
+  // 4. For each dog, call the personality worker
+  const personalities = [];
+  for (const { dog_id, embedding_id } of embeddingInfos) {
+    if (!embedding_id) continue; // Skip dogs with no embedding
+    try {
+      const profile = await callPersonalityWorker({
+        embedding_id,
+        dog_id,
+        dog_ids: [dog_id]
+      });
+      personalities.push({ dog_id, profile });
+    } catch (err) {
+      console.error(`Personality worker failed for dog ${dog_id}:`, err);
+    }
+  }
+  if (!personalities.length) {
+    return reply.code(400).send({ error: 'No valid personality profiles generated.' });
+  }
 
-  // 4. Call personality_worker with embedding_id and dog_id(s)
-const personalityProfile = await callPersonalityWorker({
-  embedding_id,
-  dog_id: dogIds[0],
-  dog_ids: dogIds,
-});
-
-  // 5. Get all dog_memories for the report (from report.photos: array of dog_memories IDs)
+  // 5. For each photo, call the caption/tag workers using the dog profiles for dogs in the photo
   const photoObjs = [];
   if (Array.isArray(report.photos)) {
     for (const memoryId of report.photos) {
-      // Pull dog_memories record (assuming a service exists, otherwise fetch directly)
+      // Fetch the photo (dog_memories row)
       const photo = await walkReportsService.getDogMemoryById(supabase, memoryId);
       if (!photo) continue;
 
-      // Generate caption and tags for each photo using the personality profile
-      const caption = await callWorker('caption_worker', {
-        image_url: photo.image_url,
-        dog_names: personalityProfile?.names || [],
-        personality_profile: personalityProfile,
-      });
+      // Get profiles for all dogs in this photo
+      const photoDogProfiles = personalities
+        .filter(p => (photo.dog_ids || []).includes(p.dog_id))
+        .map(p => p.profile);
 
-      const tags = await callWorker('tag_worker', {
-        image_url: photo.image_url,
-        dog_names: personalityProfile?.names || [],
-        personality_profile: personalityProfile,
-      });
+      // Combine all names for this photo (flatten)
+      const dog_names = photoDogProfiles.map(p => p.names).flat();
+
+      // Pick the first profile for captions/tags (or improve to combine if you want)
+      const primaryProfile = photoDogProfiles[0] || {};
+
+      // Call caption worker
+      const caption = await callCaptionWorker(
+        photo,
+        dog_names,
+        null, // eventType, if you have it
+        primaryProfile
+      );
+
+      // Call tag worker
+      const tags = await callTagWorker(
+        photo,
+        dog_names,
+        null, // eventType, if you have it
+        primaryProfile
+      );
 
       photoObjs.push({
         url: photo.image_url,
@@ -64,12 +86,11 @@ const personalityProfile = await callPersonalityWorker({
     }
   }
 
-  // 6. Optionally, generate a summary/story for the walk
-  const ai_story_json = await callWorker('personality_worker', {
+  // 6. Generate a story/summary for the walk using all personality profiles and images
+  const ai_story_json = await callPersonalityWorker({
     mode: "story",
-    dog_id: dogIds[0],
     dog_ids: dogIds,
-    personality_profile: personalityProfile,
+    personality_profiles: personalities.map(p => p.profile),
     images: photoObjs,
   });
 
