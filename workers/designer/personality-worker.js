@@ -23,7 +23,6 @@ export default {
 
     try {
       if (embedding_id) {
-        // Use queryById: this is the most robust for semantic search
         console.log(`[PersonalityWorker] Using queryById with embedding_id: ${embedding_id}, dog_id: ${dog_id}, max: ${max}`);
         matches = await env.VECTORIZE_TEXT.queryById(embedding_id, {
           topK: max,
@@ -32,7 +31,6 @@ export default {
         });
         console.log(`[PersonalityWorker] queryById result count: ${matches?.matches?.length || 0}`);
       } else {
-        // No embedding id? Do a pure metadata filter search.
         console.log(`[PersonalityWorker] No embedding_id. Using filter query for dog_id: ${dog_id}, max: ${max}`);
         matches = await env.VECTORIZE_TEXT.query({
           topK: max,
@@ -54,7 +52,6 @@ export default {
     // Pick up to 10 snippets for LLM summary
     summaryInputTexts = texts.slice(0, 10);
 
-    // If we have no texts, return default
     if (!summaryInputTexts.length) {
       const result = {
         dog_id,
@@ -80,37 +77,42 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
 
     let personalitySummary = "";
     try {
-      console.log("[PersonalityWorker] Calling Replicate Claude 3.5 Haiku...");
+      // LOG: Show Replicate payload
+      const replicatePayload = {
+        input: {
+          prompt: promptText,
+          system_prompt: systemPrompt,
+          max_tokens: 512
+        }
+      };
+      console.log("[PersonalityWorker] About to call Replicate with payload:", JSON.stringify(replicatePayload));
+
       const replicateResp = await fetch("https://api.replicate.com/v1/models/anthropic/claude-3.5-haiku/predictions", {
         method: "POST",
         headers: {
           "Authorization": `Token ${replicateApiToken}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          input: {
-            prompt: promptText,
-            system_prompt: systemPrompt,
-            max_tokens: 512 // Plenty for a detailed profile
-          }
-        })
+        body: JSON.stringify(replicatePayload)
       });
 
-      if (!replicateResp.ok) {
-        const errText = await replicateResp.text();
-        throw new Error(`[ReplicateAPI] Bad status: ${replicateResp.status} - ${errText}`);
-      }
+      console.log("[PersonalityWorker] Replicate API HTTP status:", replicateResp.status);
+
       const replicateResult = await replicateResp.json();
+      console.log("[PersonalityWorker] Replicate raw response:", JSON.stringify(replicateResult));
+
       // Replicate returns output as an array of strings
-      if (replicateResult?.output && Array.isArray(replicateResult.output)) {
+      if (replicateResult?.output && Array.isArray(replicateResult.output) && replicateResult.output.length > 0) {
         personalitySummary = replicateResult.output.join('').trim();
       } else {
         personalitySummary = "Summary model returned no usable output.";
+        console.log("[PersonalityWorker] Replicate output was empty or invalid:", replicateResult.output);
       }
-      console.log("[PersonalityWorker] Received summary from Replicate.");
+      console.log("[PersonalityWorker] Received summary from Replicate:", personalitySummary);
+
     } catch (e) {
       personalitySummary = "Could not generate summary (model error).";
-      console.log("[PersonalityWorker] Error calling Replicate:", e);
+      console.log("[PersonalityWorker] Error calling Replicate:", e, e.stack);
     }
 
     // --- Compose response
@@ -124,6 +126,7 @@ You are a skilled dog walker in Jersey City. Your job is to write personality pr
     };
 
     console.log("[PersonalityWorker] Sending result (summary length: " + personalitySummary.length + ")");
+    console.log("[PersonalityWorker] Final result object:", JSON.stringify(result));
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { "content-type": "application/json" }
