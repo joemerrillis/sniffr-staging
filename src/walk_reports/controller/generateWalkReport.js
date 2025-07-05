@@ -1,6 +1,6 @@
 // src/walk_reports/controller/generateWalkReportController.js
 
-import walkReportsService from '../services/walkReportAIService.js';
+import walkReportsService from '../service/walkReportAIService.js';
 
 export async function generateWalkReportController(request, reply) {
   const supabase = request.server.supabase;
