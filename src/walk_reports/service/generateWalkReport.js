@@ -141,5 +141,3 @@ async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
   if (data && data.length > 0) return data[0].embedding_id;
   return null;
 }
-  return data && data.length > 0 ? data[0].embedding_id : null;
-}
