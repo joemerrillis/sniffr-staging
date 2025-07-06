@@ -10,51 +10,83 @@ export function buildTagsPrompt(dogNames = [], personality = "") {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
   let namePart = "";
   if (knownNames.length === 1) {
-    namePart = `the dog named ${knownNames[0]}`;
+    namePart = knownNames[0];
   } else if (knownNames.length > 1) {
-    namePart = `the dogs named ${knownNames.join(' and ')}`;
+    namePart = knownNames.join(' and ');
   } else {
-    namePart = `the dog`;
+    namePart = "";
   }
-  if (personality && personality.length > 0) {
-    return `List five short, comma-separated hashtags or descriptive words for this photo of ${namePart}. Take into account this personality profile: ${personality}`;
+
+  let personalityPart = personality && personality.length > 0
+    ? `The dog's personality: ${personality}`
+    : "";
+
+  // Instagram-specific: ask for up to 7 hashtags (comma separated, not an essay)
+  let instruction = `Generate up to 7 Instagram-appropriate hashtags for this photo. Hashtags should be short (1-3 words), expressive, and can highlight mood, appearance, or quirks. Return as a single, comma-separated list. ${personalityPart}`;
+
+  if (namePart) {
+    instruction = `Generate up to 7 Instagram-appropriate hashtags for a photo of ${namePart}. Hashtags should be short (1-3 words), expressive, and can highlight mood, appearance, or quirks. Return as a single, comma-separated list. ${personalityPart}`;
   }
-  // Fallback if no personality
-  return `List five short, comma-separated hashtags or descriptive words for this photo of ${namePart}.`;
+
+  return instruction.trim();
 }
 
 
 /**
  * Builds a caption prompt for the caption-worker.
- * Optionally includes a personality summary (from designer/worker) and always voices *as the dog* if available.
+ * Produces a strictly first-person, in-dog's-voice caption. Gives good/bad examples to steer the LLM.
  * @param {Object} options
  *   - dogNames: Array<string> (optional)
  *   - eventType: string (e.g., 'walk', 'boarding', ...)
- *   - personalitySummary: string (optional, e.g. "Goofy, obsessed with squirrels, loves belly rubs")
+ *   - personalitySummary: string (optional)
  * @returns {string} - Prompt for LLM or LLaVA.
  */
 export function buildCaptionPrompt({ dogNames = [], eventType, personalitySummary } = {}) {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
   let namePart = "";
-
   if (knownNames.length === 1) {
-    namePart = `the dog named ${knownNames[0]}`;
+    namePart = knownNames[0];
   } else if (knownNames.length > 1) {
-    namePart = `the dogs named ${knownNames.join(' and ')}`;
+    namePart = knownNames.join(' and ');
   } else {
-    namePart = `the dog`;
+    namePart = "";
   }
 
-  // Encourage caption in dog's voice if personality is provided
-  let voicePart = "";
-  if (personalitySummary && personalitySummary.trim()) {
-    voicePart = ` Write an Instagram caption as if you are this dog, speaking in the first person, using the following personality: ${personalitySummary.trim()}. Make it fun, expressive, and unique to this dog.`;
-  }
+  let personaPart = personalitySummary && personalitySummary.trim()
+    ? `Use this dog's personality profile: ${personalitySummary.trim()}`
+    : "";
+
+  // Give strict, example-based guidance
+  const negative = namePart
+    ? `Do NOT start with "As ${namePart}" or "${namePart} is". Do NOT describe yourself in the third person.`
+    : `Do NOT start with "As this dog" or "This dog is". Do NOT describe yourself in the third person.`;
+  const positive = namePart
+    ? `Write a short, vivid, first-person caption as if you are ${namePart}, narrating your own walk. Begin with "I" or an action word.`
+    : `Write a short, vivid, first-person caption as if you are the dog, narrating your own walk. Begin with "I" or an action word.`;
+
+  const example = namePart
+    ? `
+Examples:
+- Good: "I spotted three squirrels and almost caught one!"
+- Good: "Nothing better than a belly rub after a long walk."
+- Bad: "As ${namePart}, I spotted three squirrels..."
+- Bad: "${namePart} is a playful dog who loves walks."
+`
+    : `
+Examples:
+- Good: "I spotted three squirrels and almost caught one!"
+- Good: "Nothing better than a belly rub after a long walk."
+- Bad: "As this dog, I spotted three squirrels..."
+- Bad: "This dog is a playful dog who loves walks."
+`;
+
+  let corePrompt = "";
 
   if (eventType === "walk") {
-    return `Write a lively, story-like one-sentence caption for this photo of ${namePart} on an outdoor adventure walk. Capture the excitement, energy, or curiosity of being out and about.${voicePart}`;
+    corePrompt = `Write a lively, one-sentence Instagram caption for a photo taken on a walk. ${personaPart} ${positive} ${negative} ${example}`;
   } else {
-    // Default: normal caption
-    return `Write a vivid, emotionally engaging one-sentence Instagram-style caption for this photo of ${namePart}.${voicePart} Keep it short and fun.`;
+    corePrompt = `Write a vivid, emotionally engaging one-sentence Instagram caption for a photo. ${personaPart} ${positive} ${negative} ${example}`;
   }
+
+  return corePrompt.trim();
 }
