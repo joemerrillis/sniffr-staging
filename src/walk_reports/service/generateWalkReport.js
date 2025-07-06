@@ -108,15 +108,15 @@ const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, i
     });
   }
 
-  // 4. (Optional) Generate a walk summary/story using all data
-  // const summaryPayload = {
-  //   dog_ids: dogIds,
-  //   personalities: personalitySummaries,
-  //   photos: finalizedPhotos,
-  //   events: report.events || []
-  // };
-  // const summaryResult = await callWorker(process.env.CF_SUMMARY_URL, summaryPayload);
-  // const ai_story_json = summaryResult && summaryResult.story ? summaryResult.story : null;
+  //4. (Optional) Generate a walk summary/story using all data
+  const summaryPayload = {
+    dog_ids: dogIds,
+    personalities: personalitySummaries,
+    photos: finalizedPhotos,
+    events: report.events || []
+  };
+  const summaryResult = await callWorker(process.env.CF_SUMMARY_URL, summaryPayload);
+  const ai_story_json = summaryResult && summaryResult.story ? summaryResult.story : null;
   const ai_story_json = null; // Placeholder until you wire up your summary worker
 
   // 5. Update the walk report with the new data
