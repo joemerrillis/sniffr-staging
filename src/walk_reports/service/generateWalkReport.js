@@ -7,7 +7,6 @@ import {
   getDogMemoryById,
   updateDogMemory
 } from './walkReportService.js';
-// import { getDogNamesByIds } from '../dogs/dogService.js'; // Optional helper for real dog names
 
 // Helper for calling any worker and handling HTTP errors
 async function callWorker(url, payload) {
@@ -23,19 +22,43 @@ async function callWorker(url, payload) {
   return await res.json();
 }
 
+// -- IMPLEMENTED! --
+async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
+  // Looks for the newest embedding_id in chat_messages for this dog
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('embedding_id')
+    .contains('dog_ids', [dogId])
+    .not('embedding_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) {
+    throw error;
+  }
+  if (data && data.length > 0) {
+    return data[0].embedding_id;
+  }
+  return null;
+}
+
 export async function generateWalkReport(supabase, reportId) {
   // 1. Fetch walk report and all relevant dogs/photos
   const report = await getWalkReportById(supabase, reportId);
   if (!report) throw new Error('Walk report not found');
   const dogIds = report.dog_ids || [];
-  const photoIds = report.photos || [];
+  const photoRefs = report.photos || [];
+  // photoRefs could be array of ids or array of {id, url}
+  const photoIds = photoRefs.map(p => (typeof p === "string" ? p : p.id));
   const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, id)));
 
   // 2. For each dog, call personality-worker and store summary
   const personalitySummaries = {};
   for (const dogId of dogIds) {
-    // You should implement getMostRecentEmbeddingIdForDog for your schema
     const embedding_id = await getMostRecentEmbeddingIdForDog(supabase, dogId);
+    if (!embedding_id) {
+      personalitySummaries[dogId] = ""; // fallback/skip
+      continue;
+    }
     const workerResult = await callWorker(process.env.CF_PERSONALITY_URL, { dog_id: dogId, embedding_id });
     personalitySummaries[dogId] = workerResult.personalitySummary || "";
   }
@@ -43,9 +66,8 @@ export async function generateWalkReport(supabase, reportId) {
   // 3. For each photo, call caption-worker and tag-worker with personalitySummary
   const finalizedPhotos = [];
   for (const photo of photos) {
+    if (!photo) continue; // Defensive!
     const dog_id = (photo.dog_ids && photo.dog_ids[0]) || null;
-    // Optional: Fetch actual dog names from your dogs table if you wish!
-    // const dogNames = await getDogNamesByIds(photo.dog_ids);
     const dogNames = photo.dog_ids || [];
     const personalitySummary = dog_id ? personalitySummaries[dog_id] : "";
 
@@ -113,11 +135,4 @@ export async function generateWalkReport(supabase, reportId) {
   });
 
   return updated;
-}
-
-// Dummy function (implement for your schema)
-async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
-  // Should return the most recent embedding_id for a given dog
-  // (e.g., query chat_messages where dog_id = dogId and embedding_id IS NOT NULL order by created_at desc)
-  return null;
 }
