@@ -20,41 +20,41 @@ export default {
       return new Response(JSON.stringify({ error: "photos array required" }), { status: 400 });
     }
 
-    // Build the prompt
+    // Build the summary prompt
     const prompt = buildSummaryPrompt({
       photos,
       personalities,
       dogNames: dog_names
     });
 
-    // Use Replicate Haiku model VERSION (required, not model name)
-    // You can get this hash from the Replicate UI: "anthropic/claude-3.5-haiku" version string
-    const MODEL_VERSION = env.REPLICATE_HAIKU_MODEL_VERSION || "b2e6691fd53b4527a6e43b9a7a083ec27e90117059e1c3dd32e4e3a763349dad";
+    // Use Replicate Claude 3.5 Haiku model (named model endpoint, not version hash)
     const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
     let predictionId = null;
     let output = null;
 
     try {
-      // Start prediction (POST)
-      const startRes = await fetch("https://api.replicate.com/v1/predictions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${replicateToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          version: MODEL_VERSION,
-          input: {
-            prompt: prompt,
-            max_tokens: 180,
-            temperature: 0.65,
-            top_p: 1
-          }
-        }),
-      });
+      // Start prediction (POST) with Token auth and {input: ...} format
+      const replicatePayload = {
+        prompt: prompt,
+        max_tokens: 180,
+        temperature: 0.65,
+        top_p: 1
+      };
+
+      const startRes = await fetch(
+        "https://api.replicate.com/v1/models/anthropic/claude-3.5-haiku/predictions",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Token ${replicateToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ input: replicatePayload })
+        }
+      );
 
       const startJson = await startRes.json();
-      if (startRes.status !== 201) {
+      if (!startRes.ok) {
         return new Response(JSON.stringify({ error: "Replicate API failed", details: startJson }), { status: 500 });
       }
 
@@ -73,7 +73,7 @@ export default {
         const pollUrl = `https://api.replicate.com/v1/predictions/${predictionId}`;
         const pollRes = await fetch(pollUrl, {
           method: "GET",
-          headers: { "Authorization": `Bearer ${replicateToken}` }
+          headers: { "Authorization": `Token ${replicateToken}` }
         });
         prediction = await pollRes.json();
       }
