@@ -101,12 +101,13 @@ ${captionExamples}
 }
 // src/dog_memories/utils/promptUtils.js
 
-
-
- @param {Array<Object>} photos - Array of { ai_caption, url, [tags], [dog_ids] }
- @param {Array<string>} [personalities] - Optional dog personality profiles.
- @param {Array<string>} [dogNames] - Array of dog names.
- @returns {string}
+/**
+ * Build a summary prompt for the walk summary worker.
+ * @param {Array<Object>} photos - Array of objects like { ai_caption, url, tags, dog_ids }
+ * @param {Array<string>} [personalities] - Optional dog personality profiles.
+ * @param {Array<string>} [dogNames] - Array of dog names.
+ * @returns {string}
+ */
 
 export function buildSummaryPrompt({ photos, personalities = [], dogNames = [] }) {
   let photoDescriptions = photos.map((photo, i) =>
