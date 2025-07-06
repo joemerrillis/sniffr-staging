@@ -32,9 +32,8 @@ export async function generateWalkReport(supabase, reportId) {
   if (!report) throw new Error('Walk report not found');
   const dogIds = Array.from(new Set(report.dog_ids || []));
   const photoRefs = report.photos || [];
-const photoIds = photoRefs.map(p => (typeof p === "string" ? p : p.id));
-const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, id)));
-
+  const photoIds = photoRefs.map(p => (typeof p === "string" ? p : p.id));
+  const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, id)));
 
   // 2. For each unique dog, call personality-worker ONCE and store result
   const personalitySummaries = {};
@@ -108,16 +107,22 @@ const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, i
     });
   }
 
-  //4. (Optional) Generate a walk summary/story using all data
-  const summaryPayload = {
-    dog_ids: dogIds,
-    personalities: personalitySummaries,
-    photos: finalizedPhotos,
-    events: report.events || []
-  };
-  const summaryResult = await callWorker(process.env.CF_SUMMARY_URL, summaryPayload);
-  const ai_story_json = summaryResult && summaryResult.story ? summaryResult.story : null;
-  const ai_story_json = null; // Placeholder until you wire up your summary worker
+  // 4. Generate a walk summary/story using all data (NEW)
+  let ai_story_json = null;
+  try {
+    const summaryPayload = {
+      dog_ids: dogIds,
+      personalities: Object.values(personalitySummaries),
+      photos: finalizedPhotos,
+      events: report.events || []
+    };
+    const summaryResult = await callWorker(process.env.CF_SUMMARY_URL, summaryPayload);
+    if (summaryResult && summaryResult.story) {
+      ai_story_json = summaryResult.story;
+    }
+  } catch (err) {
+    console.warn('Summary worker failed, continuing without ai_story_json:', err);
+  }
 
   // 5. Update the walk report with the new data
   const updated = await updateWalkReport(supabase, reportId, {
