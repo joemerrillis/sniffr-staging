@@ -72,11 +72,11 @@ EXAMPLES:
   if (personalitySummary && personalitySummary.trim()) {
     voicePart = `
 Base the caption on the following personality profile: ${personalitySummary.trim()}
-Do not mention the dog's name, do not introduce yourself, and do not summarize. Write only what the dog would be thinking or feeling in this exact moment, in first person, present tense.
+Don’t introduce yourself. Just narrate your excitement, actions, or mood in first-person.
 `.trim();
   } else {
     voicePart = `
-Do not mention the dog's name, do not introduce yourself, and do not summarize. Write only what the dog would be thinking or feeling in this exact moment, in first person, present tense.
+Don’t introduce yourself. Just narrate your excitement, actions, or mood in first-person. Make it sound like an internal monologue.
 `.trim();
   }
 
