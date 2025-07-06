@@ -16,7 +16,7 @@ export default {
     }
 
     // Pull out all relevant fields from the data
-    const { image_url, dog_names = [], meta } = data;
+    const { image_url, dog_names = [], meta = {} } = data;
     if (!image_url) {
       console.log("Missing image_url");
       return new Response(JSON.stringify({ error: "image_url required" }), { status: 400 });
@@ -25,22 +25,25 @@ export default {
     // --- DEBUG LOG: Input
     console.log("Input received:", { image_url, dog_names, meta });
 
-    // --- New: get dog_id for personality fetch ---
+    // Personality: use orchestrator/meta if present, else fetch from personality-worker
+    let personalitySummary = meta.personalitySummary || "";
     const dog_id = Array.isArray(meta?.dog_ids) && meta.dog_ids.length > 0 ? meta.dog_ids[0] : null;
-    let personalitySummary = "";
-    if (dog_id && env.CF_DESIGNER_URL) {
+
+    if (!personalitySummary && dog_id && env.CF_PERSONALITY_URL) {
       try {
-        const designerRes = await fetch(env.CF_DESIGNER_URL, {
+        const res = await fetch(env.CF_PERSONALITY_URL, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ dog_id })
         });
-        const designerJson = await designerRes.json();
-        personalitySummary = designerJson.personalitySummary || "";
-        console.log("Fetched personalitySummary:", personalitySummary);
+        const json = await res.json();
+        personalitySummary = json.personalitySummary || "";
+        console.log("Fetched personalitySummary from personality-worker:", personalitySummary);
       } catch (e) {
-        console.log("Failed to fetch personality from designer-worker:", e);
+        console.log("Failed to fetch personality from personality-worker:", e);
       }
+    } else {
+      console.log("Using personalitySummary from orchestrator/meta:", personalitySummary);
     }
 
     // Fetch image as base64 Data URI
