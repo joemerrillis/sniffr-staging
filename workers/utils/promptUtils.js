@@ -99,3 +99,34 @@ ${captionExamples}
 `.trim();
   }
 }
+// src/dog_memories/utils/promptUtils.js
+
+/**
+ * Builds a summary prompt for the summary-worker, based on the photos and captions.
+ * @param {Array<Object>} photos - Array of { ai_caption, url, [tags], [dog_ids] }
+ * @param {Array<string>} [personalities] - Optional dog personality profiles.
+ * @returns {string}
+ */
+export function buildSummaryPrompt({ photos, personalities = [], dogNames = [] }) {
+  let photoDescriptions = photos.map((photo, i) =>
+    `Photo ${i + 1}: ${photo.ai_caption}${photo.tags ? ' (tags: ' + photo.tags.join(', ') + ')' : ''}`
+  ).join('\n');
+
+  let dogsLine = dogNames.length > 0
+    ? `Dogs on this walk: ${dogNames.join(', ')}.\n`
+    : '';
+
+  let personalityNote = personalities.length
+    ? `\nPersonality details: ${personalities.join('\n')}\n`
+    : '';
+
+  return `
+${dogsLine}
+${personalityNote}
+Below is a sequence of AI-generated captions for each photo taken on a dog walk. Write a friendly, energetic 2-3 sentence summary to send to the dog's human. Reference specific moments or moods from the captions, avoid repeating the captions directly, and focus on what made this walk special for the dogs. Don't repeat the dog's name every sentence. No bullet points. Write naturally as the walker or a friendly assistant.
+
+${photoDescriptions}
+
+Summary:
+`;
+}
