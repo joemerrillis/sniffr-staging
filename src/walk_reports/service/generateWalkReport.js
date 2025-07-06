@@ -30,7 +30,7 @@ export async function generateWalkReport(supabase, reportId) {
   // 1. Fetch walk report and all relevant dogs/photos
   const report = await getWalkReportById(supabase, reportId);
   if (!report) throw new Error('Walk report not found');
-  const dogIds = report.dog_ids || [];
+  const dogIds = Array.from(new Set(report.dog_ids || []));
   const photoRefs = report.photos || [];
 const photoIds = photoRefs.map(p => (typeof p === "string" ? p : p.id));
 const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, id)));
