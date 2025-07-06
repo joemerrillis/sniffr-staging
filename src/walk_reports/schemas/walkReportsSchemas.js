@@ -124,7 +124,7 @@ export const walkReportsSchemas = {
               items: { type: 'string', format: 'uuid' }
             }
           },
-          required: ['id', 'url', 'ai_caption', 'tags', 'dog_ids'],
+          required: ['id', 'url'],
           additionalProperties: true
         }
       }
@@ -169,7 +169,7 @@ export const walkReportsSchemas = {
               items: { type: 'string', format: 'uuid' }
             }
           },
-          required: ['id', 'url', 'ai_caption', 'tags', 'dog_ids'],
+          required: ['id', 'url'],
           additionalProperties: true
         }
       }
