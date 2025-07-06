@@ -10,83 +10,92 @@ export function buildTagsPrompt(dogNames = [], personality = "") {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
   let namePart = "";
   if (knownNames.length === 1) {
-    namePart = knownNames[0];
+    namePart = `the dog named ${knownNames[0]}`;
   } else if (knownNames.length > 1) {
-    namePart = knownNames.join(' and ');
+    namePart = `the dogs named ${knownNames.join(' and ')}`;
   } else {
-    namePart = "";
+    namePart = `the dog`;
   }
 
-  let personalityPart = personality && personality.length > 0
-    ? `The dog's personality: ${personality}`
-    : "";
+  // Instagram-style tag examples (not just #dog)
+  const tagExamples = `
+EXAMPLES:
+#outdooradventure #dogsofinstagram #blackandwhitepup #happywalk #goofballenergy #queenattitude #sunnysniffs
+`;
 
-  // Instagram-specific: ask for up to 7 hashtags (comma separated, not an essay)
-  let instruction = `Generate up to 7 Instagram-appropriate hashtags for this photo. Hashtags should be short (1-3 words), expressive, and can highlight mood, appearance, or quirks. Return as a single, comma-separated list. ${personalityPart}`;
-
-  if (namePart) {
-    instruction = `Generate up to 7 Instagram-appropriate hashtags for a photo of ${namePart}. Hashtags should be short (1-3 words), expressive, and can highlight mood, appearance, or quirks. Return as a single, comma-separated list. ${personalityPart}`;
+  if (personality && personality.length > 0) {
+    return `List up to 7 short, comma-separated hashtags appropriate for Instagram for this photo of ${namePart}.
+Take into account this personality profile: ${personality}
+Do not use essay-length or multi-sentence tags. Each hashtag should be short, fun, and reflect the dog's energy/personality. Use only lowercase, remove spaces, and do not repeat the dog's name.
+${tagExamples}`.trim();
   }
-
-  return instruction.trim();
+  // Fallback if no personality
+  return `List up to 7 short, comma-separated hashtags appropriate for Instagram for this photo of ${namePart}.
+Do not use essay-length or multi-sentence tags. Each hashtag should be short, fun, and reflect the dog's energy/personality. Use only lowercase, remove spaces, and do not repeat the dog's name.
+${tagExamples}`.trim();
 }
-
 
 /**
  * Builds a caption prompt for the caption-worker.
- * Produces a strictly first-person, in-dog's-voice caption. Gives good/bad examples to steer the LLM.
+ * Optionally includes a personality summary and always voices *as the dog* if available.
+ * Prompts the model for a present-tense, in-the-moment, authentic inner monologue—NOT a self-intro or summary.
  * @param {Object} options
  *   - dogNames: Array<string> (optional)
  *   - eventType: string (e.g., 'walk', 'boarding', ...)
- *   - personalitySummary: string (optional)
+ *   - personalitySummary: string (optional, e.g. "Goofy, obsessed with squirrels, loves belly rubs")
  * @returns {string} - Prompt for LLM or LLaVA.
  */
 export function buildCaptionPrompt({ dogNames = [], eventType, personalitySummary } = {}) {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
   let namePart = "";
+
   if (knownNames.length === 1) {
-    namePart = knownNames[0];
+    namePart = `the dog named ${knownNames[0]}`;
   } else if (knownNames.length > 1) {
-    namePart = knownNames.join(' and ');
+    namePart = `the dogs named ${knownNames.join(' and ')}`;
   } else {
-    namePart = "";
+    namePart = `the dog`;
   }
 
-  let personaPart = personalitySummary && personalitySummary.trim()
-    ? `Use this dog's personality profile: ${personalitySummary.trim()}`
-    : "";
-
-  // Give strict, example-based guidance
-  const negative = namePart
-    ? `Do NOT start with "As ${namePart}" or "${namePart} is". Do NOT describe yourself in the third person.`
-    : `Do NOT start with "As this dog" or "This dog is". Do NOT describe yourself in the third person.`;
-  const positive = namePart
-    ? `Write a short, vivid, first-person caption as if you are ${namePart}, narrating your own walk. Begin with "I" or an action word.`
-    : `Write a short, vivid, first-person caption as if you are the dog, narrating your own walk. Begin with "I" or an action word.`;
-
-  const example = namePart
-    ? `
-Examples:
-- Good: "I spotted three squirrels and almost caught one!"
-- Good: "Nothing better than a belly rub after a long walk."
-- Bad: "As ${namePart}, I spotted three squirrels..."
-- Bad: "${namePart} is a playful dog who loves walks."
-`
-    : `
-Examples:
-- Good: "I spotted three squirrels and almost caught one!"
-- Good: "Nothing better than a belly rub after a long walk."
-- Bad: "As this dog, I spotted three squirrels..."
-- Bad: "This dog is a playful dog who loves walks."
+  // Inner monologue examples — Instagram, present tense, no self-intros
+  const captionExamples = `
+EXAMPLES:
+1. "Let’s go, human! The world isn’t going to sniff itself."
+2. "Did someone say treat? I’m on it!"
+3. "That squirrel better watch out today."
+4. "Nothing beats a sunny walk and belly rubs."
+5. "So many smells, so little time!"
 `;
 
-  let corePrompt = "";
-
-  if (eventType === "walk") {
-    corePrompt = `Write a lively, one-sentence Instagram caption for a photo taken on a walk. ${personaPart} ${positive} ${negative} ${example}`;
+  // If personality, instruct to use it in the inner monologue
+  let voicePart = "";
+  if (personalitySummary && personalitySummary.trim()) {
+    voicePart = `
+Base the caption on the following personality profile: ${personalitySummary.trim()}
+Do not mention the dog's name, do not introduce yourself, and do not summarize. Write only what the dog would be thinking or feeling in this exact moment, in first person, present tense.
+`.trim();
   } else {
-    corePrompt = `Write a vivid, emotionally engaging one-sentence Instagram caption for a photo. ${personaPart} ${positive} ${negative} ${example}`;
+    voicePart = `
+Do not mention the dog's name, do not introduce yourself, and do not summarize. Write only what the dog would be thinking or feeling in this exact moment, in first person, present tense.
+`.trim();
   }
 
-  return corePrompt.trim();
+  if (eventType === "walk") {
+    return `
+Write a fun, present-tense Instagram caption for this photo of ${namePart} on an outdoor adventure walk.
+The caption must sound like the dog's own thoughts, in first person, but do NOT use the dog's name or introduce yourself.
+Start with what the dog is thinking or feeling in the moment. Keep it authentic and playful. One sentence only.
+${voicePart}
+${captionExamples}
+`.trim();
+  } else {
+    // Default: normal caption
+    return `
+Write a vivid, emotionally engaging one-sentence Instagram caption for this photo of ${namePart}.
+The caption must sound like the dog's own thoughts, in first person, but do NOT use the dog's name or introduce yourself.
+Start with what the dog is thinking or feeling in the moment. Keep it authentic and playful. One sentence only.
+${voicePart}
+${captionExamples}
+`.trim();
+  }
 }
