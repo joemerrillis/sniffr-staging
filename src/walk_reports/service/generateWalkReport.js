@@ -107,21 +107,20 @@ export async function generateWalkReport(supabase, reportId) {
     });
   }
 
-  // 4. Generate a walk summary/story using all data (NEW)
+  // 4. Generate a walk summary/story using all data (calls summary worker)
   let ai_story_json = null;
   try {
     const summaryPayload = {
-      dog_ids: dogIds,
-      personalities: Object.values(personalitySummaries),
       photos: finalizedPhotos,
-      events: report.events || []
+      personalities: Object.values(personalitySummaries),
+      dog_names: dogIds, // You can map these to names if you want actual names instead of IDs
+      // events: report.events || []
     };
     const summaryResult = await callWorker(process.env.CF_SUMMARY_URL, summaryPayload);
-    if (summaryResult && summaryResult.story) {
-      ai_story_json = summaryResult.story;
-    }
-  } catch (err) {
-    console.warn('Summary worker failed, continuing without ai_story_json:', err);
+    ai_story_json = summaryResult && summaryResult.summary ? summaryResult.summary : null;
+  } catch (e) {
+    console.warn("Summary worker failed, continuing without ai_story_json:", e);
+    ai_story_json = null;
   }
 
   // 5. Update the walk report with the new data
