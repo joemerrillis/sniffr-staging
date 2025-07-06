@@ -51,7 +51,27 @@ export const walkReportsSchemas = {
       stats_json:  { type: ['object', 'null'], additionalProperties: true },
       survey_json: { type: ['object', 'null'], additionalProperties: true },
       visibility:  { type: ['string', 'null'] },
-      photos:      { type: ['object', 'null'], additionalProperties: true },
+      photos: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            url: { type: 'string' },
+            ai_caption: { type: 'string' },
+            tags: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            dog_ids: {
+              type: 'array',
+              items: { type: 'string', format: 'uuid' }
+            }
+          },
+          required: ['id', 'url', 'ai_caption', 'tags', 'dog_ids'],
+          additionalProperties: true
+        }
+      },
       created_at:  { type: ['string', 'null'], format: 'date-time' },
       updated_at:  { type: ['string', 'null'], format: 'date-time' }
     },
@@ -87,7 +107,27 @@ export const walkReportsSchemas = {
       stats_json:  { type: ['object', 'null'], additionalProperties: true },
       survey_json: { type: ['object', 'null'], additionalProperties: true },
       visibility:  { type: ['string', 'null'] },
-      photos:      { type: ['object', 'null'], additionalProperties: true }
+      photos: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            url: { type: 'string' },
+            ai_caption: { type: 'string' },
+            tags: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            dog_ids: {
+              type: 'array',
+              items: { type: 'string', format: 'uuid' }
+            }
+          },
+          required: ['id', 'url', 'ai_caption', 'tags', 'dog_ids'],
+          additionalProperties: true
+        }
+      }
     },
     required: ['walk_id', 'dog_ids', 'walker_id', 'user_id'],
     additionalProperties: true
@@ -112,7 +152,27 @@ export const walkReportsSchemas = {
       stats_json:  { type: ['object', 'null'], additionalProperties: true },
       survey_json: { type: ['object', 'null'], additionalProperties: true },
       visibility:  { type: ['string', 'null'] },
-      photos:      { type: ['object', 'null'], additionalProperties: true }
+      photos: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            url: { type: 'string' },
+            ai_caption: { type: 'string' },
+            tags: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            dog_ids: {
+              type: 'array',
+              items: { type: 'string', format: 'uuid' }
+            }
+          },
+          required: ['id', 'url', 'ai_caption', 'tags', 'dog_ids'],
+          additionalProperties: true
+        }
+      }
     },
     additionalProperties: true
   }
