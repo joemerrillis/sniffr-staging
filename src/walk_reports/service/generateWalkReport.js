@@ -130,18 +130,16 @@ export async function generateWalkReport(supabase, reportId) {
 
 // --- Helper: Find the most recent embedding_id for this dog from chat_messages
 async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
-  // Find the most recent non-null embedding_id for this dog in chat_messages
-  // (e.g., query chat_messages where dog_id = dogId and embedding_id IS NOT NULL order by created_at desc)
   const { data, error } = await supabase
     .from('chat_messages')
     .select('embedding_id')
-    .eq('dog_ids', dogId)
+    .contains('dog_ids', [dogId])
     .not('embedding_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(1);
-  if (error) {
-    console.warn('[Orchestrator] Error getting most recent embedding_id:', error);
-    return null;
-  }
+  if (error) throw error;
+  if (data && data.length > 0) return data[0].embedding_id;
+  return null;
+}
   return data && data.length > 0 ? data[0].embedding_id : null;
 }
