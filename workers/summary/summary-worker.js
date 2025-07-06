@@ -27,8 +27,8 @@ export default {
       dogNames: dog_names
     });
 
-    // Use Replicate Haiku model (same as your personality worker)
-    const MODEL_VERSION = env.REPLICATE_HAIKU_MODEL_VERSION || "b2e6691fd53b4527a6e43b9a7a083ec27e90117059e1c3dd32e4e3a763349dad"; // Replace with your actual Haiku model version if different
+    // Replicate model details
+    const MODEL_NAME = "anthropic/claude-3.5-haiku";
     const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
     let predictionId = null;
     let output = null;
@@ -42,7 +42,7 @@ export default {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          version: MODEL_VERSION,
+          model: MODEL_NAME,
           input: {
             prompt: prompt,
             max_tokens: 180,
