@@ -25,116 +25,6 @@ async function callWorker(url, payload) {
   return result;
 }
 
-// --- Only call personality-worker ONCE per unique dog ---
-export async function generateWalkReport(supabase, reportId) {
-  // 1. Fetch walk report and all relevant dogs/photos
-  const report = await getWalkReportById(supabase, reportId);
-  if (!report) throw new Error('Walk report not found');
-  const dogIds = Array.from(new Set(report.dog_ids || []));
-  const photoRefs = report.photos || [];
-  const photoIds = photoRefs.map(p => (typeof p === "string" ? p : p.id));
-  const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, id)));
-
-  // 2. For each unique dog, call personality-worker ONCE and store result
-  const personalitySummaries = {};
-  for (const dogId of dogIds) {
-    if (!personalitySummaries[dogId]) {
-      const embedding_id = await getMostRecentEmbeddingIdForDog(supabase, dogId);
-      console.log(`[Orchestrator] Most recent embedding_id for dog:`, { dogId, embedding_id });
-
-      if (!embedding_id) {
-        // Log and fallback, or skip, or error
-        console.warn(`[Orchestrator] WARNING: No embedding_id found for dog ${dogId}. Skipping personality-worker call for this dog. Using empty profile.`);
-        personalitySummaries[dogId] = ""; // or some fallback string
-      } else {
-        const workerResult = await callWorker(process.env.CF_PERSONALITY_URL, { dog_id: dogId, embedding_id });
-        personalitySummaries[dogId] = workerResult.personalitySummary || "";
-      }
-    }
-  }
-
-  // 3. For each photo, call caption-worker and tag-worker with that dog's personalitySummary
-  const finalizedPhotos = [];
-  for (const photo of photos) {
-    const dog_id = (photo.dog_ids && photo.dog_ids[0]) || null;
-    const dogNames = photo.dog_ids || [];
-    const personalitySummary = dog_id ? personalitySummaries[dog_id] : "";
-
-    // Caption Worker
-    const captionPayload = {
-      image_url: photo.image_url,
-      dog_names: dogNames,
-      event_type: 'walk',
-      meta: {
-        dog_ids: photo.dog_ids,
-        personalitySummary
-      }
-    };
-    console.log(`[Orchestrator] Preparing to call caption worker:`, JSON.stringify(captionPayload, null, 2));
-    const captionResult = await callWorker(process.env.CF_CAPTION_URL, captionPayload);
-    const ai_caption =
-      Array.isArray(captionResult.output) ? captionResult.output.join(" ").trim() :
-      (captionResult.caption || "");
-
-    // Tag Worker
-    const tagsPayload = {
-      image_url: photo.image_url,
-      dog_names: dogNames,
-      meta: {
-        dog_ids: photo.dog_ids,
-        personalitySummary
-      }
-    };
-    console.log(`[Orchestrator] Preparing to call tags worker:`, JSON.stringify(tagsPayload, null, 2));
-    const tagsResult = await callWorker(process.env.CF_TAGS_URL, tagsPayload);
-    const tags =
-      Array.isArray(tagsResult.output) ? tagsResult.output.map(t => t.trim()) :
-      (tagsResult.tags || []);
-
-    // -- Save AI caption/tags to dog_memories
-    await updateDogMemory(supabase, photo.id, {
-      ai_caption,
-      tags
-    });
-
-    // -- Save to walkReport.photos JSONB
-    finalizedPhotos.push({
-      id: photo.id,
-      url: photo.image_url,
-      ai_caption,
-      tags,
-      dog_ids: photo.dog_ids
-    });
-  }
-
-  // 4. Generate a walk summary/story using all data (save as summary, not ai_story_json)
-  let walkSummary = null;
-  try {
-    const summaryPayload = {
-      dog_ids: dogIds,
-      personalities: Object.values(personalitySummaries),
-      photos: finalizedPhotos,
-      events: report.events || []
-    };
-    const summaryResult = await callWorker(process.env.CF_SUMMARY_URL, summaryPayload);
-    walkSummary = summaryResult && summaryResult.summary ? summaryResult.summary : null;
-  } catch (err) {
-    console.warn("Summary worker failed, continuing without summary:", err);
-    walkSummary = null;
-  }
-
-  // 5. Update the walk report with the new data (drop summary in `summary`, ai_story_json stays null/undefined)
-  const updated = await updateWalkReport(supabase, reportId, {
-    photos: finalizedPhotos,
-    summary: walkSummary,
-    ai_story_json: null, // always null unless you implement that array-of-objects logic
-    updated_at: new Date().toISOString(),
-  });
-
-  console.log('[Orchestrator] Updated walk report after AI:', JSON.stringify(updated, null, 2));
-  return updated;
-}
-
 // --- Helper: Find the most recent embedding_id for this dog from chat_messages
 async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
   const { data, error } = await supabase
@@ -147,4 +37,111 @@ async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
   if (error) throw error;
   if (data && data.length > 0) return data[0].embedding_id;
   return null;
+}
+
+export async function generateWalkReport(supabase, reportId) {
+  // 1. Fetch walk report and all relevant dogs/photos
+  const report = await getWalkReportById(supabase, reportId);
+  if (!report) throw new Error('Walk report not found');
+  const dogIds = Array.from(new Set(report.dog_ids || []));
+  const photoRefs = report.photos || [];
+  const photoIds = photoRefs.map(p => (typeof p === "string" ? p : p.id));
+  const photos = await Promise.all(photoIds.map(id => getDogMemoryById(supabase, id)));
+
+  // 2. For each unique dog, call personality-worker ONCE and store result (sequential, since usually only 1-2 dogs)
+  const personalitySummaries = {};
+  for (const dogId of dogIds) {
+    if (!personalitySummaries[dogId]) {
+      const embedding_id = await getMostRecentEmbeddingIdForDog(supabase, dogId);
+      console.log(`[Orchestrator] Most recent embedding_id for dog:`, { dogId, embedding_id });
+      if (!embedding_id) {
+        console.warn(`[Orchestrator] WARNING: No embedding_id found for dog ${dogId}. Skipping personality-worker call for this dog. Using empty profile.`);
+        personalitySummaries[dogId] = "";
+      } else {
+        const workerResult = await callWorker(process.env.CF_PERSONALITY_URL, { dog_id: dogId, embedding_id });
+        personalitySummaries[dogId] = workerResult.personalitySummary || "";
+      }
+    }
+  }
+
+  // 3. For each photo, fire caption/tag worker calls in parallel
+  const photoJobs = photos.map(async (photo) => {
+    const dog_id = (photo.dog_ids && photo.dog_ids[0]) || null;
+    const dogNames = photo.dog_ids || [];
+    const personalitySummary = dog_id ? personalitySummaries[dog_id] : "";
+
+    // Build payloads
+    const captionPayload = {
+      image_url: photo.image_url,
+      dog_names: dogNames,
+      event_type: 'walk',
+      meta: {
+        dog_ids: photo.dog_ids,
+        personalitySummary
+      }
+    };
+    const tagsPayload = {
+      image_url: photo.image_url,
+      dog_names: dogNames,
+      meta: {
+        dog_ids: photo.dog_ids,
+        personalitySummary
+      }
+    };
+
+    // Fire off both requests in parallel
+    const [captionResult, tagsResult] = await Promise.all([
+      callWorker(process.env.CF_CAPTION_URL, captionPayload),
+      callWorker(process.env.CF_TAGS_URL, tagsPayload)
+    ]);
+    const ai_caption =
+      Array.isArray(captionResult.output) ? captionResult.output.join(" ").trim() :
+      (captionResult.caption || "");
+    const tags =
+      Array.isArray(tagsResult.output) ? tagsResult.output.map(t => t.trim()) :
+      (tagsResult.tags || []);
+
+    // -- Save AI caption/tags to dog_memories
+    await updateDogMemory(supabase, photo.id, {
+      ai_caption,
+      tags
+    });
+
+    // -- Save to walkReport.photos JSONB
+    return {
+      id: photo.id,
+      url: photo.image_url,
+      ai_caption,
+      tags,
+      dog_ids: photo.dog_ids
+    };
+  });
+
+  const finalizedPhotos = await Promise.all(photoJobs);
+
+  // 4. Generate a walk summary/story using all data (calls summary worker)
+  let summary = null;
+  try {
+    const summaryPayload = {
+      dog_ids: dogIds,
+      personalities: Object.values(personalitySummaries),
+      photos: finalizedPhotos,
+      events: report.events || []
+    };
+    const summaryResult = await callWorker(process.env.CF_SUMMARY_URL, summaryPayload);
+    summary = summaryResult && summaryResult.summary ? summaryResult.summary : null;
+  } catch (err) {
+    console.warn("Summary worker failed, continuing without summary:", err);
+    summary = null;
+  }
+
+  // 5. Update the walk report with the new data
+  const updated = await updateWalkReport(supabase, reportId, {
+    photos: finalizedPhotos,
+    summary,  // Note: now saving to the summary field!
+    updated_at: new Date().toISOString(),
+  });
+
+  console.log('[Orchestrator] Updated walk report after AI:', JSON.stringify(updated, null, 2));
+  return updated;
 }
