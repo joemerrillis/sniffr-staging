@@ -101,12 +101,13 @@ ${captionExamples}
 }
 // src/dog_memories/utils/promptUtils.js
 
-/**
- * Builds a summary prompt for the summary-worker, based on the photos and captions.
- * @param {Array<Object>} photos - Array of { ai_caption, url, [tags], [dog_ids] }
- * @param {Array<string>} [personalities] - Optional dog personality profiles.
- * @returns {string}
- */
+
+
+ @param {Array<Object>} photos - Array of { ai_caption, url, [tags], [dog_ids] }
+ @param {Array<string>} [personalities] - Optional dog personality profiles.
+ @param {Array<string>} [dogNames] - Array of dog names.
+ @returns {string}
+
 export function buildSummaryPrompt({ photos, personalities = [], dogNames = [] }) {
   let photoDescriptions = photos.map((photo, i) =>
     `Photo ${i + 1}: ${photo.ai_caption}${photo.tags ? ' (tags: ' + photo.tags.join(', ') + ')' : ''}`
