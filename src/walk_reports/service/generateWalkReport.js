@@ -135,7 +135,7 @@ async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
   const { data, error } = await supabase
     .from('chat_messages')
     .select('embedding_id')
-    .eq('dog_id', dogId)
+    .eq('dog_ids', dogId)
     .not('embedding_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(1);
