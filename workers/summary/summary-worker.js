@@ -27,8 +27,9 @@ export default {
       dogNames: dog_names
     });
 
-    // Replicate model details
-    const MODEL_NAME = "anthropic/claude-3.5-haiku";
+    // Use Replicate Haiku model VERSION (required, not model name)
+    // You can get this hash from the Replicate UI: "anthropic/claude-3.5-haiku" version string
+    const MODEL_VERSION = env.REPLICATE_HAIKU_MODEL_VERSION || "b2e6691fd53b4527a6e43b9a7a083ec27e90117059e1c3dd32e4e3a763349dad";
     const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
     let predictionId = null;
     let output = null;
@@ -42,7 +43,7 @@ export default {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: MODEL_NAME,
+          version: MODEL_VERSION,
           input: {
             prompt: prompt,
             max_tokens: 180,
