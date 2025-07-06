@@ -1,0 +1,4 @@
+name = "sniffr-summary-worker"
+main = "summary-worker.js"
+compatibility_date = "2025-07-06"
+account_id = "774b68e8a6ad8edd33820cd760f785d9"
