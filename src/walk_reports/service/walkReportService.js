@@ -1,7 +1,5 @@
 // src/walk_reports/service/walkReportService.js
 
-// All functions receive the fastify-decorated `supabase` as first parameter!
-
 // CREATE
 export async function createWalkReport(supabase, data) {
   const { data: rows, error } = await supabase
@@ -84,5 +82,17 @@ export async function getDogMemoryById(supabase, memoryId) {
     .eq('id', memoryId)
     .single();
   if (error) return null;
+  return data;
+}
+
+// UPDATE DOG MEMORY (needed for AI captions/tags)
+export async function updateDogMemory(supabase, memoryId, updates) {
+  const { data, error } = await supabase
+    .from('dog_memories')
+    .update(updates)
+    .eq('id', memoryId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
   return data;
 }
