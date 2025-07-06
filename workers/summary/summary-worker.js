@@ -20,21 +20,21 @@ export default {
       return new Response(JSON.stringify({ error: "photos array required" }), { status: 400 });
     }
 
-    // --- Build prompt for LLM ---
+    // Build the prompt
     const prompt = buildSummaryPrompt({
       photos,
       personalities,
       dogNames: dog_names
     });
 
-    // --- Replicate POST /prediction ---
-    const MODEL_VERSION = env.REPLICATE_SUMMARY_MODEL_VERSION || "YOUR_DEFAULT_VERSION";
+    // Use Replicate Haiku model (same as your personality worker)
+    const MODEL_VERSION = env.REPLICATE_HAIKU_MODEL_VERSION || "b2e6691fd53b4527a6e43b9a7a083ec27e90117059e1c3dd32e4e3a763349dad"; // Replace with your actual Haiku model version if different
     const replicateToken = env.REPLICATE_API_TOKEN ? env.REPLICATE_API_TOKEN.trim() : '';
     let predictionId = null;
     let output = null;
 
     try {
-      // Start prediction
+      // Start prediction (POST)
       const startRes = await fetch("https://api.replicate.com/v1/predictions", {
         method: "POST",
         headers: {
@@ -59,7 +59,7 @@ export default {
 
       predictionId = startJson.id;
 
-      // Poll for completion
+      // Poll for completion (GET)
       let prediction = startJson;
       let pollCount = 0;
       const maxPolls = 24;
