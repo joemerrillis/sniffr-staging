@@ -25,7 +25,7 @@ async function callWorker(url, payload) {
   return result;
 }
 
-// --- NEW: Only call personality-worker ONCE per unique dog ---
+// --- Only call personality-worker ONCE per unique dog ---
 export async function generateWalkReport(supabase, reportId) {
   // 1. Fetch walk report and all relevant dogs/photos
   const report = await getWalkReportById(supabase, reportId);
@@ -40,9 +40,15 @@ export async function generateWalkReport(supabase, reportId) {
     if (!personalitySummaries[dogId]) {
       const embedding_id = await getMostRecentEmbeddingIdForDog(supabase, dogId);
       console.log(`[Orchestrator] Most recent embedding_id for dog:`, { dogId, embedding_id });
-      const workerResult = await callWorker(process.env.CF_PERSONALITY_URL, { dog_id: dogId, embedding_id });
-      personalitySummaries[dogId] = workerResult.personalitySummary || "";
-      // Optional: log personality profile for visibility
+
+      if (!embedding_id) {
+        // Log and fallback, or skip, or error
+        console.warn(`[Orchestrator] WARNING: No embedding_id found for dog ${dogId}. Skipping personality-worker call for this dog. Using empty profile.`);
+        personalitySummaries[dogId] = ""; // or some fallback string
+      } else {
+        const workerResult = await callWorker(process.env.CF_PERSONALITY_URL, { dog_id: dogId, embedding_id });
+        personalitySummaries[dogId] = workerResult.personalitySummary || "";
+      }
     }
   }
 
@@ -122,7 +128,7 @@ export async function generateWalkReport(supabase, reportId) {
   return updated;
 }
 
-// --- Dummy: Replace with your schema logic ---
+// --- Helper: Find the most recent embedding_id for this dog from chat_messages
 async function getMostRecentEmbeddingIdForDog(supabase, dogId) {
   // Find the most recent non-null embedding_id for this dog in chat_messages
   // (e.g., query chat_messages where dog_id = dogId and embedding_id IS NOT NULL order by created_at desc)
