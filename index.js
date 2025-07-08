@@ -63,17 +63,12 @@ await fastify.register(fastifyStatic, {
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'public'),
   prefix: '/', // serves /public/audio.html at /audio.html
-  decorateReply: false
+ 
 });
 
 // ---- Quick debug route to verify static serving ----
-fastify.get('/test-static', async (req, reply) => {
-  // Will attempt to send audio.html from the static directory
-  try {
-    return reply.sendFile('audio.html');
-  } catch (err) {
-    return reply.code(404).send({ error: 'audio.html not found', details: err.message });
-  }
+fastify.get('/test-static', (req, reply) => {
+  return reply.sendFile('audio.html');
 });
 
 // ---- 2. Register Swagger/OpenAPI ----
