@@ -41,7 +41,6 @@ import dogEventsPlugin from './src/dog_events/index.js';
 
 dotenv.config();
 
-
 const fastify = Fastify({ logger: true });
 
 await fastify.register(fastifyMultipart);
@@ -49,39 +48,19 @@ await fastify.register(fastifyMultipart);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ---- FIX: Serve static files at /public/static ----
+// ---- 1. Serve static files at /public/static and root FIRST ----
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'public'),
-  prefix: '/rapi-doc/', // so your static docs are at /rapi-doc/*
+  prefix: '/rapi-doc/', // serves /public/rapi-doc/rapidoc.html at /rapi-doc/rapidoc.html
+  decorateReply: false
+});
+await fastify.register(fastifyStatic, {
+  root: path.join(__dirname, 'public'),
+  prefix: '/', // serves /public/audio-test.html at /audio-test.html
   decorateReply: false
 });
 
-// Serve all other static files at root (/public/* → /*)
-await fastify.register(fastifyStatic, {
-  root: path.join(__dirname, 'public'),
-  prefix: '/', // Serves /public/audio-test.html at /audio-test.html
-  decorateReply: false
-});
-
-// Initialize Replicate client
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN
-});
-
-async function getClipEmbeddingFromFile(filePath) {
-  const file = fs.readFileSync(filePath);
-  const base64 = file.toString('base64');
-  const dataUri = `data:image/${path.extname(filePath).substring(1)};base64,${base64}`;
-  const output = await replicate.run(
-    "krthr/clip-embeddings:latest",
-    {
-      input: { image: "https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/<image_id>/<variant_name>" },
-    }
-  );
-  return output.embedding;
-}
-
-// --- Register Swagger (OpenAPI) docs FIRST ---
+// ---- 2. Register Swagger/OpenAPI ----
 await fastify.register(fastifySwagger, {
   openapi: {
     info: {
@@ -104,41 +83,25 @@ await fastify.register(fastifySwagger, {
   }
 });
 
-// --- Register Swagger UI ---
+// ---- 3. Register Swagger UI ----
 await fastify.register(fastifySwaggerUi, {
-  routePrefix: '/docs', // this is still your main /docs page
+  routePrefix: '/docs', // main /docs page
   uiConfig: {
     docExpansion: 'none',
     deepLinking: false
   }
 });
 
-// --- Core (Supabase client, error hooks, logging) ---
+// ---- 4. Core (Supabase client, error hooks, logging) ----
 await fastify.register(corePlugin);
 
-// --- Public health check (no auth required) ---
+// ---- 5. Public health check (no auth required) ----
 fastify.get('/healthz', async () => ({ status: 'ok' }));
 
-// Clip embedding endpoint
-fastify.post('/dogs/:id/embedding', async (req, reply) => {
-  const { id } = req.params;
-  const { imagePath } = req.body;
-  if (!imagePath) {
-    return reply.code(400).send({ error: "Select a local imagePath<1MB to embed." });
-  }
-  try {
-    const embedding = await getClipEmbeddingFromFile(imagePath);
-    return { dogId: id, embedding };
-  } catch (err) {
-    fastify.log.error(err);
-    return reply.code(500).send({ error: "Embedding failed" });
-  }
-});
-
-// --- Auth plugin (JWT, /auth routes, protects subsequent routes) ---
+// ---- 6. Auth plugin (JWT, /auth routes, protects subsequent routes) ----
 await fastify.register(authPlugin);
 
-// --- Application modules (all with prefixes for isolation) ---
+// ---- 7. Application modules (all with prefixes for isolation) ----
 await fastify.register(usersPlugin, { prefix: '/users' });
 await fastify.register(householdsPlugin, { prefix: '/households' });
 await fastify.register(tenantsPlugin, { prefix: '/tenants' });
@@ -165,7 +128,44 @@ await fastify.register(chatPlugin, { prefix: '/chats' });
 await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
 await fastify.register(dogEventsPlugin, { prefix: '/dog-events' });
 
-// --- GLOBAL ERROR HANDLER ---
+// ---- 8. Custom endpoints go *after* static & plugin registration ----
+
+// Initialize Replicate client
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN
+});
+
+import fs from 'fs';
+async function getClipEmbeddingFromFile(filePath) {
+  const file = fs.readFileSync(filePath);
+  const base64 = file.toString('base64');
+  const dataUri = `data:image/${path.extname(filePath).substring(1)};base64,${base64}`;
+  const output = await replicate.run(
+    "krthr/clip-embeddings:latest",
+    {
+      input: { image: "https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/<image_id>/<variant_name>" },
+    }
+  );
+  return output.embedding;
+}
+
+// Place this *after* plugins, or put it in a plugin/module:
+fastify.post('/dogs/:id/embedding', async (req, reply) => {
+  const { id } = req.params;
+  const { imagePath } = req.body;
+  if (!imagePath) {
+    return reply.code(400).send({ error: "Select a local imagePath<1MB to embed." });
+  }
+  try {
+    const embedding = await getClipEmbeddingFromFile(imagePath);
+    return { dogId: id, embedding };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.code(500).send({ error: "Embedding failed" });
+  }
+});
+
+// ---- 9. GLOBAL ERROR HANDLER ----
 fastify.setErrorHandler((error, request, reply) => {
   request.log.error({ err: error }, '[GLOBAL ERROR HANDLER]');
   if (error.validation) {
@@ -192,7 +192,7 @@ const start = async () => {
     fastify.log.info(`🚀 Server listening on 0.0.0.0:${port}`);
     fastify.log.info(`📚 Swagger UI at /docs`);
     fastify.log.info(`❤️ Health check at /healthz`);
-    fastify.log.info(`📝 Static docs at /docs/static/rapidoc.html`);
+    fastify.log.info(`📝 Static docs at /rapi-doc/rapidoc.html`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
