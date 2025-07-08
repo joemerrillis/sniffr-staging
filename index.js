@@ -48,6 +48,10 @@ await fastify.register(fastifyMultipart);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+console.log('__dirname:', __dirname);
+console.log('Does file exist?', require('fs').existsSync(path.join(__dirname, 'public/audio.html')));
+
+
 // ---- 1. Serve static files at /public/static and root FIRST ----
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'public'),
@@ -100,6 +104,11 @@ fastify.get('/healthz', async () => ({ status: 'ok' }));
 
 // ---- 6. Auth plugin (JWT, /auth routes, protects subsequent routes) ----
 await fastify.register(authPlugin);
+
+fastify.get('/test-static', async (req, reply) => {
+  return reply.sendFile('audio.html');
+});
+
 
 // ---- 7. Application modules (all with prefixes for isolation) ----
 await fastify.register(usersPlugin, { prefix: '/users' });
