@@ -49,10 +49,17 @@ await fastify.register(fastifyMultipart);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ---- FIX: Serve static files at /docs/static ----
+// ---- FIX: Serve static files at /public/static ----
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'public'),
   prefix: '/rapi-doc/', // so your static docs are at /rapi-doc/*
+  decorateReply: false
+});
+
+// Serve all other static files at root (/public/* → /*)
+await fastify.register(fastifyStatic, {
+  root: path.join(__dirname, 'public'),
+  prefix: '/', // Serves /public/audio-test.html at /audio-test.html
   decorateReply: false
 });
 
