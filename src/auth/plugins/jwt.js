@@ -35,7 +35,8 @@ export default fp(async function jwtPlugin(fastify, opts) {
     '/api/transcribe',
     '/favicon.ico',
     '/audio',
-    '/audio.html'
+    '/audio.html',
+    '/test-static'
   ];
 
   fastify.addHook('onRequest', async (request, reply) => {
