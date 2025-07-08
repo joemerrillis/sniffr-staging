@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Record & Transcribe Audio</title>
+</head>
+<body>
+  <h1>Dog Walk Audio Recorder</h1>
+  <button id="recordBtn">Start Recording</button>
+  <button id="stopBtn" disabled>Stop</button>
+  <audio id="audioPlayback" controls style="display:none"></audio>
+  <div id="uploadStatus"></div>
+  <div id="transcriptBox" style="margin-top:20px"></div>
+
+  <script>
+    let mediaRecorder, audioChunks = [];
+    const recordBtn = document.getElementById('recordBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const audioPlayback = document.getElementById('audioPlayback');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const transcriptBox = document.getElementById('transcriptBox');
+
+    recordBtn.onclick = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioURL = URL.createObjectURL(audioBlob);
+        audioPlayback.src = audioURL;
+        audioPlayback.style.display = 'block';
+        uploadStatus.innerText = "Uploading audio...";
+        // Upload the audio file
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'walk_audio.webm');
+        // Change the fetch URL to your backend/worker endpoint!
+        const uploadResp = await fetch('https://YOUR_CLOUDFLARE_WORKER_OR_API/transcribe', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await uploadResp.json();
+        uploadStatus.innerText = "Transcription complete!";
+        transcriptBox.innerHTML = `<b>Transcript:</b><br>${result.transcript || 'No transcript found.'}`;
+      };
+      mediaRecorder.start();
+      recordBtn.disabled = true;
+      stopBtn.disabled = false;
+    };
+
+    stopBtn.onclick = () => {
+      mediaRecorder.stop();
+      recordBtn.disabled = false;
+      stopBtn.disabled = true;
+    };
+  </script>
+</body>
+</html>
