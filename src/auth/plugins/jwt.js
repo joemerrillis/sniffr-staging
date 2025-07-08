@@ -28,10 +28,11 @@ export default fp(async function jwtPlugin(fastify, opts) {
     '/dog-memories/test-upload',
     '/dog-memories/upload',
     '/rapi-doc',
-    '/audio-test',
+    '/audio-test.html',
     '/transcribe',
     '/audio/upload',
-    '/api/transcribe'
+    '/api/transcribe',
+    '/favicon.ico'
   ];
 
   fastify.addHook('onRequest', async (request, reply) => {
