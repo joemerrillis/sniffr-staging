@@ -9,6 +9,7 @@ import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync, readFileSync } from 'fs';
 
 // --- Feature Plugins ---
 import corePlugin from './src/core/index.js';
@@ -48,9 +49,10 @@ await fastify.register(fastifyMultipart);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const audioFilePath = path.join(__dirname, 'public/audio.html');
 console.log('__dirname:', __dirname);
-console.log('Does file exist?', require('fs').existsSync(path.join(__dirname, 'public/audio.html')));
-
+console.log('Looking for:', audioFilePath);
+console.log('Does file exist?', existsSync(audioFilePath));
 
 // ---- 1. Serve static files at /public/static and root FIRST ----
 await fastify.register(fastifyStatic, {
@@ -60,8 +62,18 @@ await fastify.register(fastifyStatic, {
 });
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'public'),
-  prefix: '/', // serves /public/audio-test.html at /audio-test.html
+  prefix: '/', // serves /public/audio.html at /audio.html
   decorateReply: false
+});
+
+// ---- Quick debug route to verify static serving ----
+fastify.get('/test-static', async (req, reply) => {
+  // Will attempt to send audio.html from the static directory
+  try {
+    return reply.sendFile('audio.html');
+  } catch (err) {
+    return reply.code(404).send({ error: 'audio.html not found', details: err.message });
+  }
 });
 
 // ---- 2. Register Swagger/OpenAPI ----
@@ -89,7 +101,7 @@ await fastify.register(fastifySwagger, {
 
 // ---- 3. Register Swagger UI ----
 await fastify.register(fastifySwaggerUi, {
-  routePrefix: '/docs', // main /docs page
+  routePrefix: '/docs',
   uiConfig: {
     docExpansion: 'none',
     deepLinking: false
@@ -104,11 +116,6 @@ fastify.get('/healthz', async () => ({ status: 'ok' }));
 
 // ---- 6. Auth plugin (JWT, /auth routes, protects subsequent routes) ----
 await fastify.register(authPlugin);
-
-fastify.get('/test-static', async (req, reply) => {
-  return reply.sendFile('audio.html');
-});
-
 
 // ---- 7. Application modules (all with prefixes for isolation) ----
 await fastify.register(usersPlugin, { prefix: '/users' });
@@ -144,9 +151,8 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN
 });
 
-import fs from 'fs';
 async function getClipEmbeddingFromFile(filePath) {
-  const file = fs.readFileSync(filePath);
+  const file = readFileSync(filePath);
   const base64 = file.toString('base64');
   const dataUri = `data:image/${path.extname(filePath).substring(1)};base64,${base64}`;
   const output = await replicate.run(
@@ -158,7 +164,6 @@ async function getClipEmbeddingFromFile(filePath) {
   return output.embedding;
 }
 
-// Place this *after* plugins, or put it in a plugin/module:
 fastify.post('/dogs/:id/embedding', async (req, reply) => {
   const { id } = req.params;
   const { imagePath } = req.body;
