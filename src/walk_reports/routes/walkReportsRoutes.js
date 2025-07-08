@@ -7,6 +7,7 @@ import { listWalkReportsController } from '../controller/listWalkReports.js';
 import { deleteWalkReportController } from '../controller/deleteWalkReport.js';
 import { walkReportsSchemas } from '../schemas/walkReportsSchemas.js';
 import { generateWalkReportController } from '../controller/generateWalkReport.js';
+import { uploadWalkReportAudioController } from '../controller/uploadWalkReportAudio.js'; // <-- NEW
 
 export default async function walkReportsRoutes(fastify, opts) {
   // Create a walk report
@@ -134,5 +135,42 @@ export default async function walkReportsRoutes(fastify, opts) {
       }
     },
     generateWalkReportController
+  );
+
+  // NEW: Upload audio/recording for a walk report
+  fastify.post(
+    '/:id/record',
+    {
+      schema: {
+        summary: 'Upload an audio recording for a walk report',
+        consumes: ['multipart/form-data'],
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          properties: {
+            audio: { type: 'string', format: 'binary' } // Field must match form field name
+          },
+          required: ['audio']
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+              transcript: { type: 'string' }, // Optional, if returning transcript
+              filename: { type: 'string' }
+            },
+            required: ['success', 'message']
+          }
+        },
+        tags: ['WalkReports']
+      }
+    },
+    uploadWalkReportAudioController
   );
 }
