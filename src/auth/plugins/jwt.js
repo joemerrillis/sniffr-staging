@@ -28,6 +28,7 @@ export default fp(async function jwtPlugin(fastify, opts) {
     '/dog-memories/test-upload',
     '/dog-memories/upload',
     '/rapi-doc',
+    '/audio-test',
     '/audio-test.html',
     '/transcribe',
     '/audio/upload',
@@ -38,8 +39,17 @@ export default fp(async function jwtPlugin(fastify, opts) {
   fastify.addHook('onRequest', async (request, reply) => {
     const { method, url } = request.raw;
 
+    // Log every incoming request (for debugging)
+    // fastify.log.info({ url, method }, 'Request received at JWT hook');
+
     // Health check root GET/HEAD
     if (url === '/' && (method === 'GET' || method === 'HEAD')) {
+      return;
+    }
+
+    // Skip all common static files by extension
+    if (url.match(/\.(html|js|css|png|jpg|jpeg|gif|webm|svg|ico)$/)) {
+      fastify.log.info({ url, method }, 'Static file route, skipping JWT check');
       return;
     }
 
