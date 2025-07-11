@@ -42,9 +42,9 @@ export async function appendTranscriptEventsService({
   if (updateError) throw updateError;
 
   // 6. Insert events into dog_events table
-  // Each event: assign walk_report_id, dog_id, tags, source='transcript', event_type='walk_report', note=event.text
+  // Each event: assign report_id, dog_id, tags, source='transcript', event_type='walk_report', note=event.text
   const eventsToInsert = eventsArray.map(event => ({
-    walk_report_id: walkReportId,
+    report_id: walkReportId,
     dog_id: dogId,                // supply in controller!
     tags: event.tags,
     source: 'transcript',
