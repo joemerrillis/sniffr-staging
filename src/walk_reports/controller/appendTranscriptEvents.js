@@ -47,18 +47,13 @@ export async function appendTranscriptEventsController(req, reply) {
     let tags = Array.isArray(result.tags)
       ? result.tags.map(tag => (typeof tag === 'object' ? tag : (() => { req.log.warn('Tag not object:', tag); return {}; })()))
       : [];
-    let events = Array.isArray(result.events)
-      ? result.events.map(ev => {
-          if (typeof ev !== 'object') {
-            req.log.warn('Event not object:', ev);
-            return {};
-          }
-          if (!ev.report_id) {
-            req.log.error('Event missing report_id:', ev);
-          }
-          return ev;
-        })
-      : [];
+let events = Array.isArray(result.events)
+  ? result.events.filter(ev => typeof ev === 'object' && ev.report_id)
+  : [];
+if (events.length === 0) {
+  req.log.error('[TranscriptController] No events with report_id found:', result.events);
+}
+
 
     // Final send; this response shape matches your OpenAPI spec
     return reply.send({
