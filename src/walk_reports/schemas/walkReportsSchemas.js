@@ -217,14 +217,14 @@ export const walkReportsSchemas = {
     type: 'object',
     properties: {
       success: { type: 'boolean' },
-      walk_report_id: { type: 'string', format: 'uuid' },
+      report_id: { type: 'string', format: 'uuid' },
       transcript: { $ref: 'TranscriptObject#' },
       events: {
         type: 'array',
         items: {
           type: 'object',
           properties: {
-            walk_report_id: { type: 'string', format: 'uuid' },
+            report_id: { type: 'string', format: 'uuid' },
             dog_id: { type: 'string', format: 'uuid' },
             tags: {
               type: 'array',
@@ -236,7 +236,7 @@ export const walkReportsSchemas = {
             created_at: { type: 'string', format: 'date-time' }
           },
           required: [
-            'walk_report_id', 'dog_id', 'tags', 'source', 'event_type', 'note', 'created_at'
+            'report_id', 'dog_id', 'tags', 'source', 'event_type', 'note', 'created_at'
           ],
           additionalProperties: true
         }
@@ -246,7 +246,7 @@ export const walkReportsSchemas = {
         items: { type: 'string' }
       }
     },
-    required: ['success', 'walk_report_id', 'transcript'],
+    required: ['success', 'report_id', 'transcript'],
     additionalProperties: false
   }
 };
