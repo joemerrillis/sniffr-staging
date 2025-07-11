@@ -132,3 +132,34 @@ ${photoDescriptions}
 Summary:
 `;
 }
+// NEW: Build prompt for event/tag extraction from a transcript
+export function buildEventTagPrompt({ transcript }) {
+  return `
+Break the following dog walk transcript into structured events.
+
+For each event, provide:
+- "text": a sentence describing the event
+- "tags": an array of short tags for that event
+
+Example output:
+[
+  {
+    "text": "Juno was so happy to see me when I came in that she started crying and happy peeing all over the place.",
+    "tags": ["happy", "crying", "pee"]
+  },
+  {
+    "text": "Once she calmed down she let me put her leash on, then it was all business.",
+    "tags": ["calm", "leash", "business"]
+  },
+  {
+    "text": "We marched straight to the dog park where she cuddled with me, and pooped on the way home.",
+    "tags": ["dog park", "cuddle", "poop"]
+  }
+]
+
+Transcript:
+"""${transcript}"""
+
+Return only a valid JSON array in the format shown above.
+`.trim();
+}
