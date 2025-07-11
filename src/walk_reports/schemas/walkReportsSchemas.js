@@ -72,11 +72,12 @@ export const walkReportsSchemas = {
           additionalProperties: true
         }
       },
+      transcript: { $ref: 'TranscriptObject#' }, // NEW: link to schema below
       created_at:  { type: ['string', 'null'], format: 'date-time' },
       updated_at:  { type: ['string', 'null'], format: 'date-time' }
     },
     required: [
-       'id', 'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
+      'id', 'walk_id', 'dog_ids', 'walker_id', 'user_id', 'created_at', 'updated_at'
     ],
     additionalProperties: true
   },
@@ -175,5 +176,77 @@ export const walkReportsSchemas = {
       }
     },
     additionalProperties: true
+  },
+
+  // NEW: Transcript JSONB schema
+  TranscriptObject: {
+    $id: 'TranscriptObject',
+    type: 'object',
+    properties: {
+      raw: { type: 'string' }, // original transcript text
+      events: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            text: { type: 'string' },
+            tags: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          },
+          required: ['text', 'tags'],
+          additionalProperties: false
+        }
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' }
+      },
+      status: { type: 'string', enum: ['processing', 'complete', 'error'] },
+      created_at: { type: 'string', format: 'date-time' },
+      processed_at: { type: ['string', 'null'], format: 'date-time' }
+    },
+    required: ['raw', 'status', 'created_at'],
+    additionalProperties: true
+  },
+
+  // NEW: Envelope for /transcript endpoint
+  TranscriptResponse: {
+    $id: 'TranscriptResponse',
+    type: 'object',
+    properties: {
+      success: { type: 'boolean' },
+      walk_report_id: { type: 'string', format: 'uuid' },
+      transcript: { $ref: 'TranscriptObject#' },
+      events: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            walk_report_id: { type: 'string', format: 'uuid' },
+            dog_id: { type: 'string', format: 'uuid' },
+            tags: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            source: { type: 'string' },
+            event_type: { type: 'string' },
+            note: { type: 'string' },
+            created_at: { type: 'string', format: 'date-time' }
+          },
+          required: [
+            'walk_report_id', 'dog_id', 'tags', 'source', 'event_type', 'note', 'created_at'
+          ],
+          additionalProperties: true
+        }
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' }
+      }
+    },
+    required: ['success', 'walk_report_id', 'transcript'],
+    additionalProperties: false
   }
 };
