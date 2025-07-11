@@ -8,6 +8,7 @@ import { deleteWalkReportController } from '../controller/deleteWalkReport.js';
 import { walkReportsSchemas } from '../schemas/walkReportsSchemas.js';
 import { generateWalkReportController } from '../controller/generateWalkReport.js';
 import { uploadWalkReportAudioController } from '../controller/uploadWalkReportAudio.js'; // <-- NEW
+import { appendTranscriptEventsController } from '../controller/appendTranscriptEvents.js';
 
 export default async function walkReportsRoutes(fastify, opts) {
   // Create a walk report
@@ -173,4 +174,40 @@ export default async function walkReportsRoutes(fastify, opts) {
     },
     uploadWalkReportAudioController
   );
+  fastify.post(
+  '/:id/transcript',
+  {
+    schema: {
+      summary: 'Process and append transcript events/tags for a walk report',
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', format: 'uuid' } },
+        required: ['id']
+      },
+      body: {
+        type: 'object',
+        properties: {
+          transcript: { type: 'string' },
+          dog_id: { type: 'string', format: 'uuid' }
+        },
+        required: ['transcript', 'dog_id']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            walk_report_id: { type: 'string', format: 'uuid' },
+            transcript: { type: 'object' },
+            events: { type: 'array', items: { type: 'object' } },
+            tags: { type: 'array', items: { type: 'string' } }
+          },
+          required: ['success', 'walk_report_id']
+        }
+      },
+      tags: ['WalkReports']
+    }
+  },
+  appendTranscriptEventsController
+);
 }
