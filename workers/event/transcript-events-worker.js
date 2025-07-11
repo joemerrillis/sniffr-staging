@@ -86,8 +86,13 @@ export default {
     // Parse model output as JSON array of events
     let eventsAndTags;
     try {
-      const text = Array.isArray(result) ? result[0] : result;
-      eventsAndTags = JSON.parse(text);
+      let text = Array.isArray(result) ? result.join('') : result;
+text = text
+  .replace(/^```(?:json)?/im, '')
+  .replace(/```$/m, '')
+  .trim();
+eventsAndTags = JSON.parse(text);
+
     } catch (e) {
       return new Response(JSON.stringify({ error: "Failed to parse model output", raw: result }), { status: 500 });
     }
