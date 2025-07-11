@@ -174,7 +174,7 @@ export default async function walkReportsRoutes(fastify, opts) {
     },
     uploadWalkReportAudioController
   );
-  fastify.post(
+fastify.post(
   '/:id/transcript',
   {
     schema: {
@@ -193,17 +193,7 @@ export default async function walkReportsRoutes(fastify, opts) {
         required: ['transcript', 'dog_id']
       },
       response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            walk_report_id: { type: 'string', format: 'uuid' },
-            transcript: { type: 'object' },
-            events: { type: 'array', items: { type: 'object' } },
-            tags: { type: 'array', items: { type: 'string' } }
-          },
-          required: ['success', 'walk_report_id']
-        }
+        200: walkReportsSchemas.TranscriptResponse
       },
       tags: ['WalkReports']
     }
