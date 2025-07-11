@@ -17,7 +17,7 @@ export default {
     // Accept transcript, max_completion_tokens, (optionally walk_report_id, meta, etc.)
     const {
       transcript = "",
-      max_completion_tokens = 512,
+      max_completion_tokens = 4096,
       walk_report_id = null,
       meta = {}
     } = data;
