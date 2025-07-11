@@ -3,8 +3,8 @@ import fetch from 'node-fetch';
 export async function appendTranscriptEventsService({
   supabase,
   walkReportId,
-  transcriptText,         // string: the raw transcript
-  dogId                   // uuid, FK to dogs table, for this walk report
+  transcriptText, // string: the raw transcript
+  dogId           // uuid, FK to dogs table, for this walk report
 }) {
   // 1. Call the worker to get events and tags
   const workerUrl = process.env.CF_TRANSCRIPT_EVENT_WORKER_URL;
@@ -17,12 +17,17 @@ export async function appendTranscriptEventsService({
     const errText = await workerRes.text();
     throw new Error(`Worker error: ${errText}`);
   }
-  const { output: eventsArray } = await workerRes.json(); // should be [{text, tags}, ...]
+  const { output: eventsArray } = await workerRes.json(); // should be [{text, tags: [objects]}, ...]
 
-  // 2. Extract all unique tags from all events
-  const uniqueTags = [
-    ...new Set(eventsArray.flatMap(e => Array.isArray(e.tags) ? e.tags : []))
-  ];
+  // 2. Extract all tags (objects) from all events, deduplicate by name
+  const allTags = eventsArray.flatMap(e => Array.isArray(e.tags) ? e.tags : []);
+  const uniqueTagsMap = new Map();
+  for (const tag of allTags) {
+    if (tag && tag.name && !uniqueTagsMap.has(tag.name)) {
+      uniqueTagsMap.set(tag.name, tag);
+    }
+  }
+  const uniqueTags = Array.from(uniqueTagsMap.values());
 
   // 3. Get current timestamp
   const processedAt = new Date().toISOString();
@@ -44,11 +49,11 @@ export async function appendTranscriptEventsService({
   if (updateError) throw updateError;
 
   // 6. Insert events into dog_events table
-  // Each event: assign report_id, dog_id, tags, source='transcript', event_type='walk_report', note=event.text
+  // Each event: assign report_id, dog_id, tags (as objects), source, event_type, note
   const eventsToInsert = eventsArray.map(event => ({
     report_id: walkReportId,
-    dog_id: dogId,                // supply in controller!
-    tags: event.tags,
+    dog_id: dogId, // supply in controller!
+    tags: event.tags, // <-- now array of tag objects (jsonb)
     source: 'transcript',
     event_type: 'walk_report',
     note: event.text,
@@ -67,22 +72,22 @@ export async function appendTranscriptEventsService({
 
   // 7. Insert unique tags into event_tags if not already present
   if (uniqueTags.length > 0) {
-    // Query for existing tags
+    // Query for existing tags by name
     const { data: existingTagsData, error: tagQueryError } = await supabase
       .from('event_tags')
       .select('tag')
-      .in('tag', uniqueTags);
+      .in('tag', uniqueTags.map(t => t.name));
     if (tagQueryError) throw tagQueryError;
 
     const existingTags = (existingTagsData || []).map(row => row.tag);
-    const newTags = uniqueTags.filter(tag => !existingTags.includes(tag));
+    const newTags = uniqueTags.filter(t => !existingTags.includes(t.name));
     if (newTags.length > 0) {
-      // Insert new tags with minimum default fields
-      const newTagsRows = newTags.map(tag => ({
-        tag,
-        display_name: tag.charAt(0).toUpperCase() + tag.slice(1),
-        description: "",
-        emoji: "",
+      // Insert new tags using tag fields
+      const newTagsRows = newTags.map(t => ({
+        tag: t.name,
+        display_name: t.name.charAt(0).toUpperCase() + t.name.slice(1),
+        description: t.description || "",
+        emoji: t.emoji || "",
         active: true
       }));
       const { error: insertTagsError } = await supabase
