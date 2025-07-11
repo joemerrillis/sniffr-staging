@@ -47,7 +47,7 @@ export async function appendTranscriptEventsController(req, reply) {
 
     return reply.send({
       success: true,
-      walk_report_id: walkReportId,
+      report_id: walkReportId,
       transcript: result.transcript,
       events,
       tags
