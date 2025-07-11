@@ -34,7 +34,7 @@ export const walkReportsSchemas = {
         items: { type: 'string', format: 'uuid' }
       },
       walker_id:  { type: 'string', format: 'uuid' },
-      user_id:    { type: 'string', format: 'uuid' }, // replaces client_id
+      user_id:    { type: 'string', format: 'uuid' },
       summary:    { type: ['string', 'null'] },
       ai_story_json: {
         type: ['array', 'null'],
@@ -72,7 +72,7 @@ export const walkReportsSchemas = {
           additionalProperties: true
         }
       },
-      transcript: { $ref: 'TranscriptObject#' }, // NEW: link to schema below
+      transcript: { $ref: 'TranscriptObject#' },
       created_at:  { type: ['string', 'null'], format: 'date-time' },
       updated_at:  { type: ['string', 'null'], format: 'date-time' }
     },
@@ -91,7 +91,7 @@ export const walkReportsSchemas = {
         items: { type: 'string', format: 'uuid' }
       },
       walker_id: { type: 'string', format: 'uuid' },
-      user_id:   { type: 'string', format: 'uuid' }, // replaces client_id
+      user_id:   { type: 'string', format: 'uuid' },
       summary:   { type: ['string', 'null'] },
       ai_story_json: {
         type: ['array', 'null'],
@@ -178,12 +178,25 @@ export const walkReportsSchemas = {
     additionalProperties: true
   },
 
+  // NEW: Tag Object Schema
+  TagObject: {
+    $id: 'TagObject',
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      emoji: { type: 'string' },
+      description: { type: 'string' }
+    },
+    required: ['name', 'emoji', 'description'],
+    additionalProperties: false
+  },
+
   // NEW: Transcript JSONB schema
   TranscriptObject: {
     $id: 'TranscriptObject',
     type: 'object',
     properties: {
-      raw: { type: 'string' }, // original transcript text
+      raw: { type: 'string' },
       events: {
         type: 'array',
         items: {
@@ -192,7 +205,7 @@ export const walkReportsSchemas = {
             text: { type: 'string' },
             tags: {
               type: 'array',
-              items: { type: 'string' }
+              items: { $ref: 'TagObject#' }
             }
           },
           required: ['text', 'tags'],
@@ -201,13 +214,13 @@ export const walkReportsSchemas = {
       },
       tags: {
         type: 'array',
-        items: { type: 'string' }
+        items: { $ref: 'TagObject#' }
       },
       status: { type: 'string', enum: ['processing', 'complete', 'error'] },
-      created_at: { type: 'string', format: 'date-time' },
+      created_at: { type: ['string', 'null'], format: 'date-time' },
       processed_at: { type: ['string', 'null'], format: 'date-time' }
     },
-    required: ['raw', 'status', 'created_at'],
+    required: ['raw', 'status'],
     additionalProperties: true
   },
 
@@ -228,7 +241,7 @@ export const walkReportsSchemas = {
             dog_id: { type: 'string', format: 'uuid' },
             tags: {
               type: 'array',
-              items: { type: 'string' }
+              items: { $ref: 'TagObject#' }
             },
             source: { type: 'string' },
             event_type: { type: 'string' },
@@ -243,7 +256,7 @@ export const walkReportsSchemas = {
       },
       tags: {
         type: 'array',
-        items: { type: 'string' }
+        items: { $ref: 'TagObject#' }
       }
     },
     required: ['success', 'report_id', 'transcript'],
