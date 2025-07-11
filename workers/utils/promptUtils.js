@@ -1,11 +1,6 @@
 // src/dog_memories/utils/promptUtils.js
 
-/**
- * Builds a tags prompt for the tags-worker, based on known dog names and personality summary.
- * @param {Array<string>} dogNames - Array of dog names, may be empty or contain "Unknown".
- * @param {string} personality - Personality summary or description.
- * @returns {string} - Prompt for LLM or LLaVA.
- */
+// ---------- Instagram Tags Prompt ----------
 export function buildTagsPrompt(dogNames = [], personality = "") {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
   let namePart = "";
@@ -17,7 +12,6 @@ export function buildTagsPrompt(dogNames = [], personality = "") {
     namePart = `the dog`;
   }
 
-  // Instagram-style tag examples (not just #dog)
   const tagExamples = `
 EXAMPLES:
 #outdooradventure #dogsofinstagram #blackandwhitepup #happywalk #goofballenergy #queenattitude #sunnysniffs
@@ -35,16 +29,7 @@ Do not use essay-length or multi-sentence tags. Each hashtag should be short, fu
 ${tagExamples}`.trim();
 }
 
-/**
- * Builds a caption prompt for the caption-worker.
- * Optionally includes a personality summary and always voices *as the dog* if available.
- * Prompts the model for a present-tense, in-the-moment, authentic inner monologue—NOT a self-intro or summary.
- * @param {Object} options
- *   - dogNames: Array<string> (optional)
- *   - eventType: string (e.g., 'walk', 'boarding', ...)
- *   - personalitySummary: string (optional, e.g. "Goofy, obsessed with squirrels, loves belly rubs")
- * @returns {string} - Prompt for LLM or LLaVA.
- */
+// ---------- Caption Prompt ----------
 export function buildCaptionPrompt({ dogNames = [], eventType, personalitySummary } = {}) {
   const knownNames = dogNames.filter(n => n && n !== "Unknown");
   let namePart = "";
@@ -57,7 +42,6 @@ export function buildCaptionPrompt({ dogNames = [], eventType, personalitySummar
     namePart = `the dog`;
   }
 
-  // Inner monologue examples — Instagram, present tense, no self-intros
   const captionExamples = `
 EXAMPLES:
 1. "Let’s go, human! The world isn’t going to sniff itself."
@@ -67,7 +51,6 @@ EXAMPLES:
 5. "So many smells, so little time!"
 `;
 
-  // If personality, instruct to use it in the inner monologue
   let voicePart = "";
   if (personalitySummary && personalitySummary.trim()) {
     voicePart = `
@@ -99,16 +82,8 @@ ${captionExamples}
 `.trim();
   }
 }
-// src/dog_memories/utils/promptUtils.js
 
-/**
- * Build a summary prompt for the walk summary worker.
- * @param {Array<Object>} photos - Array of objects like { ai_caption, url, tags, dog_ids }
- * @param {Array<string>} [personalities] - Optional dog personality profiles.
- * @param {Array<string>} [dogNames] - Array of dog names.
- * @returns {string}
- */
-
+// ---------- Walk Summary Prompt ----------
 export function buildSummaryPrompt({ photos, personalities = [], dogNames = [] }) {
   let photoDescriptions = photos.map((photo, i) =>
     `Photo ${i + 1}: ${photo.ai_caption}${photo.tags ? ' (tags: ' + photo.tags.join(', ') + ')' : ''}`
@@ -130,30 +105,44 @@ Below is a sequence of AI-generated captions for each photo taken on a dog walk.
 ${photoDescriptions}
 
 Summary:
-`;
+`.trim();
 }
-// NEW: Build prompt for event/tag extraction from a transcript
+
+// ---------- Event/Tag Extraction Prompt ----------
 export function buildEventTagPrompt({ transcript }) {
   return `
-Break the following dog walk transcript into structured events.
+Your job is to extract only events that inform us about the dog's experience, state of mind, or personality during the walk. Do NOT create events for human background actions (like closing doors, putting on shoes, opening gates) unless it clearly relates to the dog's reaction or mood. Focus on moments that reveal how the dog interacts with their environment, their human, or other dogs.
 
-For each event, provide:
-- "text": a sentence describing the event
-- "tags": an array of short tags for that event
+For each meaningful event, provide:
+- "text": a single sentence describing the event, rephrased in a way that emphasizes the dog's perspective, mood, or response. Be specific.
+For each tag, provide:
+- "name": the tag (a single word or short phrase)
+- "emoji": a single emoji matching the tag meaning (use your best guess)
+- "description": a very short phrase (max 6 words) that gives a general definition of the tag, not specific to this walk or place.
+
 
 Example output:
 [
   {
-    "text": "Juno was so happy to see me when I came in that she started crying and happy peeing all over the place.",
-    "tags": ["happy", "crying", "pee"]
+    "text": "Juno cried with joy at being picked up for her walk.",
+    "tags": [
+      { "name": "joy", "emoji": "😄", "description": "Expressed happiness" },
+      { "name": "pickup", "emoji": "🦮", "description": "Picked up for walk" }
+    ]
   },
   {
-    "text": "Once she calmed down she let me put her leash on, then it was all business.",
-    "tags": ["calm", "leash", "business"]
+    "text": "She got all her cuddles on the park bench.",
+    "tags": [
+      { "name": "cuddle", "emoji": "🤗", "description": "Sought physical affection" },
+      { "name": "park", "emoji": "🏞️", "description": "At the dog park" }
+    ]
   },
   {
-    "text": "We marched straight to the dog park where she cuddled with me, and pooped on the way home.",
-    "tags": ["dog park", "cuddle", "poop"]
+    "text": "She pooped a second time on the way home.",
+    "tags": [
+      { "name": "poop", "emoji": "💩", "description": "Had a bowel movement" },
+      { "name": "home", "emoji": "🏠", "description": "Returning home" }
+    ]
   }
 ]
 
