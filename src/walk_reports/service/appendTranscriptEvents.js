@@ -20,7 +20,9 @@ export async function appendTranscriptEventsService({
   const { output: eventsArray } = await workerRes.json(); // should be [{text, tags}, ...]
 
   // 2. Extract all unique tags from all events
-  const uniqueTags = [...new Set(eventsArray.flatMap(e => Array.isArray(e.tags) ? e.tags : []))];
+  const uniqueTags = [
+    ...new Set(eventsArray.flatMap(e => Array.isArray(e.tags) ? e.tags : []))
+  ];
 
   // 3. Get current timestamp
   const processedAt = new Date().toISOString();
@@ -53,11 +55,14 @@ export async function appendTranscriptEventsService({
     created_at: processedAt
   }));
 
+  let insertedEvents = [];
   if (eventsToInsert.length > 0) {
-    const { error: eventsError } = await supabase
+    const { data, error: eventsError } = await supabase
       .from('dog_events')
-      .insert(eventsToInsert);
+      .insert(eventsToInsert)
+      .select('*'); // Ensures full objects are returned!
     if (eventsError) throw eventsError;
+    insertedEvents = data || [];
   }
 
   // 7. Insert unique tags into event_tags if not already present
@@ -72,10 +77,17 @@ export async function appendTranscriptEventsService({
     const existingTags = (existingTagsData || []).map(row => row.tag);
     const newTags = uniqueTags.filter(tag => !existingTags.includes(tag));
     if (newTags.length > 0) {
-      // Insert new tags
+      // Insert new tags with minimum default fields
+      const newTagsRows = newTags.map(tag => ({
+        tag,
+        display_name: tag.charAt(0).toUpperCase() + tag.slice(1),
+        description: "",
+        emoji: "",
+        active: true
+      }));
       const { error: insertTagsError } = await supabase
         .from('event_tags')
-        .insert(newTags.map(tag => ({ tag })));
+        .insert(newTagsRows);
       if (insertTagsError) throw insertTagsError;
     }
   }
@@ -83,7 +95,7 @@ export async function appendTranscriptEventsService({
   // 8. Return everything for logging or controller response
   return {
     transcript: transcriptObj,
-    events: eventsToInsert,
+    events: insertedEvents, // Actual rows from the DB!
     tags: uniqueTags
   };
 }
