@@ -1,0 +1,9 @@
+name = "transcript-events-worker"
+main = "transcript-events-worker.js"
+compatibility_date = "2025-07-10"
+account_id = "774b68e8a6ad8edd33820cd760f785d9"
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+
