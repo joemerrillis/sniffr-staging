@@ -39,6 +39,7 @@ import visibilityPlugin from './src/dogVisibility/index.js';
 import chatPlugin from './src/chat/index.js';
 import walkReportsPlugin from './src/walk_reports/index.js';
 import dogEventsPlugin from './src/dog_events/index.js';
+import boarding_reports from './src/boarding-reports/index.js';
 
 dotenv.config();
 
@@ -138,6 +139,7 @@ await fastify.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
 await fastify.register(chatPlugin, { prefix: '/chats' });
 await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
 await fastify.register(dogEventsPlugin, { prefix: '/dog-events' });
+await fastify.register(boardingReportsPlugin, {prefix: '/boarding-reports' });
 
 // ---- 8. Custom endpoints go *after* static & plugin registration ----
 
