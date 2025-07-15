@@ -39,7 +39,7 @@ import visibilityPlugin from './src/dogVisibility/index.js';
 import chatPlugin from './src/chat/index.js';
 import walkReportsPlugin from './src/walk_reports/index.js';
 import dogEventsPlugin from './src/dog_events/index.js';
-import boarding_reports from './src/boarding-reports/index.js';
+import boarding_reports from './src/boarding_reports/index.js';
 
 dotenv.config();
 
