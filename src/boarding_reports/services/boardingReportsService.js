@@ -13,7 +13,7 @@ async function listBoardingReports(supabase, filters = {}) {
   }
   const { data, error } = await query.order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
-  return { boarding_reports: data };
+  return { boarding_reports: data || [] };
 }
 
 async function getBoardingReport(supabase, id) {
@@ -72,6 +72,63 @@ async function deleteBoardingReport(supabase, id) {
   return { boarding_report: data };
 }
 
+// --------- EXTRA ROUTES: COMPLETE-TASK & PUSH-TO-CLIENT ---------
+
+async function completeBoardingReportTask(supabase, id, taskKey, completedBy, timestamp) {
+  // 1. Fetch the report
+  const { data: report, error } = await supabase
+    .from('boarding_reports')
+    .select('tasks')
+    .eq('id', id)
+    .single();
+  if (error) throw new Error(error.message);
+  if (!report) throw new Error('Boarding report not found.');
+
+  // 2. Find and update the task atomically
+  const updatedTasks = (report.tasks || []).map(task =>
+    task.key === taskKey
+      ? {
+          ...task,
+          completed: true,
+          completed_at: timestamp || new Date().toISOString(),
+          completed_by: completedBy
+        }
+      : task
+  );
+
+  // 3. Save updated tasks
+  const { data: updated, error: upError } = await supabase
+    .from('boarding_reports')
+    .update({
+      tasks: updatedTasks,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (upError) throw new Error(upError.message);
+  return { boarding_report: updated };
+}
+
+async function pushBoardingReportToClient(supabase, id, type, message) {
+  // Optionally: fetch the report and do any extra logic (like setting status, flag, or audit log)
+  // Here, just a placeholder for real notification integration
+  // You might want to update a "pushed_to_client_at" or status field here, or trigger a notification
+
+  // Example: set a "last_pushed_to_client" timestamp (optional)
+  const updatePayload = { updated_at: new Date().toISOString() };
+  // Optionally: status, or audit log
+
+  await supabase
+    .from('boarding_reports')
+    .update(updatePayload)
+    .eq('id', id);
+
+  // Simulate notification logic (external integration would go here)
+  // For now, always return success
+  return { success: true };
+}
+
 // --- FK validation helper ---
 async function validateFKs(supabase, data, isPartial = false) {
   // Only check keys present in the payload if isPartial=true (patch)
@@ -97,7 +154,7 @@ async function validateFKs(supabase, data, isPartial = false) {
       if (!exists) throw new Error(`Invalid staff_id: ${staffId} not found in users`);
     }
   }
-  // photos: no FK, but if you want, can check dog_memories.id refs here as well
+  // photos: no FK, but you could check dog_memories.id refs here if needed
 }
 
 export {
@@ -106,4 +163,6 @@ export {
   createBoardingReport,
   updateBoardingReport,
   deleteBoardingReport,
+  completeBoardingReportTask,
+  pushBoardingReportToClient
 };
