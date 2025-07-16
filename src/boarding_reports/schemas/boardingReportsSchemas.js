@@ -121,9 +121,11 @@ export const boardingReportsSchemas = {
       end_time: { type: ['string', 'null'], format: 'date-time' },
       user_id: { type: 'string', format: 'uuid' },
       instructions_img_url: { type: ['string', 'null'], format: 'uri' },
-      notes: { type: ['string', 'null'] }
+      notes: { type: ['string', 'null'] },
+      status: { type: ['string', 'null'] },
+      visibility: {type: ['string', 'null'] }
     },
-    required: ['boarding_id', 'dog_id', 'user_id'],
+    required: ['boarding_id', 'dog_id', 'user_id', 'status', 'visibility'],
     additionalProperties: false
   },
 
