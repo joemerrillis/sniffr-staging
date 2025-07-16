@@ -30,11 +30,21 @@ async function createBoardingReport(supabase, payload) {
   // Validate all required foreign keys exist!
   await validateFKs(supabase, payload);
 
+  const now = new Date().toISOString();
+  const start_time = payload.start_time || now;
+  // end_time: use payload value if present, otherwise undefined (left blank in DB)
+
   const insertPayload = {
     ...payload,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    start_time,
+    created_at: now,
+    updated_at: now,
   };
+
+  // Only add end_time if present (avoid overwriting DB default/null)
+  if ('end_time' in payload) {
+    insertPayload.end_time = payload.end_time;
+  }
 
   const { data, error } = await supabase
     .from('boarding_reports')
@@ -44,6 +54,7 @@ async function createBoardingReport(supabase, payload) {
   if (error) throw new Error(error.message);
   return { boarding_report: data };
 }
+
 
 async function updateBoardingReport(supabase, id, updates) {
   if (Object.keys(updates).length === 0) throw new Error('No update fields provided');
