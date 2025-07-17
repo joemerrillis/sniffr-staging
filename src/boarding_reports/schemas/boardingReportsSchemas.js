@@ -217,3 +217,34 @@ export const boardingReportsSchemas = {
     additionalProperties: false
   }
 };
+  // ...existing boardingReportsSchemas above...
+
+  Chat: {
+    $id: 'Chat',
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      tenant_id: { type: ['string', 'null'], format: 'uuid' },
+      chat_type: { type: 'string' },
+      household_id: { type: ['string', 'null'], format: 'uuid' },
+      service_id: { type: ['string', 'null'], format: 'uuid' },
+      title: { type: ['string', 'null'] },
+      created_at: { type: ['string', 'null'], format: 'date-time' },
+      updated_at: { type: ['string', 'null'], format: 'date-time' },
+      last_message_at: { type: ['string', 'null'], format: 'date-time' },
+      is_archived: { type: ['boolean', 'null'] }
+    },
+    required: ['id', 'chat_type'],
+    additionalProperties: true // allows for extra fields if you expand in the future
+  },
+
+  ChatEnvelope: {
+    $id: 'ChatEnvelope',
+    type: 'object',
+    properties: {
+      chat: { $ref: 'Chat#' }
+    },
+    required: ['chat'],
+    additionalProperties: false
+  }
+};
