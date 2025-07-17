@@ -215,9 +215,7 @@ export const boardingReportsSchemas = {
     },
     required: ['success'],
     additionalProperties: false
-  }
-};
-  // ...existing boardingReportsSchemas above...
+  },
 
   Chat: {
     $id: 'Chat',
@@ -235,7 +233,7 @@ export const boardingReportsSchemas = {
       is_archived: { type: ['boolean', 'null'] }
     },
     required: ['id', 'chat_type'],
-    additionalProperties: true // allows for extra fields if you expand in the future
+    additionalProperties: true
   },
 
   ChatEnvelope: {
