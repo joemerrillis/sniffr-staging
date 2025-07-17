@@ -27,14 +27,31 @@ export async function createChatForBoardingReport(req, reply) {
   }
 
   // Lookup household_id for the user
-  const { data: household_member, error: hmErr } = await supabase
-    .from('household_members')
-    .select('household_id')
-    .eq('user_id', boarding.user_id)
+// 1. Try household_members first
+let { data: household_member } = await supabase
+  .from('household_members')
+  .select('household_id')
+  .eq('user_id', boarding.user_id)
+  .single();
+
+let household_id = household_member?.household_id;
+
+if (!household_id) {
+  // 2. Fallback: look up households where user is the primary contact
+  const { data: household, error: hErr } = await supabase
+    .from('households')
+    .select('id')
+    .eq('primary_contact_id', boarding.user_id)
     .single();
-  if (hmErr || !household_member) {
-    return reply.code(400).send({ error: 'Could not determine household for boarding user.' });
-  }
+
+  household_id = household?.id;
+}
+
+if (!household_id) {
+  reply.code(400).send({ error: 'Could not determine household for boarding user.' });
+  return;
+}
+
 
   // Create the chat thread
   const chat = await createBoardingChatThread(supabase, {
