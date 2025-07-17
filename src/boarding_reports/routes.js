@@ -153,7 +153,7 @@ export default async function boardingReportsRoutes(fastify) {
     pushToClient
   );
 
-  // --- NEW: PATCH /boarding-reports/:id/create-chat-thread ---
+  // PATCH /boarding-reports/:id/create-chat-thread — create/recreate chat thread
   fastify.patch(
     '/boarding-reports/:id/create-chat-thread',
     {
@@ -164,13 +164,7 @@ export default async function boardingReportsRoutes(fastify) {
           'Creates a dedicated chat thread between staff and all household users for this boarding report. Useful if the thread was not created at report creation, or needs to be repaired.',
         params: boardingReportsSchemas.BoardingReportIdParam,
         response: {
-          200: boardingReportsSchemas.ChatEnvelope || {
-            // fallback schema in case you haven't defined ChatEnvelope yet
-            type: 'object',
-            properties: {
-              chat: { type: 'object' },
-            },
-          },
+          200: boardingReportsSchemas.ChatEnvelope
         },
       },
     },
