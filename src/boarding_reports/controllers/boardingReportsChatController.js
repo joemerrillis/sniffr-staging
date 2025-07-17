@@ -6,7 +6,7 @@ export async function createChatForBoardingReport(req, reply) {
   const supabase = req.server.supabase;
   const boarding_report_id = req.params.id;
 
-  // Lookup boarding_report
+  // Lookup boarding_report to get boarding_id, staff_ids, etc.
   const { data: report, error: reportErr } = await supabase
     .from('boarding_reports')
     .select('id, boarding_id, staff_ids')
@@ -18,7 +18,7 @@ export async function createChatForBoardingReport(req, reply) {
     return reply.code(404).send({ error: 'Boarding report not found.' });
   }
 
-  // Lookup boarding
+  // Lookup boardings for tenant_id, user_id, etc.
   const { data: boarding, error: bErr } = await supabase
     .from('boardings')
     .select('id, tenant_id, user_id')
@@ -31,21 +31,22 @@ export async function createChatForBoardingReport(req, reply) {
   }
 
   const user_id = boarding.user_id;
+  let household_id = null;
 
-  // 1. Check if the user is primary_contact in any household
-  let { data: household, error: householdErr } = await supabase
+  // 1. Check households table first (primary_contact_id)
+  const { data: household, error: householdErr } = await supabase
     .from('households')
     .select('id')
     .eq('primary_contact_id', user_id)
     .single();
 
-  let household_id = household?.id;
-
   console.log('Checked households table for user', user_id, 'Result:', household);
 
-  // 2. If not found, look in household_members
-  if (!household_id) {
-    let { data: household_member, error: memberErr } = await supabase
+  if (household && household.id) {
+    household_id = household.id;
+  } else {
+    // 2. Fallback: check household_members table for any membership
+    const { data: household_member, error: memberErr } = await supabase
       .from('household_members')
       .select('household_id')
       .eq('user_id', user_id)
@@ -53,7 +54,9 @@ export async function createChatForBoardingReport(req, reply) {
 
     console.log('Checked household_members for user', user_id, 'Result:', household_member);
 
-    household_id = household_member?.household_id;
+    if (household_member && household_member.household_id) {
+      household_id = household_member.household_id;
+    }
   }
 
   if (!household_id) {
@@ -62,7 +65,7 @@ export async function createChatForBoardingReport(req, reply) {
     return;
   }
 
-  // 3. Find all household members (for logging/possible use)
+  // (Optional) Log all household members (if you want to see who will be included)
   const { data: all_members, error: allMembersErr } = await supabase
     .from('household_members')
     .select('user_id')
@@ -70,10 +73,10 @@ export async function createChatForBoardingReport(req, reply) {
 
   console.log('All household members for household', household_id, ':', all_members);
 
-  // 4. Create the chat thread
+  // Create the chat thread using the resolved household_id
   const chat = await createBoardingChatThread(supabase, {
     tenant_id: boarding.tenant_id,
-    household_id, // <- always use this
+    household_id, // Always the correct ID now
     boarding_id: boarding.id,
     staff_ids: report.staff_ids || [],
     title: 'Boarding Updates',
