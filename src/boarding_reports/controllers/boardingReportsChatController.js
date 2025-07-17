@@ -4,7 +4,7 @@ import { createBoardingChatThread } from '../../chat/services/chatService.js';
 
 export async function createChatForBoardingReport(req, reply) {
   const supabase = req.server.supabase;
-  const { boarding_report_id } = req.body; // Accepts POST { boarding_report_id: "..." }
+  const boarding_report_id = req.params.id; // <-- Use route param!
 
   // Lookup boarding_report to get boarding_id, staff_ids, etc.
   const { data: report, error: reportErr } = await supabase
