@@ -1,5 +1,3 @@
-// src/dog_memories/services/mediaProcessing/onPhotoUploaded.js
-/*
 import {
   getDogNamesFromIds,
 } from './helpers.js';
@@ -12,6 +10,7 @@ import {
 } from './workers.js';
 
 export async function onPhotoUploaded({ memory }) {
+  /*
   const dogNames = await getDogNamesFromIds(memory.dog_ids);
   const eventType = memory.event_type || null;
 
@@ -31,7 +30,8 @@ export async function onPhotoUploaded({ memory }) {
 
   // 4. Fire caption, passing personalitySummary
   await callCaptionWorker(memory, dogNames, eventType, personalitySummary);
-*/
+
   // 5. Fire tags, passing personalitySummary
   await callTagsWorker(memory, dogNames, personalitySummary);
+  */
 }
