@@ -6,6 +6,14 @@ import { onPhotoUploaded } from './mediaProcessing.js';
 
 export async function handleDogMemoryUpload(request, reply, fastify) {
   fastify.log.info('UPLOAD HANDLER STARTED');
+
+  // === AUTH CHECK: uploader_id is REQUIRED ===
+  const uploader_id = request.user?.id;
+  if (!uploader_id) {
+    fastify.log.warn('No uploader_id: upload attempted without authentication');
+    return reply.code(401).send({ error: 'Authentication required to upload dog memory.' });
+  }
+
   const parts = request.parts();
   let count = 0;
   let fileCount = 0;
@@ -80,7 +88,7 @@ export async function handleDogMemoryUpload(request, reply, fastify) {
       fastify.log.info('About to insert dog memory into DB...');
       newMemory = await insertDogMemory({
         object_key: cloudflareResp.id,
-        uploader_id: request.user?.id || null,
+        uploader_id, // Always present
         dog_ids: dogIds,
         event_id: eventId,
         image_url: cloudflareResp.variants?.[0] ||
