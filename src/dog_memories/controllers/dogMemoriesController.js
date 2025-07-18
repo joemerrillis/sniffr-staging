@@ -1,129 +1,136 @@
-// src/dog_memories/controllers/dogMemoriesController.js
+// src/dog_memories/services/uploadHandler.js
 
-import {
-  insertDogMemory,
-  getDogMemoryById,
-  listDogMemoriesByDogId,
-  listDogMemoriesByUploader,
-  updateDogMemory,
-  deleteDogMemory,
-} from '../models/dogMemoryModel.js';
+import { uploadToCloudflareImages } from './cloudflareImages.js'; // adjust path if needed
+import { insertDogMemory } from '../models/dogMemoryModel.js';    // adjust path if needed
+import { onPhotoUploaded } from './mediaProcessing.js';
 
-import { enrichDogMemories } from '../services/enrichDogMemories.js';
-import { parseCaptionForEvents } from '../services/eventParser.js';
+export async function handleDogMemoryUpload(request, reply, fastify) {
+  fastify.log.info('UPLOAD HANDLER STARTED');
 
-// CREATE (POST /dog-memories)
-export async function create(request, reply) {
-  try {
-    const uploader_id = request.user?.id || request.body.uploader_id; // or pull from JWT/session
-    const data = { ...request.body, uploader_id };
-    const memory = await insertDogMemory(data);
-    reply.code(201).send({ memory });
-  } catch (err) {
-    reply.code(400).send({ error: err.message });
+  // === AUTH CHECK: uploader_id is REQUIRED ===
+  const uploader_id = request.user?.id;
+  if (!uploader_id) {
+    fastify.log.warn('No uploader_id: upload attempted without authentication');
+    return reply.code(401).send({ error: 'Authentication required to upload dog memory.' });
   }
-}
 
-// GET BY ID (GET /dog-memories/:id)
-export async function retrieve(request, reply) {
+  const parts = request.parts();
+  let count = 0;
+  let fileCount = 0;
+  let fieldCount = 0;
+  let partNames = [];
+  let fileBuffer = null;
+  let fileInfo = null;
+  let fields = {};
+
   try {
-    const { id } = request.params;
-    const memory = await getDogMemoryById(id);
-    if (!memory) return reply.code(404).send({ error: 'Dog memory not found' });
-    reply.send({ memory });
-  } catch (err) {
-    reply.code(400).send({ error: err.message });
-  }
-}
+    for await (const part of parts) {
+      count++;
+      if (part.file) {
+        fileCount++;
+        partNames.push(part.filename || 'unnamed-file');
+        fastify.log.info({ partNum: count, filename: part.filename, mimetype: part.mimetype }, 'File part received');
 
-// LIST BY DOG (GET /dog-memories/dog/:dogId)
-export async function listByDog(request, reply) {
-  try {
-    const { dogId } = request.params;
-    const { limit, offset } = request.query;
-    const memories = await listDogMemoriesByDogId(dogId, { limit, offset });
-    reply.send({ memories });
-  } catch (err) {
-    reply.code(400).send({ error: err.message });
-  }
-}
-
-// LIST BY UPLOADER (GET /dog-memories/uploader/:userId)
-export async function listByUploader(request, reply) {
-  try {
-    const { userId } = request.params;
-    const { limit, offset } = request.query;
-    const memories = await listDogMemoriesByUploader(userId, { limit, offset });
-    reply.send({ memories });
-  } catch (err) {
-    reply.code(400).send({ error: err.message });
-  }
-}
-
-// UPDATE (PATCH /dog-memories/:id)
-export async function modify(request, reply) {
-  try {
-    const { id } = request.params;
-    const updates = request.body;
-    const memory = await updateDogMemory(id, updates);
-    if (!memory) return reply.code(404).send({ error: 'Dog memory not found' });
-    reply.send({ memory });
-  } catch (err) {
-    reply.code(400).send({ error: err.message });
-  }
-}
-
-// DELETE (DELETE /dog-memories/:id)
-export async function remove(request, reply) {
-  try {
-    const { id } = request.params;
-    const memory = await deleteDogMemory(id);
-    if (!memory) return reply.code(404).send({ error: 'Dog memory not found' });
-    reply.send({ success: true, memory });
-  } catch (err) {
-    reply.code(400).send({ error: err.message });
-  }
-}
-
-// BATCH ENRICHMENT (POST /dog-memories/enrich-batch)
-export async function enrichBatch(request, reply) {
-  try {
-    const { memoryIds } = request.body;
-    const supabase = request.server.supabase;
-    const memories = await enrichDogMemories(supabase, memoryIds);
-    reply.send({ memories });
-  } catch (err) {
-    request.log?.error({ err }, "Error enriching dog memories");
-    reply.code(500).send({ error: 'Enrichment failed', details: err.message });
-  }
-}
-
-// SAVE & PARSE (PATCH /dog-memories/:id/save-parse)
-export async function saveAndParseMemory(request, reply) {
-  try {
-    const { id } = request.params;
-    const { caption, tags } = request.body;
-    const supabase = request.server.supabase;
-
-    // 1. Save the edited caption/tags
-    const memory = await updateDogMemory(id, {
-      ai_caption: caption,
-      tags,
-      updated_at: new Date().toISOString(),
-    });
-    if (!memory) return reply.code(404).send({ error: 'Dog memory not found' });
-
-    // 2. Parse the new caption for events/tags
-    let parsedEvents = [];
-    try {
-      parsedEvents = await parseCaptionForEvents(caption, tags, memory);
-    } catch (e) {
-      request.log?.warn({ e }, "Event parsing failed");
-      parsedEvents = [];
+        // Buffer the file as soon as it's seen
+        fastify.log.info('About to buffer file part...');
+        fileBuffer = await streamToBuffer(part.file, fastify);
+        fileInfo = { filename: part.filename, mimetype: part.mimetype };
+        fastify.log.info({ bufferLength: fileBuffer.length }, 'File part buffered');
+      } else if (part.fieldname) {
+        fieldCount++;
+        fields[part.fieldname] = part.value;
+        partNames.push(part.fieldname);
+        fastify.log.info({ partNum: count, field: part.fieldname, value: part.value }, 'Field part received');
+      } else {
+        fastify.log.warn({ partNum: count }, 'Unknown part type received');
+      }
     }
 
-    reply.send({ memory, parsedEvents });
+    fastify.log.info({ count, fileCount, fieldCount, partNames }, 'All parts processed, starting Cloudflare upload');
+
+    if (!fileBuffer) {
+      fastify.log.warn('No file uploaded');
+      return reply.code(400).send({ error: 'No file uploaded' });
+    }
+
+    // === CLOUDLFARE UPLOAD STEP ===
+    let cloudflareResp;
+    try {
+      fastify.log.info('About to upload to Cloudflare Images...');
+      cloudflareResp = await uploadToCloudflareImages({
+        fileBuffer,
+        fileName: fileInfo.filename,
+        metadata: fields
+      });
+      fastify.log.info({ cloudflareResp }, 'Cloudflare upload finished');
+    } catch (err) {
+      fastify.log.error({ err }, 'Cloudflare upload failed');
+      return reply.code(502).send({ error: 'Cloudflare upload failed', details: err.message });
+    }
+
+    // === DATA NORMALIZATION ===
+    // dog_ids must always be an array (even if one value, Postgres _uuid)
+    let dogIds;
+    if (Array.isArray(fields.dog_ids)) {
+      dogIds = fields.dog_ids;
+    } else if (typeof fields.dog_ids === 'string') {
+      dogIds = fields.dog_ids.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      dogIds = [];
+    }
+
+    // event_id is a single UUID (uuid type)
+    let eventId = (typeof fields.event_id === 'string') ? fields.event_id.trim() : null;
+
+    // === DB INSERT STEP ===
+    let newMemory;
+    try {
+      fastify.log.info('About to insert dog memory into DB...');
+      newMemory = await insertDogMemory({
+        object_key: cloudflareResp.id,
+        uploader_id, // Always present
+        dog_ids: dogIds,
+        event_id: eventId,
+        image_url: cloudflareResp.variants?.[0] ||
+                   `https://imagedelivery.net/9wUa4dldcGfmWFQ1Xyg0gA/${cloudflareResp.id}/public`,
+        file_type: fileInfo.mimetype,
+        file_ext: (fileInfo.filename || '').split('.').pop(),
+        meta: cloudflareResp.meta,
+      });
+      fastify.log.info({ newMemory }, 'Dog memory inserted');
+    } catch (err) {
+      fastify.log.error({ err }, 'Dog memory insert failed');
+      return reply.code(500).send({ error: 'DB insert failed', details: err.message });
+    }
+
+    // === Kick off async media processing (embedding/vectorization) ===
+    try {
+      onPhotoUploaded({ memory: newMemory }); // Don't await!
+    } catch (err) {
+      // Use console.error here; fastify is not available in this async context!
+      console.error('Failed to trigger media processing', err);
+    }
+
+    // === Respond to Client ===
+    return reply.code(201).send({
+      ok: true,
+      message: "File uploaded and dog memory created",
+      memory: newMemory
+    });
+
   } catch (err) {
-    reply.code(400).send({ error: err.message });
+    fastify.log.error({ err, count }, 'Error in upload handler');
+    return reply.code(500).send({ error: err.message || 'Upload handler failed' });
   }
+}
+
+async function streamToBuffer(stream, fastify) {
+  fastify.log.info('streamToBuffer started');
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  const buffer = Buffer.concat(chunks);
+  fastify.log.info({ bufferLength: buffer.length }, 'streamToBuffer complete');
+  return buffer;
 }
