@@ -1,5 +1,5 @@
 // src/dog_memories/services/mediaProcessing/workers.js
-
+/*
 import fetch from 'node-fetch';
 import { updateDogMemory } from '../../models/dogMemoryModel.js';
 
@@ -176,3 +176,4 @@ export async function callTagsWorker(memory, dogNames, personalitySummary = null
     console.error("[TagsWorker] Error:", e);
   }
 }
+*/
