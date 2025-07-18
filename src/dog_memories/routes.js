@@ -4,7 +4,9 @@ import {
   listByDog, 
   listByUploader, 
   modify, 
-  remove 
+  remove,
+  enrichBatch,       // ADD THIS
+  saveAndParseMemory // ADD THIS
 } from './controllers/dogMemoriesController.js';
 
 import { dogMemoriesSchemas } from './schemas/dogMemoriesSchemas.js';
@@ -16,6 +18,67 @@ export default async function dogMemoriesRoutes(fastify, opts) {
     try { fastify.addSchema(schema); } catch (e) {}
   }
 
+  // New: Async batch enrichment (AI caption/tag) for selected dog_memories
+  fastify.post(
+    '/dog-memories/enrich-batch',
+    {
+      schema: {
+        tags: ['DogMemories'],
+        body: {
+          type: 'object',
+          required: ['memoryIds'],
+          properties: {
+            memoryIds: {
+              type: 'array',
+              items: { type: 'string', format: 'uuid' },
+              minItems: 1
+            }
+          }
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              memories: {
+                type: 'array',
+                items: dogMemoriesSchemas.DogMemory
+              }
+            }
+          }
+        }
+      }
+    },
+    enrichBatch
+  );
+
+  // New: PATCH endpoint to save caption/tags, then parse events (fires on user save)
+  fastify.patch(
+    '/dog-memories/:id/save-parse',
+    {
+      schema: {
+        tags: ['DogMemories'],
+        body: {
+          type: 'object',
+          required: ['caption', 'tags'],
+          properties: {
+            caption: { type: 'string' },
+            tags: { type: 'array', items: { type: 'string' } }
+          }
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              memory: dogMemoriesSchemas.DogMemory,
+              parsedEvents: { type: 'array', items: { type: 'object' } }
+            }
+          }
+        }
+      }
+    },
+    saveAndParseMemory
+  );
+  
   // TEST UPLOAD PAGE (public, for convenience)
   fastify.get('/dog-memories/test-upload', async (request, reply) => {
     reply.type('text/html').send(`
