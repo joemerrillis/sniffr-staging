@@ -1,7 +1,33 @@
-// src/dog_memories/services/mediaProcessing/workers.js
+// ============================================
+// Disabled AI worker exports (STUBS ONLY)
+// This lets imports work, but nothing happens.
+// Restore real code from below if/when needed.
+// ============================================
+
+export async function callEmbeddingWorker() {
+  // No-op. AI embedding worker is disabled.
+}
+
+export async function callPersonalityWorker() {
+  // No-op. AI personality worker is disabled.
+  return null;
+}
+
+export async function callCaptionWorker() {
+  // No-op. AI caption worker is disabled.
+}
+
+export async function callTagsWorker() {
+  // No-op. AI tags worker is disabled.
+}
+
 /*
-import fetch from 'node-fetch';
-import { updateDogMemory } from '../../models/dogMemoryModel.js';
+=================================================
+Original AI worker implementations (commented out)
+=================================================
+
+// import fetch from 'node-fetch';
+// import { updateDogMemory } from '../../models/dogMemoryModel.js';
 
 // IMAGE EMBEDDER
 export async function callEmbeddingWorker(memory, dogNames) {
