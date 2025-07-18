@@ -9,8 +9,8 @@ import {
   deleteDogMemory,
 } from '../models/dogMemoryModel.js';
 
-import { enrichDogMemories } from '../service/enrichDogMemories.js';
-import { parseCaptionForEvents } from '../service/eventParser.js';
+import { enrichDogMemories } from '../services/enrichDogMemories.js';
+import { parseCaptionForEvents } from '../services/eventParser.js';
 
 // CREATE (POST /dog-memories)
 export async function create(request, reply) {
