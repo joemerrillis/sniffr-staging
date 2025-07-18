@@ -9,6 +9,9 @@ import {
   deleteDogMemory,
 } from '../models/dogMemoryModel.js';
 
+import { enrichDogMemories } from '../service/enrichDogMemories.js';
+import { parseCaptionForEvents } from '../service/eventParser.js';
+
 // CREATE (POST /dog-memories)
 export async function create(request, reply) {
   try {
@@ -77,6 +80,49 @@ export async function remove(request, reply) {
     const memory = await deleteDogMemory(id);
     if (!memory) return reply.code(404).send({ error: 'Dog memory not found' });
     reply.send({ success: true, memory });
+  } catch (err) {
+    reply.code(400).send({ error: err.message });
+  }
+}
+
+// BATCH ENRICHMENT (POST /dog-memories/enrich-batch)
+export async function enrichBatch(request, reply) {
+  try {
+    const { memoryIds } = request.body;
+    const supabase = request.server.supabase;
+    const memories = await enrichDogMemories(supabase, memoryIds);
+    reply.send({ memories });
+  } catch (err) {
+    request.log?.error({ err }, "Error enriching dog memories");
+    reply.code(500).send({ error: 'Enrichment failed', details: err.message });
+  }
+}
+
+// SAVE & PARSE (PATCH /dog-memories/:id/save-parse)
+export async function saveAndParseMemory(request, reply) {
+  try {
+    const { id } = request.params;
+    const { caption, tags } = request.body;
+    const supabase = request.server.supabase;
+
+    // 1. Save the edited caption/tags
+    const memory = await updateDogMemory(id, {
+      ai_caption: caption,
+      tags,
+      updated_at: new Date().toISOString(),
+    });
+    if (!memory) return reply.code(404).send({ error: 'Dog memory not found' });
+
+    // 2. Parse the new caption for events/tags
+    let parsedEvents = [];
+    try {
+      parsedEvents = await parseCaptionForEvents(caption, tags, memory);
+    } catch (e) {
+      request.log?.warn({ e }, "Event parsing failed");
+      parsedEvents = [];
+    }
+
+    reply.send({ memory, parsedEvents });
   } catch (err) {
     reply.code(400).send({ error: err.message });
   }
