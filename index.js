@@ -41,7 +41,7 @@ import chatPlugin from './src/chat/index.js';
 import walkReportsPlugin from './src/walk_reports/index.js';
 import dogEventsPlugin from './src/dog_events/index.js';
 import boardingReportsPlugin from './src/boarding_reports/index.js';
-import calendarSyncPlugin from './calendar_sync/index.js';
+import calendarSyncPlugin from './src/calendar_sync/index.js';
 
 dotenv.config();
 
