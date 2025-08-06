@@ -25,7 +25,8 @@
     "replicate": "^1.0.1",
     "@fastify/static": "^6.12.0",
     "rapidoc": "^9.3.8",
-    "stripe": "^14.25.0"
+    "stripe": "^14.25.0",
+    "googleapis": "^131.0.0"
 
 
   },
