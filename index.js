@@ -41,6 +41,7 @@ import chatPlugin from './src/chat/index.js';
 import walkReportsPlugin from './src/walk_reports/index.js';
 import dogEventsPlugin from './src/dog_events/index.js';
 import boardingReportsPlugin from './src/boarding_reports/index.js';
+import calendarSyncPlugin from './calendar_sync/index.js';
 
 dotenv.config();
 
@@ -142,6 +143,7 @@ await fastify.register(chatPlugin, { prefix: '/chats' });
 await fastify.register(walkReportsPlugin, { prefix: '/walk-reports' });
 await fastify.register(dogEventsPlugin, { prefix: '/dog-events' });
 await fastify.register(boardingReportsPlugin, {prefix: '/boarding-reports' });
+await fastify.register(calendarSyncPlugin, {prefix: '/calendar-sync' });
 
 // ---- 8. Custom endpoints go *after* static & plugin registration ----
 
