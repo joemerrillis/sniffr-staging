@@ -73,5 +73,7 @@ const pr = await gh.pulls.create({
   body: `### Summary\n${out.summary || "Agent proposal"}\n\nAuto-generated.`,
 });
 
-console.log(`pr_url=${pr.data.html_url}`);
-process.stdout.write(`\n::set-output name=pr_url::${pr.data.html_url}\n`); // kept for older runners
+// ... after PR is created
+import { appendFileSync } from "fs";
+appendFileSync(process.env.GITHUB_OUTPUT, `pr_url=${pr.data.html_url}\n`);
+
