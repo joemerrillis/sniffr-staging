@@ -10,8 +10,8 @@ jobs:
     steps:
       - name: Delete CNAME in Cloudflare
         env:
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ZONE: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_TOKEN: ${{ secrets.CF_API_ID }}        # <-- your token name
+          ZONE: ${{ secrets.CF_ZONE_ID }}          # <-- your zone id name
           FQDN: pr-${{ github.event.number }}.stage.sniffrpack.com
         run: |
           sudo apt-get update && sudo apt-get install -y jq
