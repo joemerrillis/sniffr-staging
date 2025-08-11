@@ -1,0 +1,10 @@
+# deps
+node_modules/
+npm-debug.log*
+pnpm-lock.yaml
+yarn.lock
+.pnpm-store/
+.yarn/*
+# env & misc
+.env
+.DS_Store
