@@ -49,23 +49,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Install deps for agent script (scratch dir)
+      - name: Install deps for agent script
         run: |
-          mkdir -p .agent_runtime
-          cd .agent_runtime
-          npm init -y >/dev/null 2>&1
-          npm i openai@^4 @octokit/rest@^20
-        env:
-          npm_config_fund: "false"
-          npm_config_audit: "false"
+          npm init -y >/dev/null 2>&1 || true
+          npm i --no-audit --no-fund openai@^4 @octokit/rest@^20
 
       - name: Run agent (plan -> files -> branch -> PR)
         id: agent
-        env:
-          NODE_PATH: ${{ github.workspace }}/.agent_runtime/node_modules
         run: |
-          node -e "require('module').Module._initPaths()"
           node .github/agent/plan-and-commit.mjs <<'EOF'
           ${{ steps.req.outputs.text }}
           EOF
