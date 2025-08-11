@@ -65,7 +65,9 @@ for (const f of out.files) {
   writeFileSync(full, f.contents ?? "", "utf8");
 }
 
-execSync("git add -A", { stdio: "inherit" });
+for (const f of out.files) {
+  execSync(`git add -- "${f.path}"`, { stdio: "inherit" });
+}
 execSync(`git commit -m "${out.commitMessage || "agent: add files"}"`, { stdio: "inherit" });
 execSync(`git push origin ${newBranch}`, { stdio: "inherit" });
 
