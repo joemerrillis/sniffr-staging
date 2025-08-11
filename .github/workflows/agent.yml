@@ -21,18 +21,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine request text
+           - name: Determine request text
         id: req
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "issues" ]; then
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
             {
-              echo "text<<'EOF'"
-              echo "${{ github.event.issue.title }} — ${{ github.event.issue.body }}"
-              echo "EOF"
+              printf 'text<<EOF\n'
+              printf '%s — %s\n' "${{ github.event.issue.title }}" "${{ github.event.issue.body }}"
+              printf 'EOF\n'
             } >> "$GITHUB_OUTPUT"
           else
             echo "text=${{ github.event.comment.body }}" >> "$GITHUB_OUTPUT"
           fi
+
 
       - name: Setup Node
         uses: actions/setup-node@v4
