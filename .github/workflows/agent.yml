@@ -50,14 +50,22 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install deps for agent script
+      - name: Install deps for agent script (scratch dir)
         run: |
-          npm init -y --scope agent >/dev/null 2>&1
+          mkdir -p .agent_runtime
+          cd .agent_runtime
+          npm init -y >/dev/null 2>&1
           npm i openai@^4 @octokit/rest@^20
+        env:
+          npm_config_fund: "false"
+          npm_config_audit: "false"
 
       - name: Run agent (plan -> files -> branch -> PR)
         id: agent
+        env:
+          NODE_PATH: ${{ github.workspace }}/.agent_runtime/node_modules
         run: |
+          node -e "require('module').Module._initPaths()"
           node .github/agent/plan-and-commit.mjs <<'EOF'
           ${{ steps.req.outputs.text }}
           EOF
@@ -68,5 +76,17 @@ jobs:
         with:
           script: |
             const url = "${{ steps.agent.outputs.pr_url }}";
-            const issue_number = context.payload.issue?.number || context.payload.comment?.issue_url.split('/').pop();
-            await github.rest.issues.createComment({ ...context.repo, issue_number, body: `✅ Agent opened PR: ${url}` });
+            const issue_number =
+              context.payload.issue?.number ||
+              (context.payload.comment?.issue_url
+                ? Number(context.payload.comment.issue_url.split('/').pop())
+                : undefined);
+            if (issue_number) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number,
+                body: `✅ Agent opened PR: ${url}`
+              });
+            } else {
+              core.info(`PR opened: ${url}`);
+            }
