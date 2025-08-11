@@ -1,4 +1,4 @@
 name = "render-pr-alias"
-main = "src/worker/render/render-pr-alias.js"
+main = "render-pr-alias.js"
 compatibility_date = "2025-08-11"  # use today's date
 account_id = "774b68e8a6ad8edd33820cd760f785d9"
