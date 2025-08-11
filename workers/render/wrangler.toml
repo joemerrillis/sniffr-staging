@@ -1,0 +1,3 @@
+name = "render-pr-alias"
+main = "src/worker/render/render-pr-alias.js"
+compatibility_date = "2025-08-11"  # use today's date
