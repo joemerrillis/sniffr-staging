@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import OpenAI from "openai";
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, mkdirSync, appendFileSync } from "fs";
 import { execSync } from "child_process";
 import path from "path";
 
@@ -41,6 +41,7 @@ Rules:
 `;
 
 const userPrompt = `User request:\n${requestText}`;
+
 const completion = await ai.chat.completions.create({
   model: "gpt-4.1-mini",
   response_format: { type: "json_object" },
@@ -50,7 +51,10 @@ const completion = await ai.chat.completions.create({
   ],
 });
 
-const out = JSON.parse(completion.choices[0].message.content);
+const out = JSON.parse(completion.choices[0].message.content || "{}");
+if (!out.files || !Array.isArray(out.files) || out.files.length === 0) {
+  throw new Error("Agent returned no files to write.");
+}
 
 // Create branch, write files, commit, push, PR
 execSync(`git checkout -b ${newBranch}`, { stdio: "inherit" });
@@ -73,7 +77,5 @@ const pr = await gh.pulls.create({
   body: `### Summary\n${out.summary || "Agent proposal"}\n\nAuto-generated.`,
 });
 
-// ... after PR is created
-import { appendFileSync } from "fs";
+// Output PR URL for later workflow steps
 appendFileSync(process.env.GITHUB_OUTPUT, `pr_url=${pr.data.html_url}\n`);
-
