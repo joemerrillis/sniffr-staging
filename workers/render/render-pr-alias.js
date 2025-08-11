@@ -1,77 +1,61 @@
 export default {
   async fetch(req, env) {
-    try {
-      // 1) Verify shared secret
+    const url = new URL(req.url);
+    const isWorkersDev = url.hostname.endsWith('.workers.dev');
+
+    // ---------- Control plane (webhooks & cleanup) ----------
+    if (isWorkersDev && req.method === 'POST') {
       const secret = req.headers.get('x-hook-secret');
       if (!secret || secret !== env.WEBHOOK_SECRET) {
         return new Response('forbidden', { status: 403 });
       }
 
-      // 2) Parse payload from Render webhook
-      const bodyText = await req.text();
+      const text = await req.text();
       let payload = {};
-      try { payload = JSON.parse(bodyText || '{}'); } catch {}
-      const deploy = payload.deploy || payload;
+      try { payload = JSON.parse(text || '{}'); } catch {}
 
-      // Render payloads vary by account; we try a few common fields
+      const action = (payload.action || '').toLowerCase();
+
+      // ----- Cleanup mode: delete DNS + Route + KV for PR -----
+      if (action === 'delete') {
+        const prId = Number(payload.prId);
+        if (!Number.isFinite(prId)) return new Response('bad prId', { status: 400 });
+
+        const fqdn = `pr-${prId}-stage.${env.ROOT_DOMAIN}`;
+        await deleteDns(env, fqdn);
+        await deleteRoute(env, `${fqdn}/*`);
+        await env.PR_PREVIEWS.delete(fqdn);
+
+        return new Response(`deleted: ${fqdn}`, { status: 200 });
+      }
+
+      // ----- Webhook from Render: upsert mapping + DNS + route -----
+      const deploy = payload.deploy || payload;
       const isPreview = !!(deploy.preview ?? deploy.isPreview ?? deploy.type === 'preview');
       const previewUrl = (deploy.url || deploy.deployUrl || '').toString();
       const commitMsg = deploy.commit?.message || '';
       const explicitPr = payload.pullRequestId ?? payload.prId ?? payload.prNumber;
-
-      // Try to get PR number from explicit field or from commit message like "PR 12"
       const prId = Number(explicitPr ?? (commitMsg.match(/PR[ #]?(\d+)/i)?.[1] ?? NaN));
 
-      // If not a preview or missing info, ignore gracefully
       if (!isPreview || !previewUrl || !Number.isFinite(prId)) {
         return new Response('ignored', { status: 200 });
       }
 
-      // 3) Build pretty single-level FQDN (avoids nested subdomain SSL issue)
-      // e.g., pr-12-stage.sniffrpack.com
       const fqdn = `pr-${prId}-stage.${env.ROOT_DOMAIN}`;
+      const targetHost = previewUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-      // Normalize Render host (strip protocol & trailing slash)
-      const target = previewUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      // KV: host -> preview host
+      await env.PR_PREVIEWS.put(fqdn, targetHost);
 
-      // 4) Upsert CNAME in Cloudflare
-      const zoneId = env.CLOUDFLARE_ZONE_ID;
-      const cfHeaders = {
-        'Authorization': `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        'Content-Type': 'application/json'
-      };
+      // DNS: create/update proxied A (dummy IP, worker route intercepts before origin)
+      await upsertDnsA(env, fqdn, '192.0.2.1');
 
-      // Look up existing record
-      const lookupResp = await fetch(
-        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?type=CNAME&name=${fqdn}`,
-        { headers: cfHeaders }
-      ).then(r => r.json());
+      // Route: pr-<n>-stage.<root>/* -> this worker
+      await ensureRoute(env, `${fqdn}/*`);
 
-      const existingId = lookupResp?.result?.[0]?.id;
-
-      const recordPayload = JSON.stringify({
-        type: 'CNAME',
-        name: fqdn,
-        content: target,
-        ttl: 1,
-        proxied: true
-      });
-
-      if (existingId) {
-        await fetch(
-          `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${existingId}`,
-          { method: 'PUT', headers: cfHeaders, body: recordPayload }
-        );
-      } else {
-        await fetch(
-          `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`,
-          { method: 'POST', headers: cfHeaders, body: recordPayload }
-        );
-      }
-
-      // 5) Optional: comment the pretty URL back on the PR
+      // Optional PR comment
       if (env.GH_TOKEN && env.GH_REPO) {
-        const commentBody = { body: `🔗 Preview ready: https://${fqdn}` };
+        const body = { body: `🔗 Preview ready: https://${fqdn}` };
         await fetch(`https://api.github.com/repos/${env.GH_REPO}/issues/${prId}/comments`, {
           method: 'POST',
           headers: {
@@ -80,13 +64,104 @@ export default {
             'X-GitHub-Api-Version': '2022-11-28',
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(commentBody)
+          body: JSON.stringify(body)
         }).catch(() => {});
       }
 
-      return new Response(`ok: ${fqdn} -> ${target}`, { status: 200 });
-    } catch (err) {
-      return new Response(`error: ${err?.message || String(err)}`, { status: 500 });
+      return new Response(`ok: ${fqdn} -> ${targetHost}`, { status: 200 });
     }
+
+    // ---------- Data plane (proxy PR traffic) ----------
+    // Only handle exact PR hosts like pr-123-stage.sniffrpack.com
+    const prHostRe = new RegExp(`^pr-\\d+-stage\\.${escapeDot(env.ROOT_DOMAIN)}$`);
+    if (prHostRe.test(url.hostname)) {
+      const targetHost = await env.PR_PREVIEWS.get(url.hostname);
+      if (!targetHost) return new Response('Preview mapping not found.', { status: 404 });
+
+      const originUrl = `https://${targetHost}${url.pathname}${url.search}`;
+      const init = {
+        method: req.method,
+        headers: new Headers(req.headers),
+        body: (req.method === 'GET' || req.method === 'HEAD') ? undefined : await req.arrayBuffer(),
+      };
+      const res = await fetch(originUrl, init);
+      return new Response(res.body, { status: res.status, headers: res.headers });
+    }
+
+    return new Response('ok', { status: 200 });
   }
 };
+
+// ---------- helpers ----------
+function escapeDot(d) { return d.replace(/\./g, '\\.'); }
+
+async function upsertDnsA(env, name, ip) {
+  const { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ZONE_ID: zone } = env;
+  const H = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  const find = await fetch(
+    `https://api.cloudflare.com/client/v4/zones/${zone}/dns_records?name=${name}`,
+    { headers: H }
+  ).then(r => r.json());
+
+  const payload = JSON.stringify({ type: 'A', name, content: ip, ttl: 1, proxied: true });
+
+  const id = find?.result?.[0]?.id;
+  if (id) {
+    await fetch(`https://api.cloudflare.com/client/v4/zones/${zone}/dns_records/${id}`, {
+      method: 'PUT', headers: H, body: payload
+    });
+  } else {
+    await fetch(`https://api.cloudflare.com/client/v4/zones/${zone}/dns_records`, {
+      method: 'POST', headers: H, body: payload
+    });
+  }
+}
+
+async function deleteDns(env, name) {
+  const { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ZONE_ID: zone } = env;
+  const H = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const find = await fetch(
+    `https://api.cloudflare.com/client/v4/zones/${zone}/dns_records?name=${name}`,
+    { headers: H }
+  ).then(r => r.json());
+  const id = find?.result?.[0]?.id;
+  if (id) {
+    await fetch(`https://api.cloudflare.com/client/v4/zones/${zone}/dns_records/${id}`, {
+      method: 'DELETE', headers: H
+    });
+  }
+}
+
+async function ensureRoute(env, pattern) {
+  const { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ZONE_ID: zone, WORKER_NAME: script } = env;
+  const H = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  const list = await fetch(
+    `https://api.cloudflare.com/client/v4/zones/${zone}/workers/routes`,
+    { headers: H }
+  ).then(r => r.json());
+
+  const existing = (list?.result || []).find(r => r.pattern === pattern && r.script === script);
+  if (!existing) {
+    await fetch(`https://api.cloudflare.com/client/v4/zones/${zone}/workers/routes`, {
+      method: 'POST', headers: H, body: JSON.stringify({ pattern, script })
+    });
+  }
+}
+
+async function deleteRoute(env, pattern) {
+  const { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ZONE_ID: zone } = env;
+  const H = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const list = await fetch(
+    `https://api.cloudflare.com/client/v4/zones/${zone}/workers/routes`,
+    { headers: H }
+  ).then(r => r.json());
+
+  const hit = (list?.result || []).find(r => r.pattern === pattern);
+  if (hit?.id) {
+    await fetch(`https://api.cloudflare.com/client/v4/zones/${zone}/workers/routes/${hit.id}`, {
+      method: 'DELETE', headers: H
+    });
+  }
+}
