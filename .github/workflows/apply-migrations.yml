@@ -38,29 +38,34 @@ jobs:
         with:
           ref: refs/pull/${{ steps.pr.outputs.num }}/head
 
-      - name: Check there are migrations in this PR
+      - name: List migrations changed in this PR (FYI)
         id: hasmig
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.event.repository.default_branch }}...HEAD | grep '^supabase/migrations/' || true)
+          base="${{ github.event.repository.default_branch }}"
+          CHANGED=$(git diff --name-only "origin/${base}"...HEAD | grep '^supabase/migrations/' || true)
           echo "changed<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           if [ -z "$CHANGED" ]; then
-            echo "No migrations changed."
-            exit 0
+            echo "No migrations changed in this PR."
           fi
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
 
+      - name: Supabase CLI version
+        run: supabase --version
+
       - name: Link project (Sniffr-GPT-Dev)
         run: |
+          set -euo pipefail
           supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Apply migrations to Sniffr-GPT-Dev
         id: push
         run: |
-          set -e
+          set -euo pipefail
+          # No --include flag here!
           supabase db push --password "$SUPABASE_DB_PASSWORD"
           echo "ok=true" >> $GITHUB_OUTPUT
 
@@ -70,5 +75,6 @@ jobs:
         with:
           script: |
             const num = Number("${{ steps.pr.outputs.num }}");
-            const body = "✅ Migrations applied to **Sniffr-GPT-Dev**.\n\nFiles:\n```\n${{ steps.hasmig.outputs.changed }}\n```";
+            const files = `${{ steps.hasmig.outputs.changed }}`.trim() || "(all pending migrations)";
+            const body = "✅ Migrations applied to **Sniffr-GPT-Dev**.\n\nFiles:\n```\n" + files + "\n```";
             await github.rest.issues.createComment({ ...context.repo, issue_number: num, body });
