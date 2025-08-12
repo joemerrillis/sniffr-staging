@@ -65,8 +65,17 @@ jobs:
         id: push
         run: |
           set -euo pipefail
-          # No --include flag here!
-          supabase db push --password "$SUPABASE_DB_PASSWORD"
+          set +e
+          OUT=$(supabase db push --password "$SUPABASE_DB_PASSWORD" 2>&1)
+          STATUS=$?
+          echo "$OUT"
+          if [ $STATUS -ne 0 ] && echo "$OUT" | grep -qi 'Rerun the command with --include-all'; then
+            echo "Retrying with --include-all because local migrations must be inserted before remote..."
+            set -e
+            supabase db push --password "$SUPABASE_DB_PASSWORD" --include-all
+          else
+            test $STATUS -eq 0 || exit $STATUS
+          fi
           echo "ok=true" >> $GITHUB_OUTPUT
 
       - name: Comment result
