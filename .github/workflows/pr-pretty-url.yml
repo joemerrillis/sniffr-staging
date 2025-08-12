@@ -5,22 +5,21 @@ on:
     types: [closed]
 
 jobs:
-  delete-dns:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete CNAME in Cloudflare
+      - name: Call Worker cleanup
         env:
-          CF_TOKEN: ${{ secrets.CF_API_ID }}        # <-- your token name
-          ZONE: ${{ secrets.CF_ZONE_ID }}          # <-- your zone id name
-          FQDN: pr-${{ github.event.number }}.stage.sniffrpack.com
+          WORKER_URL: ${{ secrets.PR_WORKER_URL }}        # e.g. https://render-pr-alias.your.workers.dev/
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}  # same as used by Render webhook
+          PR_NUMBER: ${{ github.event.number }}
         run: |
-          sudo apt-get update && sudo apt-get install -y jq
-          rec_id=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records?type=CNAME&name=$FQDN" \
-            -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" | jq -r '.result[0].id')
-          if [ "$rec_id" != "null" ] && [ -n "$rec_id" ]; then
-            curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records/$rec_id" \
-              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" >/dev/null
-            echo "Deleted $FQDN"
-          else
-            echo "No record to delete for $FQDN"
+          if [ -z "$WORKER_URL" ] || [ -z "$WEBHOOK_SECRET" ]; then
+            echo "Missing PR_WORKER_URL or WEBHOOK_SECRET secrets"; exit 1;
           fi
+          echo "Deleting preview for PR $PR_NUMBER via worker..."
+          curl -s -X POST "$WORKER_URL" \
+            -H "x-hook-secret: $WEBHOOK_SECRET" \
+            -H "content-type: application/json" \
+            -d "{\"action\":\"delete\",\"prId\":$PR_NUMBER}" \
+            | sed -e 's/^/worker: /'
