@@ -1,0 +1,74 @@
+name: Apply Supabase Migrations (on demand)
+
+on:
+  pull_request_target:
+    types: [labeled, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  maybe-apply:
+    if: >
+      (github.event_name == 'pull_request_target' &&
+       contains(github.event.pull_request.labels.*.name, 'apply-migrations'))
+      || (github.event_name == 'issue_comment' &&
+          github.event.issue.pull_request != null &&
+          startsWith(github.event.comment.body, '/apply-migrations'))
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - name: Find PR number
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request_target" ]; then
+            echo "num=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "num=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout PR HEAD (read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ steps.pr.outputs.num }}/head
+
+      - name: Check there are migrations in this PR
+        id: hasmig
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.event.repository.default_branch }}...HEAD | grep '^supabase/migrations/' || true)
+          echo "changed<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          if [ -z "$CHANGED" ]; then
+            echo "No migrations changed."
+            exit 0
+          fi
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+
+      - name: Link project (Sniffr-GPT-Dev)
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Apply migrations to Sniffr-GPT-Dev
+        id: push
+        run: |
+          set -e
+          supabase db push --password "$SUPABASE_DB_PASSWORD" --include "supabase/migrations"
+          echo "ok=true" >> $GITHUB_OUTPUT
+
+      - name: Comment result
+        if: steps.push.outputs.ok == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const num = Number("${{ steps.pr.outputs.num }}");
+            const body = "✅ Migrations applied to **Sniffr-GPT-Dev**.\n\nFiles:\n```\n${{ steps.hasmig.outputs.changed }}\n```";
+            await github.rest.issues.createComment({ ...context.repo, issue_number: num, body });
