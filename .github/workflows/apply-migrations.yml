@@ -61,7 +61,7 @@ jobs:
         id: push
         run: |
           set -e
-          supabase db push --password "$SUPABASE_DB_PASSWORD" --include "supabase/migrations"
+          supabase db push --password "$SUPABASE_DB_PASSWORD"
           echo "ok=true" >> $GITHUB_OUTPUT
 
       - name: Comment result
