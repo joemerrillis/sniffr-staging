@@ -1,0 +1,94 @@
+name: Agent Smoke Tests (PR preview)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+jobs:
+  smoke:
+    if: github.event.issue.pull_request != null && startsWith(github.event.comment.body, '/agent smoke')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Figure PR number
+        id: pr
+        run: |
+          echo "num=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+
+      - name: Build pretty URL
+        id: url
+        run: |
+          echo "pretty=https://pr-${{ steps.pr.outputs.num }}-stage.sniffrpack.com" >> $GITHUB_OUTPUT
+
+      - name: Wait for preview (max ~5 min)
+        run: |
+          set -e
+          URL="${{ steps.url.outputs.pretty }}"
+          for i in {1..60}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/_agent/health")
+            if [ "$code" = "200" ] || [ "$code" = "404" ]; then
+              echo "Preview responding with $code"; break
+            fi
+            sleep 5
+          done
+
+      - name: Run smoke checks
+        id: smoke
+        run: |
+          set +e
+          BASE="${{ steps.url.outputs.pretty }}"
+          echo "Testing $BASE"
+
+          h=$(curl -s -w '\n%{http_code}\n' "$BASE/_agent/health")
+          hb=$(echo "$h" | head -n-1); hc=$(echo "$h" | tail -n1)
+
+          d=$(curl -s -w '\n%{http_code}\n' "$BASE/docs/json")
+          db=$(echo "$d" | head -n-1); dc=$(echo "$d" | tail -n1)
+
+          echo "HEALTH_CODE=$hc" >> $GITHUB_OUTPUT
+          echo "DOCS_CODE=$dc" >> $GITHUB_OUTPUT
+
+          echo "HEALTH_BODY<<EOF" >> $GITHUB_OUTPUT
+          echo "$hb" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "DOCS_BODY<<EOF" >> $GITHUB_OUTPUT
+          echo "$db" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Comment results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const num = Number("${{ steps.pr.outputs.num }}");
+            const base = "${{ steps.url.outputs.pretty }}";
+            const hc = "${{ steps.smoke.outputs.HEALTH_CODE }}";
+            const dc = "${{ steps.smoke.outputs.DOCS_CODE }}";
+            const hb = `${{ steps.smoke.outputs.HEALTH_BODY }}`.slice(0, 4000);
+            const db = `${{ steps.smoke.outputs.DOCS_BODY }}`.slice(0, 4000);
+            const ok = (code) => (code && Number(code) < 500);
+            const body = `
+**Smoke results for PR #${num}**
+
+- Health \`GET /_agent/health\`: **${hc}** ${ok(hc)?'✅':'❌'}
+- OpenAPI \`GET /docs/json\`: **${dc}** ${ok(dc)?'✅':'❌'}
+
+Preview: ${base}/rapi-doc/rapidoc.html
+
+<details><summary>/_agent/health body</summary>
+
+\`\`\`json
+${hb}
+\`\`\`
+</details>
+
+<details><summary>/docs/json (truncated)</summary>
+
+\`\`\`json
+${db}
+\`\`\`
+</details>
+`;
+            await github.rest.issues.createComment({ ...context.repo, issue_number: num, body });
