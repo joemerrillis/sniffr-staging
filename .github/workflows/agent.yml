@@ -1,126 +1,192 @@
-name: ChatGPT Agent
+name: agent
 
 on:
+  # Normal path: you open or edit a GitHub Issue that starts with "/agent plan" or "/agent apply"
   issues:
     types: [opened, edited]
-  issue_comment:
-    types: [created]
+  # Optional: let you test manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      title:
+        description: "Fallback title (only used for manual runs)"
+        required: false
+        default: "Plan: Walker Recommendation Plugin (no migration v1)"
+      body:
+        description: "Fallback body (only used for manual runs)"
+        required: false
+        default: |
+          /agent plan
+
+          # Feature
+          Walker Recommendation Plugin — let clients recommend walkers they like to friends.
+          **Important:** the table `walker_recommendations` already exists; for v1 we must NOT add migrations.
+
+          # Goals (v1)
+          - Create a recommendation (idempotent on owner_id+friend_id+walker_id).
+          - List recommendations with filters (friend_id, owner_id, walker_id, since, limit).
+          - Get one recommendation by id.
+          - Delete a recommendation by id.
+          - Keep everything minimal + non‑breaking.
+
+          # API (prefix: /walker-recommendations)
+          All responses MUST use the envelope convention.
+
+          1) POST /walker-recommendations
+             - Body: { owner_id: uuid, friend_id: uuid, walker_id: uuid, via_voice?: boolean=false }
+             - Behavior: If (owner_id, friend_id, walker_id) already exists, return 200 with existing record; else insert and return 201.
+             - Returns: { walker_recommendation: {...} }
+             - Validate: ids are UUIDs; owner_id != friend_id.
+
+          2) GET /walker-recommendations
+             - Query: owner_id?, friend_id?, walker_id?, since?(ISO), limit?(default 50)
+             - Order: created_at desc
+             - Returns: { walker_recommendations: [ ... ] }
+
+          3) GET /walker-recommendations/:id
+             - Returns: { walker_recommendation: { ... } }
+
+          4) DELETE /walker-recommendations/:id
+             - Returns: { ok: true }
+
+          # OpenAPI
+          - Tag: WalkerRecommendations
+          - Add paths/schemas so /docs/json reflects the endpoints.
+          - Include examples that match the real DB types and envelope format.
+
+          # Controller/Service Notes
+          - Use request.server.supabase (do NOT create a new client).
+          - POST must be idempotent (select first, then insert only if missing).
+          - Return helpful 4xx on validation errors; NEVER 5xx in expected flows.
+
+          # Smoke (for the later /agent smoke step)
+          - GET /_agent/health -> 200 { ok: true }
+          - GET /docs/json -> 200 and parsable JSON
+          - POST /walker-recommendations (valid UUIDs) -> 201 (or 200 if exists)
+          - GET /walker-recommendations?friend_id=<uuid> -> 200 with array
+          - DELETE /walker-recommendations/:id -> 200 { ok: true }
+
+          # Constraints / Context
+          - NO migrations in v1 (table exists: walker_recommendations).
+          - For v1, assume owner_id, friend_id, walker_id all reference users.id (not employees).
+          - Follow Sniffr docs in /docs: CONTEXT.md, ROUTING.md, SCHEMA.md, TESTING.md
+          - Read sniffr_plugin_gotchas.md.txt to avoid schema drift & envelope errors.
+
+          # Deliverables (Planner output)
+          - Plan: bullets of tasks
+          - Files: paths + purposes to be created/edited (plugin under src/walker_recommendations/)
+          - OpenAPI: the new/changed paths (YAML-ish)
+          - Smoke: the checks you’ll rely on
+
+          When the plan looks good, we’ll run `/agent apply`.
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
 
+env:
+  # Let the code pick up the model via env (agent.mjs will default if not present)
+  AGENT_MODEL: gpt-5
+
 jobs:
   agent:
-    runs-on: ubuntu-latest
-
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      AGENT_MODEL: gpt-5
+    name: agent
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Set up job
+      - name: starting
         run: echo "starting"
 
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure git user for CI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      - name: Configure Git
         run: |
           git config user.email "bot@sniffr.dev"
           git config user.name "sniffr-agent"
 
-      - name: Determine request text + command
-        id: req
+      # -------- Extract command + message safely (no command substitution) --------
+      - name: Extract command and text
+        id: extract
         shell: bash
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          INPUT_TITLE: ${{ github.event.inputs.title }}
+          INPUT_BODY: ${{ github.event.inputs.body }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
 
-          # Build TITLE/BODY from event
-          if [[ "${{ github.event_name }}" == "issues" ]]; then
-            TITLE="${{ github.event.issue.title }}"
-            BODY="${{ github.event.issue.body }}"
+          # Use issue title/body when event is "issues"; otherwise use workflow_dispatch inputs.
+          if [[ "${GITHUB_EVENT_NAME}" == "issues" ]]; then
+            TITLE="${ISSUE_TITLE:-}"
+            BODY="${ISSUE_BODY:-}"
           else
-            TITLE=""
-            BODY="${{ github.event.comment.body }}"
+            TITLE="${INPUT_TITLE:-}"
+            BODY="${INPUT_BODY:-}"
           fi
 
-          # Extract /agent <cmd>, default to 'plan'
+          # If BODY is still empty (rare), provide a safe single-quoted heredoc fallback.
+          if [[ -z "${BODY}" ]]; then
+            read -r -d '' BODY <<'EOF'
+          /agent plan
+
+          # Feature
+          Example body to avoid shell expansion of backticks like `walker_recommendations`.
+          EOF
+          fi
+
+          # Extract "/agent <cmd>" at the top, default to "plan"
           CMD=""
-          if [[ "$BODY" =~ ^/[Aa]gent[[:space:]]+([A-Za-z]+) ]]; then
+          if [[ "${BODY}" =~ ^/[Aa]gent[[:space:]]+([A-Za-z]+) ]]; then
             CMD="${BASH_REMATCH[1],,}"
           fi
-          if [[ -z "$CMD" ]]; then CMD="plan"; fi
+          if [[ -z "${CMD}" ]]; then CMD="plan"; fi
 
-          # Freeform text after the command (or fall back to title + body)
-          AFTER="$(echo "$BODY" | sed -E 's#^/[Aa]gent[[:space:]]+[A-Za-z]+[[:space:]]*##')"
-          if [[ -z "$AFTER" ]]; then
-            MSG="$TITLE — $BODY"
+          # The message we pass to the agent is the body without the "/agent <cmd>" prefix
+          AFTER="$(printf '%s' "${BODY}" | sed -E 's#^/[Aa]gent[[:space:]]+[A-Za-z]+[[:space:]]*##')"
+          if [[ -z "${AFTER}" ]]; then
+            MSG="${TITLE} — ${BODY}"
           else
-            MSG="$AFTER"
+            MSG="${AFTER}"
           fi
 
           {
-            echo "cmd=$CMD"
-            printf 'text<<EOF\n%s\nEOF\n' "$MSG"
+            echo "cmd=${CMD}"
+            printf 'text<<EOF\n%s\nEOF\n' "${MSG}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install agent deps in scratch dir
-        id: deps
-        shell: bash
+      # -------- Optional: install deps if your agent scripts import packages --------
+      # If your repo already has node_modules from prior steps, you can skip this.
+      - name: Install dependencies (if needed)
+        if: hashFiles('package.json') != ''
         run: |
-          set -euo pipefail
-          mkdir -p .agent_runtime
-          cd .agent_runtime
-          npm init -y >/dev/null 2>&1
-          # Make installs as quiet as possible but DO NOT redirect to /dev/null
-          npm i openai@^4 @octokit/rest@^20
-          echo "NODE_PATH=$(pwd)/node_modules" >> "$GITHUB_ENV"
+          npm ci || npm install
 
-      - name: Run planner/apply
-        if: startsWith(steps.req.outputs.cmd, 'plan') || startsWith(steps.req.outputs.cmd, 'revise') || startsWith(steps.req.outputs.cmd, 'apply')
+      # -------- Run the agent (plan or apply) --------
+      - name: Run agent
         id: agent
-        shell: bash
         env:
-          MODE: ${{ steps.req.outputs.cmd }}
-          REQUEST_TEXT: ${{ steps.req.outputs.text }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGENT_MODEL: ${{ env.AGENT_MODEL }}
+          MODE: ${{ steps.extract.outputs.cmd }}
+          REQUEST_TEXT: ${{ steps.extract.outputs.text }}
         run: |
           set -euo pipefail
-          export NODE_PATH="${NODE_PATH:-}:$NODE_PATH"
-          node .github/agent/agent.mjs
+          echo "MODE=$MODE"
+          echo "Text length: $(printf '%s' "$REQUEST_TEXT" | wc -c)"
+          node agent.mjs
 
-      - name: Post plan (if any)
-        if: steps.req.outputs.cmd == 'plan'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require("fs");
-            const p = ".github/agent/.plan.md";
-            if (fs.existsSync(p)) {
-              const body = fs.readFileSync(p, "utf8");
-              const issue_number = context.payload.issue?.number || context.payload.comment?.issue_url.split('/').pop();
-              await github.rest.issues.createComment({ ...context.repo, issue_number, body });
-            }
-
-      - name: Post PR link (if any)
-        if: steps.agent.outputs.pr_url != ''
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const url = "${{ steps.agent.outputs.pr_url }}";
-            if (url) {
-              const issue_number = context.payload.issue?.number || context.payload.comment?.issue_url.split('/').pop();
-              await github.rest.issues.createComment({ ...context.repo, issue_number, body: `✅ Draft PR opened: ${url}` });
-            }
-
-      - name: No-op note when no command
-        if: steps.req.outputs.cmd == '' || steps.req.outputs.cmd == 'noop'
-        run: echo "No /agent command found."
-
+      # If the agent produced a PR URL in GITHUB_OUTPUT, surface it
+      - name: Show PR URL (if any)
+        if: always()
+        run: |
+          echo "Plan file (if generated): .github/agent/.plan.md"
+          if [[ -f "$GITHUB_OUTPUT" ]]; then
+            echo "GITHUB_OUTPUT exists."
+          fi
