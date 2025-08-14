@@ -14,7 +14,8 @@ const gh = new Octokit({ auth: process.env.GH_TOKEN });
 
 // OpenAI
 const ai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const MODEL = "gpt-5";   // <— upgrade here
+const MODEL = process.env.AGENT_MODEL || "gpt-5";
+
 
 // Utility: set output for later steps
 function setOutput(key, val) {
