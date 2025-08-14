@@ -2,9 +2,9 @@ name: ChatGPT Agent
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened, edited, reopened]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 permissions:
   contents: write
@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   agent:
+    # Also gate on /agent for comments so we don't run on every random comment
     if: >
       (github.event_name == 'issues') ||
       (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/agent'))
@@ -20,7 +21,9 @@ jobs:
 
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Use a PAT if you created one; otherwise GITHUB_TOKEN works for PRs/comments in this repo
+      GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+      AGENT_MODEL: gpt-5
 
     steps:
       - name: Checkout
@@ -31,92 +34,118 @@ jobs:
           git config user.name  "sniffr-agent"
           git config user.email "bot@sniffr.dev"
 
+      # SAFELY extract /agent <cmd> and message from raw event JSON
       - name: Determine request text + command
-        id: req
+        id: detect
         shell: bash
         run: |
           set -euo pipefail
-          # Gather title/body depending on event
+          EVENT_JSON="$(cat "$GITHUB_EVENT_PATH")"
+
           if [[ "${{ github.event_name }}" == "issues" ]]; then
-            TITLE="${{ github.event.issue.title }}"
-            BODY="${{ github.event.issue.body }}"
+            TITLE="$(jq -r '.issue.title // ""'   <<<"$EVENT_JSON")"
+            BODY="$(jq -r '.issue.body  // ""'   <<<"$EVENT_JSON")"
           else
             TITLE=""
-            BODY="${{ github.event.comment.body }}"
+            BODY="$(jq -r '.comment.body // ""' <<<"$EVENT_JSON")"
           fi
 
-          # Extract /agent <cmd> (plan|revise|apply), case-insensitive
-          CMD=""
-          if [[ "$BODY" =~ ^/[Aa]gent[[:space:]]+([A-Za-z]+) ]]; then
-            CMD="${BASH_REMATCH[1],,}"
-          fi
-          # Default to plan when no explicit subcommand
-          if [[ -z "$CMD" ]]; then CMD="plan"; fi
+          CMD="$(
+            printf '%s\n' "$BODY" \
+            | sed -nE 's@^/agent[[:space:]]+([a-z]+).*@\1@Ip' \
+            | head -n1 | tr '[:upper:]' '[:lower:]'
+          )"
 
-          # Capture freeform text after "/agent <cmd>" (or use title + body)
-          MSG="$(echo "$BODY" | sed -E 's#^/[Aa]gent[[:space:]]+[A-Za-z]+[[:space:]]*##')"
+          # If no /agent command, short‑circuit; later step will no‑op
+          if [[ -z "${CMD:-}" ]]; then
+            echo "command=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Freeform spec after "/agent <cmd>" (same line)
+          MSG="$(
+            printf '%s\n' "$BODY" \
+            | sed -nE 's@^/agent[[:space:]]+[a-z]+[[:space:]]*@@Ip' \
+            | head -n1
+          )"
+          # If the author put the details on following lines, include title/body as context
           if [[ -z "$MSG" ]]; then
-            MSG="$TITLE — $BODY"
+            MSG="$TITLE"$'\n'"$BODY"
           fi
 
+          echo "command=$CMD" >> "$GITHUB_OUTPUT"
           {
-            echo "cmd=$CMD"
-            printf 'text<<EOF\n%s\nEOF\n' "$MSG"
+            echo 'text<<EOF'
+            printf '%s\n' "$MSG"
+            echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          # Avoid npm cache complaining when no lockfile is present
-          cache: 'false'
+          # NOTE: don't set "cache" at all when you don't want caching
 
       - name: Install agent deps in scratch dir
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p .agent_runtime
           cd .agent_runtime
           npm init -y >/dev/null 2>&1
-          npm i openai@^4 @octokit/rest@^20
+          npm i openai@^4 @octokit/rest@^20 >/dev/null
+          echo "NODE_PATH=$(pwd)/node_modules" >> "$GITHUB_ENV"
 
       - name: Run planner/apply
         id: agent
+        if: ${{ steps.detect.outputs.command != '' }}
         env:
-          MODE: ${{ steps.req.outputs.cmd }}
-          REQUEST_TEXT: ${{ steps.req.outputs.text }}
+          NODE_PATH:     ${{ env.NODE_PATH }}
+          MODE:          ${{ steps.detect.outputs.command }}   # plan | apply | revise (smoke later)
+          REQUEST_TEXT:  ${{ steps.detect.outputs.text }}
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
+          GH_TOKEN:       ${{ env.GH_TOKEN }}
+          AGENT_MODEL:    ${{ env.AGENT_MODEL }}
         run: |
-          set -e
+          set -euo pipefail
           node .github/agent/agent.mjs
-        # agent.mjs will write pr_url/plan_path to $GITHUB_OUTPUT when relevant
 
       - name: Post plan (if any)
-        if: steps.agent.outputs.plan_path != ''
+        if: ${{ steps.detect.outputs.command == 'plan' }}
         uses: actions/github-script@v7
         with:
           script: |
-            const issue_number = context.payload.issue?.number || context.payload.comment?.issue_url.split('/').pop();
-            const path = "${{ steps.agent.outputs.plan_path }}";
             const fs = require('fs');
-            const plan = fs.readFileSync(path, 'utf8');
-            await github.rest.issues.createComment({
-              ...context.repo,
-              issue_number,
-              body: `### 📝 Plan\n\n${plan}`
-            });
+            const issue_number = context.payload.issue?.number
+              ?? Number(context.payload.comment?.issue_url.split('/').pop());
+            const planPath = '.github/agent/.plan.md';
+            if (fs.existsSync(planPath)) {
+              const body = fs.readFileSync(planPath, 'utf8');
+              await github.rest.issues.createComment({ ...context.repo, issue_number, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number, body: "ℹ️ Planner ran but no plan was emitted." });
+            }
 
       - name: Post PR link (if any)
-        if: steps.agent.outputs.pr_url != ''
+        if: ${{ steps.detect.outputs.command == 'apply' }}
         uses: actions/github-script@v7
         with:
           script: |
-            const issue_number = context.payload.issue?.number || context.payload.comment?.issue_url.split('/').pop();
-            const url = "${{ steps.agent.outputs.pr_url }}";
+            const fs = require('fs');
+            const issue_number = context.payload.issue?.number
+              ?? Number(context.payload.comment?.issue_url.split('/').pop());
+            const outFile = process.env.GITHUB_OUTPUT;
+            let prUrl = '';
+            if (outFile && fs.existsSync(outFile)) {
+              prUrl = fs.readFileSync(outFile, 'utf8')
+                .split('\n')
+                .find(l => l.startsWith('pr_url='))?.slice(7) || '';
+            }
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number,
-              body: `✅ Draft PR opened: ${url}`
-            });
+              body: prUrl ? `✅ Draft PR opened: ${prUrl}` : `ℹ️ Apply finished but no PR URL was emitted. Check logs.`
+            })
 
       - name: No-op note when no command
-        if: steps.req.outputs.cmd == ''
-        run: echo "No /agent command detected; skipping."
+        if: ${{ steps.detect.outputs.command == '' }}
+        run: echo "No /agent command found; skipping."
