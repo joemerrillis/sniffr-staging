@@ -1,83 +1,18 @@
 name: agent
 
 on:
-  # Normal path: you open or edit a GitHub Issue that starts with "/agent plan" or "/agent apply"
   issues:
     types: [opened, edited]
-  # Optional: let you test manually from the Actions tab
   workflow_dispatch:
     inputs:
       title:
-        description: "Fallback title (only used for manual runs)"
+        description: "Issue title (optional when dispatching)"
         required: false
-        default: "Plan: Walker Recommendation Plugin (no migration v1)"
+        default: ""
       body:
-        description: "Fallback body (only used for manual runs)"
+        description: "Issue body (optional when dispatching)"
         required: false
-        default: |
-          /agent plan
-
-          # Feature
-          Walker Recommendation Plugin — let clients recommend walkers they like to friends.
-          **Important:** the table `walker_recommendations` already exists; for v1 we must NOT add migrations.
-
-          # Goals (v1)
-          - Create a recommendation (idempotent on owner_id+friend_id+walker_id).
-          - List recommendations with filters (friend_id, owner_id, walker_id, since, limit).
-          - Get one recommendation by id.
-          - Delete a recommendation by id.
-          - Keep everything minimal + non‑breaking.
-
-          # API (prefix: /walker-recommendations)
-          All responses MUST use the envelope convention.
-
-          1) POST /walker-recommendations
-             - Body: { owner_id: uuid, friend_id: uuid, walker_id: uuid, via_voice?: boolean=false }
-             - Behavior: If (owner_id, friend_id, walker_id) already exists, return 200 with existing record; else insert and return 201.
-             - Returns: { walker_recommendation: {...} }
-             - Validate: ids are UUIDs; owner_id != friend_id.
-
-          2) GET /walker-recommendations
-             - Query: owner_id?, friend_id?, walker_id?, since?(ISO), limit?(default 50)
-             - Order: created_at desc
-             - Returns: { walker_recommendations: [ ... ] }
-
-          3) GET /walker-recommendations/:id
-             - Returns: { walker_recommendation: { ... } }
-
-          4) DELETE /walker-recommendations/:id
-             - Returns: { ok: true }
-
-          # OpenAPI
-          - Tag: WalkerRecommendations
-          - Add paths/schemas so /docs/json reflects the endpoints.
-          - Include examples that match the real DB types and envelope format.
-
-          # Controller/Service Notes
-          - Use request.server.supabase (do NOT create a new client).
-          - POST must be idempotent (select first, then insert only if missing).
-          - Return helpful 4xx on validation errors; NEVER 5xx in expected flows.
-
-          # Smoke (for the later /agent smoke step)
-          - GET /_agent/health -> 200 { ok: true }
-          - GET /docs/json -> 200 and parsable JSON
-          - POST /walker-recommendations (valid UUIDs) -> 201 (or 200 if exists)
-          - GET /walker-recommendations?friend_id=<uuid> -> 200 with array
-          - DELETE /walker-recommendations/:id -> 200 { ok: true }
-
-          # Constraints / Context
-          - NO migrations in v1 (table exists: walker_recommendations).
-          - For v1, assume owner_id, friend_id, walker_id all reference users.id (not employees).
-          - Follow Sniffr docs in /docs: CONTEXT.md, ROUTING.md, SCHEMA.md, TESTING.md
-          - Read sniffr_plugin_gotchas.md.txt to avoid schema drift & envelope errors.
-
-          # Deliverables (Planner output)
-          - Plan: bullets of tasks
-          - Files: paths + purposes to be created/edited (plugin under src/walker_recommendations/)
-          - OpenAPI: the new/changed paths (YAML-ish)
-          - Smoke: the checks you’ll rely on
-
-          When the plan looks good, we’ll run `/agent apply`.
+        default: ""
 
 permissions:
   contents: write
@@ -85,39 +20,33 @@ permissions:
   issues: write
 
 env:
-  # Let the code pick up the model via env (agent.mjs will default if not present)
   AGENT_MODEL: gpt-5
 
 jobs:
   agent:
-    name: agent
     runs-on: ubuntu-24.04
 
     steps:
       - name: starting
         run: echo "starting"
 
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: "22.x"
+          node-version: 22.x
 
-      - name: Configure Git
-        run: |
-          git config user.email "bot@sniffr.dev"
-          git config user.name "sniffr-agent"
-
-      # -------- Extract command + message safely (no command substitution) --------
-      - name: Extract command and text
-        id: extract
+      # Gather TITLE/BODY into outputs and compute CMD/text safely (no shell expansion)
+      - name: Parse event/title/body into request text
+        id: parse
         shell: bash
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_BODY:  ${{ github.event.issue.body }}
           INPUT_TITLE: ${{ github.event.inputs.title }}
-          INPUT_BODY: ${{ github.event.inputs.body }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          INPUT_BODY:  ${{ github.event.inputs.body }}
         run: |
           set -euo pipefail
 
@@ -160,31 +89,25 @@ jobs:
             printf 'text<<EOF\n%s\nEOF\n' "${MSG}"
           } >> "$GITHUB_OUTPUT"
 
-      # -------- Optional: install deps if your agent scripts import packages --------
-      # If your repo already has node_modules from prior steps, you can skip this.
-      - name: Install dependencies (if needed)
-        if: hashFiles('package.json') != ''
-        run: |
-          npm ci || npm install
+      - name: Install dependencies
+        # If you don't keep a package-lock.json at the repo root, npm ci will fail; we fall back to npm install.
+        run: npm ci || npm install
 
-      # -------- Run the agent (plan or apply) --------
       - name: Run agent
-        id: agent
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AGENT_MODEL: ${{ env.AGENT_MODEL }}
-          MODE: ${{ steps.extract.outputs.cmd }}
-          REQUEST_TEXT: ${{ steps.extract.outputs.text }}
+          GH_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          MODE:           ${{ steps.parse.outputs.cmd }}
+          REQUEST_TEXT:   ${{ steps.parse.outputs.text }}
+          AGENT_MODEL:    ${{ env.AGENT_MODEL }}
         run: |
           set -euo pipefail
           echo "MODE=$MODE"
           echo "Text length: $(printf '%s' "$REQUEST_TEXT" | wc -c)"
-          node agent.mjs
+          # ✅ Correct path to your file:
+          node .github/agent/agent.mjs
 
-      # If the agent produced a PR URL in GITHUB_OUTPUT, surface it
-      - name: Show PR URL (if any)
-        if: always()
+      - name: Post-run note
         run: |
           echo "Plan file (if generated): .github/agent/.plan.md"
           if [[ -f "$GITHUB_OUTPUT" ]]; then
