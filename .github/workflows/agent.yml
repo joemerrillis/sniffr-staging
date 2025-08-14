@@ -1,4 +1,4 @@
-name: ChatGPT Agent (plan/apply)
+name: ChatGPT Agent - Plan/Apply
 
 on:
   issues:
@@ -12,81 +12,113 @@ permissions:
   issues: write
 
 jobs:
-  route:
-    runs-on: ubuntu-latest
+  agent:
+    # Only run when a new issue is opened/edited OR a comment that starts with /agent is added.
     if: >
-      github.event_name == 'issues' ||
+      (github.event_name == 'issues') ||
       (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/agent'))
+    runs-on: ubuntu-latest
+
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Prefer a PAT if you created one; otherwise the default GitHub token works for PRs/comments.
+      GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Detect command + request text
-        id: cmd
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "issues" ]]; then
-            BODY="${{ github.event.issue.body }}"
-            TITLE="${{ github.event.issue.title }}"
-            TEXT="$TITLE — $BODY"
-          else
-            BODY="${{ github.event.comment.body }}"
-            TEXT="$BODY"
-          fi
-
-          # default to /agent plan on bare "/agent"
-          if [[ "$BODY" == "/agent" ]]; then
-            echo "command=plan" >> $GITHUB_OUTPUT
-          else
-            # /agent plan|revise|apply <rest>
-            CMD=$(echo "$BODY" | awk '{print $2}')
-            [[ -z "$CMD" ]] && CMD="plan"
-            echo "command=$CMD" >> $GITHUB_OUTPUT
-          fi
-
-          # Capture freeform text after the command
-          MSG=$(echo "$BODY" | sed -E 's#^/agent( +[a-z]+)? *##i')
-          if [[ -z "$MSG" ]]; then
-            MSG="$TEXT"
-          fi
-          printf 'text<<EOF\n%s\nEOF\n' "$MSG" >> $GITHUB_OUTPUT
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            **/package-lock.json
 
-      - name: Install agent deps
+      - name: Configure git user for CI
         run: |
-          npm init -y >/dev/null 2>&1
-          npm i openai@^4 @octokit/rest@^20
+          git config user.email "bot@sniffr.dev"
+          git config user.name  "sniffr-agent[bot]"
 
-      - name: Run planner/apply
+      # Extract the subcommand (plan|revise|apply|smoke) and the freeform text after it.
+      # If no /agent line is present (e.g., an issue body), we still pass title + body to the planner.
+      - name: Detect command + request text
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
+            BODY=$(jq -r .issue.body   <<< '${{ toJSON(github.event) }}')
+            TITLE=$(jq -r .issue.title <<< '${{ toJSON(github.event) }}')
+          else
+            BODY=$(jq -r .comment.body <<< '${{ toJSON(github.event) }}')
+            TITLE=""
+          fi
+
+          # Pull out "/agent <cmd>" if present (case-insensitive)
+          CMD=$(printf '%s\n' "$BODY" \
+            | sed -nE 's@^/agent[[:space:]]+([a-z]+).*@\1@Ip' \
+            | head -n1 \
+            | tr '[:upper:]' '[:lower:]')
+
+          # Message is whatever follows "/agent <cmd> ..." on that same line
+          MSG=$(printf '%s\n' "$BODY" \
+            | sed -nE 's@^/agent[[:space:]]+[a-z]+[[:space:]]*@@Ip' \
+            | head -n1)
+
+          # If there was no explicit /agent line, fall back to title + body
+          if [[ -z "${MSG}" ]]; then
+            MSG="${TITLE}
+${BODY}"
+          fi
+
+          echo "cmd=${CMD:-plan}" >> "$GITHUB_OUTPUT"
+          {
+            echo 'text<<EOF'
+            printf '%s\n' "$MSG"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Keep agent deps isolated so we never add node_modules to the repo.
+      - name: Install agent deps (scratch dir)
+        run: |
+          set -e
+          mkdir -p .agent_runtime
+          cd .agent_runtime
+          npm init -y >/dev/null 2>&1
+          npm i openai@^4 @octokit/rest@^20 >/dev/null
+          echo "NODE_PATH=$(pwd)/node_modules" >> "$GITHUB_ENV"
+
+      # Run the repo agent. It reads the request text from stdin and opens a PR.
+      - name: Run agent (plan -> files -> branch -> PR)
         id: agent
         env:
-          MODE: ${{ steps.cmd.outputs.command }}
-          REQUEST_TEXT: ${{ steps.cmd.outputs.text }}
+          NODE_PATH: ${{ env.NODE_PATH }}
         run: |
-          node .github/agent/agent.mjs
+          set -e
+          node .github/agent/plan-and-commit.mjs <<'EOF'
+          ${{ steps.detect.outputs.text }}
+          EOF
 
-      - name: Comment plan (if any)
-        if: steps.agent.outputs.plan_path != ''
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const p = "${{ steps.agent.outputs.plan_path }}";
-            const body = fs.readFileSync(p, 'utf8');
-            const issue_number = context.payload.issue?.number || context.payload.comment?.issue_url.split('/').pop();
-            await github.rest.issues.createComment({ ...context.repo, issue_number, body });
-
-      - name: Comment PR link (if any)
+      # Comment back with the PR URL (the script writes pr_url to GITHUB_OUTPUT).
+      - name: Post PR link
         if: steps.agent.outputs.pr_url != ''
         uses: actions/github-script@v7
         with:
           script: |
             const url = "${{ steps.agent.outputs.pr_url }}";
-            const issue_number = context.payload.issue?.number || context.payload.comment?.issue_url.split('/').pop();
-            await github.rest.issues.createComment({ ...context.repo, issue_number, body: `🧪 Draft PR opened: ${url}\n(Preview will appear shortly; use \`/agent smoke\` to run checks.)` });
+            const issue_number =
+              context.payload.issue?.number ||
+              (context.payload.comment?.issue_url
+                ? Number(context.payload.comment.issue_url.split('/').pop())
+                : undefined);
+            if (issue_number && url) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number,
+                body: `✅ Agent opened PR: ${url}`
+              });
+            }
