@@ -42,3 +42,5 @@ Each plugin lives under `src/<feature>/`:
 - **JS:** ESM, Node 22, camelCase identifiers
 - **HTTP:** 2xx success, 4xx client error; **never** 5xx in normal flows
 - **Logging:** use Fastify logger; log inputs for tricky routes during development
+
+- Test preview workflow trigger: August 2025
