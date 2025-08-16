@@ -25,6 +25,7 @@ export default fp(async function jwtPlugin(fastify, opts) {
   const publicPrefixes = [
     '/auth',
     '/docs',
+    '/healthz',
     '/dog-memories/test-upload',
     '/dog-memories/upload',
     '/rapi-doc',
