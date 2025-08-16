@@ -11,12 +11,12 @@ jobs:
       contents: read
       packages: read
 
+    # Use your custom runner image (built in tools/runner/Dockerfile)
     container:
       image: ghcr.io/${{ github.repository }}/snf-runner:latest
-      # run as container default user (root). Do not change ownership of host mounts.
+      # Default user is root in the image; we'll use appuser for npm steps
 
     env:
-      PR_NUM: ${{ github.event.number }}
       RENDER_URL: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
       PRETTY_URL: https://pr-${{ github.event.number }}-stage.sniffrpack.com
 
@@ -26,34 +26,71 @@ jobs:
           whoami && id
           ls -ld /__w /__w/_temp || true
 
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Node is preinstalled in the runner image; use npm as root to avoid FS perms issues.
-      - name: Install deps
-        run: npm ci || npm install --no-audit --no-fund
-
-      - name: Build
-        run: npm run build --if-present
-
-      - name: Tests (temporary placeholder)
-        run: node -e "console.log('✓ tests temporarily skipped')"
-
-      # Health check the Render PR deploy
-      - name: Smoke check /healthz (Render)
+      # Make workspace writable by appuser inside the container
+      - name: Fix permissions for workspace (safe paths only)
         run: |
-          echo "Checking $RENDER_URL/healthz ..."
-          for i in {1..40}; do
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          chown -R appuser:appuser "$GITHUB_WORKSPACE"
+          chown -R appuser:appuser /__w/_temp || true
+          chown -R appuser:appuser /github/home || true
+
+      - name: Install deps (as appuser)
+        run: su -s /bin/bash appuser -c "npm ci || npm install --no-audit --no-fund"
+
+      - name: Build (as appuser)
+        run: su -s /bin/bash appuser -c "npm run build --if-present"
+
+      - name: Smoke check /healthz (Render, patient)
+        run: |
+          echo "Probing $RENDER_URL/healthz ..."
+          ok=""
+          # Up to ~3 minutes (60 * 3s)
+          for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$RENDER_URL/healthz" || true)
-            if [ "$code" = "200" ]; then echo "OK"; exit 0; fi
+            # Treat 200 as success. Treat 401/403/404/502 as warming up.
+            if [ "$code" = "200" ]; then
+              echo "Health OK (200)"; ok=1; break
+            fi
+            echo "Attempt $i: got $code; waiting..."
             sleep 3
           done
-          echo "Health check failed"; exit 1
+          if [ -z "$ok" ]; then
+            echo "Health check did not return 200 within the window"; exit 1
+          fi
 
-      # Comment preview URLs: Render + (likely) pretty Cloudflare CNAME if present
+      # Call your Cloudflare Worker to upsert the A record + Workers Route + KV mapping
+      - name: Create/refresh Pretty URL in Cloudflare
+        if: ${{ success() }}
+        env:
+          WORKER_ENDPOINT: ${{ secrets.CFW_WORKER_ENDPOINT }}   # e.g. https://<your-worker>.workers.dev
+          HOOK_SECRET: ${{ secrets.CFW_WEBHOOK_SECRET }}        # must match WEBHOOK_SECRET in the Worker
+        run: |
+          if [ -z "$WORKER_ENDPOINT" ] || [ -z "$HOOK_SECRET" ]; then
+            echo "Cloudflare Worker secrets not set; skipping pretty URL provisioning."
+            exit 0
+          fi
+          echo "Calling Cloudflare Worker to upsert DNS + route for $PRETTY_URL ..."
+          curl -fsS -X POST "$WORKER_ENDPOINT" \
+            -H "x-hook-secret: $HOOK_SECRET" \
+            -H "content-type: application/json" \
+            --data @- <<'JSON'
+          {
+            "pr": ${{ github.event.number }},
+            "previewUrl": "${{ env.RENDER_URL }}",
+            "fqdn": "${{ env.PRETTY_URL }}",
+            "repo": "${{ github.repository }}",
+            "sha": "${{ github.sha }}"
+          }
+JSON
+          echo "Worker invoked."
+
       - name: Comment Preview URLs
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           message: |
-            ✅ API Preview (Render): https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
-            🔎 RapiDoc: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com/rapi-doc/rapidoc.html
-            🌐 Pretty URL: https://pr-${{ github.event.number }}-stage.sniffrpack.com
+            ✅ API Preview (Render): ${{ env.RENDER_URL }}
+            🔎 RapiDoc: ${{ env.RENDER_URL }}/rapi-doc/rapidoc.html
+            🌐 Pretty URL (Cloudflare): ${{ env.PRETTY_URL }}
