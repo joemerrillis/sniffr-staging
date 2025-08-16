@@ -47,6 +47,10 @@ dotenv.config();
 
 const fastify = Fastify({ logger: true });
 
+// Serve a 204 for missing favicon quickly
+fastify.get('/favicon.ico', async (req, reply) => reply.code(204).send());
+fastify.head('/favicon.ico', async (req, reply) => reply.code(204).send());
+
 await fastify.register(fastifyMultipart);
 
 const __filename = fileURLToPath(import.meta.url);
