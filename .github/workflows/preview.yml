@@ -14,7 +14,6 @@ jobs:
       image: ghcr.io/${{ github.repository }}/snf-runner:latest
       options: --user 10001:10001
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_SERVICE: sniffr-staging
       RAILWAY_ENV: pr-${{ github.event.number }}
     steps:
@@ -35,13 +34,16 @@ jobs:
       - name: Tests
         run: npm test --if-present
 
-      - name: Railway CLI
-        uses: railwayapp/railway-action@v2
-        with:
-          service: ${{ env.RAILWAY_SERVICE }}
+      - name: Install Railway CLI
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          railway --version
 
       - name: Deploy backend preview
         id: deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: bash scripts/deploy-preview-backend.sh
 
       - name: Comment Preview URLs
