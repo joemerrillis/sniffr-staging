@@ -1,33 +1,10 @@
-name: Preview (Backend & Frontend)
+name: Preview (Backend)
 
 on:
   pull_request:
 
 jobs:
-  detect:
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Paths filter
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-              - '.github/workflows/**'
-              - 'tools/runner/**'
-            frontend:
-              - 'frontend/**'
-              - '.github/workflows/**'
-              - 'tools/runner/**'
-
   backend:
-    needs: detect
-    if: needs.detect.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -38,119 +15,38 @@ jobs:
       options: --user 10001:10001
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      RAILWAY_SERVICE: sniffr-api
+      RAILWAY_SERVICE: sniffr-staging
       RAILWAY_ENV: pr-${{ github.event.number }}
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: npm-${{ hashFiles('backend/**/package-lock.json') }}
+          key: npm-${{ hashFiles('package-lock.json') }}
 
-      - name: Install (backend)
-        run: |
-          cd backend
-          npm ci
+      - name: Install deps
+        run: npm ci
 
-      - name: Build (backend)
-        run: |
-          cd backend
-          npm run build
-          # Optionally generate openapi.json here
-          # npm run openapi:generate
+      - name: Build
+        run: npm run build --if-present
 
-      - name: Unit/Smoke (backend)
-        run: |
-          cd backend
-          npm test --if-present
+      - name: Tests
+        run: npm test --if-present
 
       - name: Railway CLI
         uses: railwayapp/railway-action@v2
         with:
           service: ${{ env.RAILWAY_SERVICE }}
-          # This step installs CLI + auth via token
 
       - name: Deploy backend preview
         id: deploy
         run: bash scripts/deploy-preview-backend.sh
 
-      - name: Expose backend URL
-        id: urls
-        run: echo "API_URL=${{ steps.deploy.outputs.api_url }}" >> $GITHUB_OUTPUT
-
-  frontend:
-    needs: [detect, backend]
-    # Frontend might depend on backend URL; run after backend if both changed
-    if: needs.detect.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: read
-    container:
-      image: ghcr.io/${{ github.repository }}/snf-runner:latest
-      options: --user 10001:10001
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      RAILWAY_SERVICE: sniffr-web
-      RAILWAY_ENV: pr-${{ github.event.number }}
-      PREVIEW_API_URL: ${{ needs.backend.outputs.API_URL || 'https://your-staging-api.example.com' }}
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ hashFiles('frontend/**/package-lock.json') }}
-
-      - name: Install (frontend)
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Build (frontend)
-        run: |
-          cd frontend
-          # Use env PREVIEW_API_URL in your build (Vite NEXT_PUBLIC/VITE vars)
-          npm run build
-
-      - name: Frontend smoke
-        run: |
-          cd frontend
-          npm run test:smoke --if-present
-
-      - name: Railway CLI
-        uses: railwayapp/railway-action@v2
-        with:
-          service: ${{ env.RAILWAY_SERVICE }}
-
-      - name: Deploy frontend preview
-        id: deploy
-        run: bash scripts/deploy-preview-frontend.sh
-
-      - name: Expose web URL
-        id: urls
-        run: echo "WEB_URL=${{ steps.deploy.outputs.web_url }}" >> $GITHUB_OUTPUT
-
-  comment:
-    needs: [detect, backend, frontend]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Build PR message
-        id: msg
-        run: |
-          BK=$([[ "${{ needs.detect.outputs.backend }}" == "true" ]] && echo "✅ API Preview: ${{ needs.backend.outputs.API_URL }}" || echo "— No backend changes —")
-          FE=$([[ "${{ needs.detect.outputs.frontend }}" == "true" ]] && echo "✅ Web Preview: ${{ needs.frontend.outputs.WEB_URL }}" || echo "— No frontend changes —")
-          echo "MSG=$BK\n$FE" >> $GITHUB_OUTPUT
-
       - name: Comment Preview URLs
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           message: |
-            ${{ steps.msg.outputs.MSG }}
-            $( [[ "${{ needs.detect.outputs.backend }}" == "true" ]] && echo "🔎 RapiDoc: ${{ needs.backend.outputs.API_URL }}/rapidoc?url=${{ needs.backend.outputs.API_URL }}/openapi.json" )
+            ✅ API Preview: ${{ steps.deploy.outputs.api_url }}
+            🔎 RapiDoc: ${{ steps.deploy.outputs.api_url }}/rapidoc?url=${{ steps.deploy.outputs.api_url }}/openapi.json
