@@ -1,7 +1,7 @@
 name: Runner Image
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:         # lets you click "Run workflow"
   push:
     branches: [ main ]
     paths:
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      packages: write        # REQUIRED for GHCR push
     steps:
       - uses: actions/checkout@v4
 
