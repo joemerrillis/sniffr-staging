@@ -12,12 +12,7 @@ jobs:
       packages: read
 
     steps:
-      - name: Fix runner temp perms (pre-checkout)
-        run: |
-          sudo chown -R $(id -u):$(id -g) /__w/_temp || true
-          sudo chmod -R u+rwX /__w/_temp || true
-
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
