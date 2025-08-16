@@ -13,7 +13,12 @@ jobs:
 
     container:
       image: ghcr.io/${{ github.repository }}/snf-runner:latest
-      # image defaults to root (so checkout can write). We'll drop to appuser later.
+      # run as container default user (root). Do not change ownership of host mounts.
+
+    env:
+      PR_NUM: ${{ github.event.number }}
+      RENDER_URL: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
+      PRETTY_URL: https://pr-${{ github.event.number }}.sniffrpack.com
 
     steps:
       - name: Sanity (whoami / id / mounts)
@@ -23,44 +28,32 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Fix workspace perms for appuser
-        run: |
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          chown -R appuser:appuser "$GITHUB_WORKSPACE"
-          chown -R appuser:appuser /__w/_temp || true
-          chown -R appuser:appuser /github/home || true
+      # Node is preinstalled in the runner image; use npm as root to avoid FS perms issues.
+      - name: Install deps
+        run: npm ci || npm install --no-audit --no-fund
 
-      - name: Verify ownership (should be appuser:appuser)
-        run: |
-          ls -ld "$GITHUB_WORKSPACE"
-          # also show a few top-level entries for sanity
-          ls -l "$GITHUB_WORKSPACE" | head -20
+      - name: Build
+        run: npm run build --if-present
 
-      # Node 20 is already in the container; keeping it lean.
+      - name: Tests (temporary placeholder)
+        run: node -e "console.log('✓ tests temporarily skipped')"
 
-      - name: Install deps (as appuser)
-        run: su -s /bin/bash appuser -c "npm ci || npm install --no-audit --no-fund"
-
-      - name: Build (as appuser)
-        run: su -s /bin/bash appuser -c "npm run build --if-present"
-
-      - name: Tests (non-fatal placeholder; as appuser)
-        run: su -s /bin/bash appuser -c "node -e \"console.log('✓ tests temporarily skipped')\""
-
+      # Health check the Render PR deploy
       - name: Smoke check /healthz (Render)
         run: |
-          URL="https://sniffr-staging-pr-${{ github.event.number }}.onrender.com"
-          echo "Checking $URL/healthz ..."
-          for i in {1..30}; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/healthz" || true)
+          echo "Checking $RENDER_URL/healthz ..."
+          for i in {1..40}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$RENDER_URL/healthz" || true)
             if [ "$code" = "200" ]; then echo "OK"; exit 0; fi
             sleep 3
           done
           echo "Health check failed"; exit 1
 
-      - name: Comment Preview URLs (Render)
+      # Comment preview URLs: Render + (likely) pretty Cloudflare CNAME if present
+      - name: Comment Preview URLs
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           message: |
-            ✅ API Preview (Render): https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
-            🔎 RapiDoc: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com/rapi-doc/rapidoc.html
+            ✅ API Preview (Render): ${{ env.RENDER_URL }}
+            🔎 RapiDoc: ${{ env.RENDER_URL }}/rapi-doc/rapidoc.html
+            🌐 Pretty URL (if DNS finished): ${{ env.PRETTY_URL }}
