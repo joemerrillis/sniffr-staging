@@ -38,6 +38,8 @@ Each plugin lives under `src/<feature>/`:
 - **Gotchas:** `sniffr_plugin_gotchas.md.txt` (common pitfalls & fixes)
 - Keep these synchronized with any new migrations or envelope changes.
 
+- Test preview workflow trigger: August 2025
+
 ## House Conventions
 - **JS:** ESM, Node 22, camelCase identifiers
 - **HTTP:** 2xx success, 4xx client error; **never** 5xx in normal flows
