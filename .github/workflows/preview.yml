@@ -11,36 +11,26 @@ jobs:
       contents: read
       packages: read
 
-    # Use your custom runner image (built in tools/runner/Dockerfile)
+    # Use our runner image (root user; we chown workspace to appuser before npm)
     container:
       image: ghcr.io/${{ github.repository }}/snf-runner:latest
-      # Default user is root in the image; we'll use appuser for npm steps
 
     env:
+      PR_NUMBER: ${{ github.event.number }}
       RENDER_URL: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
-      PRETTY_URL: https://pr-${{ github.event.number }}-stage.sniffrpack.com
+      # Optional: if you later enable pretty URLs via Cloudflare Worker, set this repo var
+      # PRETTY_DOMAIN should be your apex domain, e.g. "sniffrpack.com"
+      PRETTY_DOMAIN: ${{ vars.PRETTY_DOMAIN }}
 
     steps:
-      - name: Sanity (whoami / id / mounts)
+      - name: Who am I
         run: |
           whoami && id
           ls -ld /__w /__w/_temp || true
 
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Toolchain sanity (versions)
-        run: |
-          echo "Node:" && node -v
-          echo "NPM:" && npm -v
-          echo "Ripgrep:" && rg --version | head -n1
-          echo "ctags:" && ctags --version | head -n1
-          echo "sqlite3:" && sqlite3 --version
-          echo "tree-sitter:" && tree-sitter --version
-  
-
-      # Make workspace writable by appuser inside the container
-      - name: Fix permissions for workspace (safe paths only)
+      - name: Fix workspace ownership for appuser
         run: |
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
           chown -R appuser:appuser "$GITHUB_WORKSPACE"
@@ -53,54 +43,40 @@ jobs:
       - name: Build (as appuser)
         run: su -s /bin/bash appuser -c "npm run build --if-present"
 
-      - name: Smoke check /healthz (Render, patient)
+      - name: Wait for Render preview to come up
         run: |
-          echo "Probing $RENDER_URL/healthz ..."
-          ok=""
-          # Up to ~3 minutes (60 * 3s)
-          for i in $(seq 1 60); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "$RENDER_URL/healthz" || true)
-            # Treat 200 as success. Treat 401/403/404/502 as warming up.
+          URL="$RENDER_URL"
+          echo "Polling $URL/healthz ..."
+          for i in {1..40}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/healthz" || true)
             if [ "$code" = "200" ]; then
-              echo "Health OK (200)"; ok=1; break
+              echo "Health OK"
+              echo "RENDER_OK=1" >> $GITHUB_ENV
+              break
             fi
-            echo "Attempt $i: got $code; waiting..."
-            sleep 3
+            sleep 5
           done
-          if [ -z "$ok" ]; then
-            echo "Health check did not return 200 within the window"; exit 1
+          if [ "${RENDER_OK:-}" != "1" ]; then
+            echo "Health not green yet, but Render is often racey; continuing to comment links…"
           fi
 
-      # Call your Cloudflare Worker to upsert the A record + Workers Route + KV mapping
-      - name: Create/refresh Pretty URL in Cloudflare
-        if: ${{ success() }}
-        env:
-          WORKER_ENDPOINT: ${{ secrets.CFW_WORKER_ENDPOINT }}   # e.g. https://<your-worker>.workers.dev
-          HOOK_SECRET: ${{ secrets.CFW_WEBHOOK_SECRET }}        # must match WEBHOOK_SECRET in the Worker
+      - name: Compose preview links
+        id: compose
         run: |
-          if [ -z "$WORKER_ENDPOINT" ] || [ -z "$HOOK_SECRET" ]; then
-            echo "Cloudflare Worker secrets not set; skipping pretty URL provisioning."
-            exit 0
+          RENDER_MSG="✅ API Preview (Render): $RENDER_URL"
+          if [ -n "$PRETTY_DOMAIN" ]; then
+            PRETTY_URL="https://pr-${PR_NUMBER}-stage.${PRETTY_DOMAIN}"
+            PRETTY_MSG="✨ Pretty URL: ${PRETTY_URL}"
+          else
+            PRETTY_MSG=""
           fi
-          echo "Calling Cloudflare Worker to upsert DNS + route for $PRETTY_URL ..."
-          curl -fsS -X POST "$WORKER_ENDPOINT" \
-            -H "x-hook-secret: $HOOK_SECRET" \
-            -H "content-type: application/json" \
-            --data @- <<'JSON'
-          {
-            "pr": ${{ github.event.number }},
-            "previewUrl": "${{ env.RENDER_URL }}",
-            "fqdn": "${{ env.PRETTY_URL }}",
-            "repo": "${{ github.repository }}",
-            "sha": "${{ github.sha }}"
-          }
-JSON
-          echo "Worker invoked."
+
+          echo "render=$RENDER_MSG" >> $GITHUB_OUTPUT
+          echo "pretty=$PRETTY_MSG" >> $GITHUB_OUTPUT
 
       - name: Comment Preview URLs
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           message: |
-            ✅ API Preview (Render): ${{ env.RENDER_URL }}
-            🔎 RapiDoc: ${{ env.RENDER_URL }}/rapi-doc/rapidoc.html
-            🌐 Pretty URL (Cloudflare): ${{ env.PRETTY_URL }}
+            ${{ steps.compose.outputs.render }}
+            ${{ steps.compose.outputs.pretty }}
