@@ -18,7 +18,7 @@ jobs:
     env:
       PR_NUM: ${{ github.event.number }}
       RENDER_URL: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
-      PRETTY_URL: https://pr-${{ github.event.number }}.sniffrpack.com
+      PRETTY_URL: https://pr-${{ github.event.number }}-stage.sniffrpack.com
 
     steps:
       - name: Sanity (whoami / id / mounts)
