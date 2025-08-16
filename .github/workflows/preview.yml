@@ -12,6 +12,7 @@ jobs:
       packages: read
     container:
       image: ghcr.io/${{ github.repository }}/snf-runner:latest
+      options: --user 0:0
     env:
       RAILWAY_SERVICE: sniffr-staging
       RAILWAY_ENV: pr-${{ github.event.number }}
