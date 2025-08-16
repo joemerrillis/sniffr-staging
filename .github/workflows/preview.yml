@@ -10,14 +10,20 @@ jobs:
     permissions:
       contents: read
       packages: read
-    container:
-      image: ghcr.io/${{ github.repository }}/snf-runner:latest
-      options: --user 0:0
-    env:
-      RAILWAY_SERVICE: sniffr-staging
-      RAILWAY_ENV: pr-${{ github.event.number }}
     steps:
       - uses: actions/checkout@v4
+
+      # Node 20 to match package.json/.nvmrc and Railway
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Minimal OS deps you previously had in the Runner image
+      - name: Install OS tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep sqlite3
 
       - name: Cache npm
         uses: actions/cache@v4
@@ -44,7 +50,25 @@ jobs:
         id: deploy
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: sniffr-staging
+          RAILWAY_ENV: pr-${{ github.event.number }}
         run: bash scripts/deploy-preview-backend.sh
+
+      # Optional: quick health check so the job turns red if preview isn't up yet
+      - name: Smoke check /healthz
+        run: |
+          URL="${{ steps.deploy.outputs.api_url }}"
+          echo "Checking $URL/healthz ..."
+          for i in {1..20}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/healthz" || true)
+            if [ "$code" = "200" ]; then
+              echo "OK"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Health check failed"
+          exit 1
 
       - name: Comment Preview URLs
         uses: marocchino/sticky-pull-request-comment@v2
