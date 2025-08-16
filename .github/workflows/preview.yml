@@ -10,16 +10,20 @@ jobs:
     permissions:
       contents: read
       packages: read
-    steps:
-      - uses: actions/checkout@v4
 
-      # Node 20 to match package.json/.nvmrc and Railway
+    steps:
+      - name: Fix runner temp perms (pre-checkout)
+        run: |
+          sudo chown -R $(id -u):$(id -g) /__w/_temp || true
+          sudo chmod -R u+rwX /__w/_temp || true
+
+      - uses: actions/checkout@v3
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # Minimal OS deps you previously had in the Runner image
       - name: Install OS tools
         run: |
           sudo apt-get update
@@ -54,7 +58,6 @@ jobs:
           RAILWAY_ENV: pr-${{ github.event.number }}
         run: bash scripts/deploy-preview-backend.sh
 
-      # Optional: quick health check so the job turns red if preview isn't up yet
       - name: Smoke check /healthz
         run: |
           URL="${{ steps.deploy.outputs.api_url }}"
