@@ -1,7 +1,7 @@
 name: Runner Image
 
 on:
-  workflow_dispatch:         # lets you click "Run workflow"
+  workflow_dispatch:
   push:
     branches: [ main ]
     paths:
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write        # REQUIRED for GHCR push
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +22,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 👇 This ensures we use the buildx "docker-container" driver (supports gha cache)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver-opts: |
+            image=moby/buildkit:buildx-stable-1
 
       - name: Build & push
         uses: docker/build-push-action@v6
