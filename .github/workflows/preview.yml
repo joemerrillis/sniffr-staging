@@ -54,6 +54,6 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           message: |
-            ✅ API Preview (Render): ${{ env.RENDER_URL }}
-            🔎 RapiDoc: ${{ env.RENDER_URL }}/rapi-doc/rapidoc.html
-            🌐 Pretty URL (if DNS finished): ${{ env.PRETTY_URL }}
+            ✅ API Preview (Render): https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
+            🔎 RapiDoc: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com/rapi-doc/rapidoc.html
+            🌐 Pretty URL: https://pr-${{ github.event.number }}-stage.sniffrpack.com
