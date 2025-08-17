@@ -2,6 +2,7 @@ name = "render-pr-alias"
 main = "render-pr-alias.js"
 compatibility_date = "2025-08-11"  # use today's date
 account_id = "774b68e8a6ad8edd33820cd760f785d9"
+workers_dev = true 
 
 [[kv_namespaces]]
 binding = "PR_PREVIEWS"
