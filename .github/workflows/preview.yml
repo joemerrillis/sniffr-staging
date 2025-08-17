@@ -10,6 +10,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      pull-requests: write   # needed for PR comments
 
     # Use our runner image (root user; we chown workspace to appuser before npm)
     container:
@@ -18,8 +19,7 @@ jobs:
     env:
       PR_NUMBER: ${{ github.event.number }}
       RENDER_URL: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
-      # Optional: if you later enable pretty URLs via Cloudflare Worker, set this repo var
-      # PRETTY_DOMAIN should be your apex domain, e.g. "sniffrpack.com"
+      # Optional: set this in repo → Settings → Variables (we read from vars.*)
       PRETTY_DOMAIN: ${{ vars.PRETTY_DOMAIN }}
 
     steps:
@@ -30,12 +30,11 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # B) SAFER: only chown the repo workspace; do NOT touch runner/system mounts
       - name: Fix workspace ownership for appuser
         run: |
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
           chown -R appuser:appuser "$GITHUB_WORKSPACE"
-          chown -R appuser:appuser /__w/_temp || true
-          chown -R appuser:appuser /github/home || true
 
       - name: Install deps (as appuser)
         run: su -s /bin/bash appuser -c "npm ci || npm install --no-audit --no-fund"
@@ -57,8 +56,32 @@ jobs:
             sleep 5
           done
           if [ "${RENDER_OK:-}" != "1" ]; then
-            echo "Health not green yet, but Render is often racey; continuing to comment links…"
+            echo "Health not green yet, but Render can be racey; continuing…"
           fi
+
+      # C) Notify the Cloudflare Worker control-plane to upsert PR → origin
+      - name: Notify preview alias worker
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}   # add in repo → Settings → Secrets
+          PR_NUMBER: ${{ github.event.number }}
+          RENDER_URL: ${{ env.RENDER_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK_SECRET:-}" ]; then
+            echo "WEBHOOK_SECRET not set; skipping."
+            exit 0
+          fi
+          curl -sS -X POST "https://render-pr-alias.joemerrillis.workers.dev/hook" \
+            -H "x-hook-secret: ${WEBHOOK_SECRET}" \
+            -H "content-type: application/json" \
+            --data @- <<'JSON'
+          {
+            "action": "upsert",
+            "pr": ${{ env.PR_NUMBER }},
+            "url": "${{ env.RENDER_URL }}"
+          }
+          JSON
+        continue-on-error: true  # don't fail the whole job if webhook is slow/flaky
 
       - name: Compose preview links
         id: compose
@@ -74,6 +97,7 @@ jobs:
           echo "render=$RENDER_MSG" >> $GITHUB_OUTPUT
           echo "pretty=$PRETTY_MSG" >> $GITHUB_OUTPUT
 
+      # D) Comment both links on the PR
       - name: Comment Preview URLs
         uses: marocchino/sticky-pull-request-comment@v2
         with:
