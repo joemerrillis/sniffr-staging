@@ -1,120 +1,90 @@
-// render-pr-alias.js
-
-/**
- * Env bindings you must set:
- *  - PR_PREVIEWS (KV Namespace)
- *  - WEBHOOK_SECRET (secret)
- *  - ROOT_DOMAIN = "previews.sniffrpack.com"
- *
- * Route (wrangler.toml):  *.previews.sniffrpack.com/*
- */
+// worker/preview-router.mjs
+// Dual-origin PR preview router: one pretty domain, two upstreams (web + api)
+// - Control-plane: POST with { action: "upsert"|"delete", pr, api, web } (+ x-webhook-secret)
+// - Data-plane: Host like pr-123-stage.previews.sniffrpack.com routes /api → api, else → web
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const host = url.hostname;
-
-    // -------- 1) Control plane: webhook to upsert/delete mappings --------
-    if (url.hostname.endsWith(".workers.dev")) {
-      if (request.method !== "POST") {
-        return new Response("Not Found", { status: 404 });
-      }
-
-      const secret = request.headers.get("x-hook-secret") || request.headers.get("x-webhook-secret");
-      if (secret !== env.WEBHOOK_SECRET) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
-      let payload;
-      try {
-        payload = await request.json();
-      } catch {
-        return new Response("Invalid JSON", { status: 400 });
-      }
-
-      const action = (payload.action || "").toLowerCase(); // "upsert" | "delete"
-      // allow either "pr" or "prId" as the field name
-      const prNum = payload.pr ?? payload.prId;
-      const origin = payload.url ?? payload.origin ?? payload.deploy?.url;
-
-      if (!prNum || (action === "upsert" && !origin)) {
-        return new Response("Missing required fields", { status: 400 });
-      }
-
-      const kvKey = `pr:${prNum}`;
-      if (action === "delete") {
-        await env.PR_PREVIEWS.delete(kvKey);
-        return json({ ok: true, action, pr: prNum, deleted: true });
-      }
-
-      // normalize origin (remove trailing slash)
-      const normalized = String(origin).replace(/\/+$/, "");
-      await env.PR_PREVIEWS.put(kvKey, normalized, { metadata: { createdAt: Date.now() } });
-      return json({ ok: true, action, pr: prNum, origin: normalized });
-    }
-
-    // -------- 2) Data plane: handle pretty URL hosts --------
-    // e.g. pr-123-stage.previews.sniffrpack.com
-    const expectedSuffix = `.${env.ROOT_DOMAIN}`;
-    if (host.endsWith(expectedSuffix)) {
-      // parse "pr-<num>-stage"
-      const sub = host.slice(0, -expectedSuffix.length); // "pr-123-stage"
-      const m = /^pr-(\d+)-stage$/i.exec(sub);
-      if (!m) {
-        // Not a preview host we recognize -> don't expose internals
-        return new Response("Not Found", { status: 404 });
-      }
-
-      const prNum = m[1];
-      const kvKey = `pr:${prNum}`;
-      const origin = await env.PR_PREVIEWS.get(kvKey);
-
-      if (!origin) {
-        // mapping missing -> friendly 404 so you know it's a wiring issue
-        return new Response(`No mapping for PR ${prNum}`, { status: 404 });
-      }
-
-      // Build full upstream URL (preserve path + search)
-      // e.g. https://<origin>/the/same/path?and=query
-      const upstream = new URL(origin);
-      upstream.pathname = joinPath(upstream.pathname, url.pathname);
-      upstream.search = url.search;
-
-      // Proxy the request (method/body/headers) to the Render origin
-      const reqInit = {
-        method: request.method,
-        headers: new Headers(request.headers),
-        body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.arrayBuffer(),
-        redirect: "follow",
-      };
-      // override the Host header so upstream sees its own host
-      reqInit.headers.set("host", upstream.hostname);
-
-      const resp = await fetch(upstream.toString(), reqInit);
-
-      // You can tweak caching here if desired
-      return new Response(resp.body, {
-        status: resp.status,
-        statusText: resp.statusText,
-        headers: resp.headers,
-      });
-    }
-
-    // Anything else
-    return new Response("Not Found", { status: 404 });
-  },
+    const isControl = host.endsWith("workers.dev") || url.pathname.startsWith("/_control");
+    return isControl ? controlPlane(request, env) : dataPlane(request, env);
+  }
 };
 
-// helpers
-function json(obj, init = {}) {
-  const body = JSON.stringify(obj, null, 2);
-  const headers = new Headers(init.headers || {});
-  headers.set("content-type", "application/json; charset=utf-8");
-  return new Response(body, { ...init, headers });
+function prFromHost(host, root = (host.split(".").slice(-3).join("."))) {
+  // expected host like pr-123-stage.previews.sniffrpack.com
+  // Extract the left-most label and parse pr number
+  const left = host.split(".")[0];
+  const match = left.match(/pr-(\d+)-/i);
+  if (!match) return null;
+  return match[1];
 }
 
-function joinPath(a = "", b = "") {
-  const left = a.endsWith("/") ? a.slice(0, -1) : a;
-  const right = b.startsWith("/") ? b : `/${b}`;
-  return `${left}${right}`;
+async function controlPlane(request, env) {
+  if (request.method !== 'POST') {
+    return new Response('Only POST', { status: 405 });
+  }
+  const secret = request.headers.get('x-webhook-secret');
+  if (!secret || secret !== env.WEBHOOK_SECRET) {
+    return new Response('Forbidden', { status: 403 });
+  }
+  const body = await request.json().catch(() => ({}));
+  const { action, pr, prId, url, origin, api, web } = body;
+  const prNum = pr || prId;
+  if (!prNum) return new Response('Missing pr', { status: 400 });
+
+  const kvKey = `pr:${prNum}`;
+  if (action === 'delete') {
+    await env.PR_PREVIEWS.delete(kvKey);
+    return json({ ok: true, deleted: kvKey });
+  }
+
+  if (action !== 'upsert') return new Response('Unknown action', { status: 400 });
+
+  // Back-compat: if only a single origin is provided, use it for both api+web
+  const rec = normalizeOrigins({ origin, url, api, web });
+  await env.PR_PREVIEWS.put(kvKey, JSON.stringify(rec), { metadata: { createdAt: Date.now() } });
+  return json({ ok: true, upserted: kvKey, rec });
 }
+
+function normalizeOrigins({ origin, url, api, web }) {
+  const norm = (u) => {
+    if (!u) return null;
+    try { const x = new URL(u); return `${x.protocol}//${x.host}`; } catch { return null; }
+  };
+  const single = norm(origin || url);
+  const a = norm(api) || single;
+  const w = norm(web) || single;
+  if (!a || !w) throw new Error('At least one origin required');
+  return { api: a, web: w };
+}
+
+async function dataPlane(request, env) {
+  const url = new URL(request.url);
+  const prNum = prFromHost(url.hostname);
+  if (!prNum) return new Response('Not a PR host', { status: 404 });
+
+  const kvKey = `pr:${prNum}`;
+  const raw = await env.PR_PREVIEWS.get(kvKey);
+  if (!raw) return new Response('No mapping', { status: 404 });
+  const rec = JSON.parse(raw); // { api, web }
+
+  const upstreamBase = url.pathname.startsWith('/api') ? rec.api : rec.web;
+  const upstream = new URL(upstreamBase);
+  upstream.pathname = url.pathname;
+  upstream.search = url.search;
+
+  const headers = new Headers(request.headers);
+  headers.set('host', upstream.host);
+
+  const resp = await fetch(upstream.toString(), {
+    method: request.method,
+    headers,
+    body: request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.arrayBuffer(),
+    redirect: 'follow'
+  });
+  return resp;
+}
+
+function json(obj, init = {}) { return new Response(JSON.stringify(obj), { status: 200, headers: { 'content-type': 'application/json' }, ...init }); }
