@@ -7,6 +7,8 @@ account_id = "774b68e8a6ad8edd33820cd760f785d9"
 binding = "PR_PREVIEWS"
 id = "c18f6a2164574a4dab78b7ceed1cc5ae"
 
-routes = [
-  { pattern = "*.previews.sniffrpack.com/*", zone_id = "0419e59ea2fc35394bccae5f769e4e85" }
-]
+[[routes]] 
+
+  pattern = "*.previews.sniffrpack.com/*", 
+  zone_id = "0419e59ea2fc35394bccae5f769e4e85"
+
