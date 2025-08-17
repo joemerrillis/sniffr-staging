@@ -1,0 +1,26 @@
+*** a/.github/agent/agent.mjs
+--- b/.github/agent/agent.mjs
+@@
+-  // existing: gather curated files (CONTEXT.md, SCHEMA, ROUTING, TESTING, etc.)
++  // existing: gather curated files (CONTEXT.md, SCHEMA, ROUTING, TESTING, etc.)
+   const docs = await Promise.all([
+     read('docs/CONTEXT.md'),
+     read('docs/SCHEMA.md'),
+     read('docs/ROUTING.md'),
+     read('docs/TESTING.md'),
+     read('package.json'),
+     read('index.js'),
+     read('public/rapi-doc/rapidoc.html'),
+     read('src/swagger.js')
+   ]);
++
++  // NEW: append harvested context if present
++  const ctxPath = '.github/agent/.context.json';
++  let harvested = '';
++  try {
++    const c = await read(ctxPath);
++    harvested = `\n\n# Harvested Context\n\n${c}`;
++  } catch {}
+@@
+-  return docs.filter(Boolean).join('\n\n');
++  return docs.filter(Boolean).join('\n\n') + harvested;
