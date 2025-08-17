@@ -2,16 +2,23 @@
   "name": "api-sniffrpack",
   "version": "1.0.0",
   "description": "",
+  "private": true,
   "main": "index.js",
   "type": "module",
-  "engines": {
-    "node": "20.x"
-  },
+  "engines": { "node": "20.x" },
+  "workspaces": [
+    "apps/*",
+    "tools"
+  ],
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "check-deps": "npx depcheck --skip-missing=false"
+    "check-deps": "npx depcheck --skip-missing=false",
+    "build:index": "ts-node tools/build-index.ts",
+    "serve:search": "node tools/search-server.ts",
+    "ctx:fetch": "node tools/fetch-context.mjs",
+    "preview:worker:dev": "wrangler dev worker/preview-router.mjs"
   },
   "keywords": [],
   "author": "",
@@ -52,5 +59,12 @@
     "stripe": "^16.0.0",
     "uuid": "^9.0.1",
     "yaml": "^2.4.5"
+  },
+  "devDependencies": {
+    "sqlite": "^5.2.4",
+    "sqlite3": "^5.1.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2",
+    "wrangler": "^3.80.0"
   }
 }
