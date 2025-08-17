@@ -19,6 +19,8 @@ jobs:
       PR_NUMBER: ${{ github.event.number }}
       RENDER_URL: https://sniffr-staging-pr-${{ github.event.number }}.onrender.com
       PRETTY_DOMAIN: ${{ vars.PRETTY_DOMAIN }}   # must be set to previews.sniffrpack.com
+      API_DOCS_PATH: /rapi-doc/rapidoc.html
+
 
     steps:
       - name: Who am I
@@ -88,14 +90,23 @@ jobs:
         id: compose
         run: |
           RENDER_MSG="✅ API Preview (Render): $RENDER_URL"
+
           if [ -n "$PRETTY_DOMAIN" ]; then
-            PRETTY_URL="https://pr-${PR_NUMBER}-stage.${PRETTY_DOMAIN}"
+            PRETTY_BASE="https://pr-${PR_NUMBER}-stage.${PRETTY_DOMAIN}"
+            PRETTY_URL="${PRETTY_BASE}"
+            PRETTY_DOCS_URL="${PRETTY_BASE}${API_DOCS_PATH}"
+
             PRETTY_MSG="✨ Pretty URL: ${PRETTY_URL}"
+            DOCS_MSG="📚 API Docs: ${PRETTY_DOCS_URL}"
           else
             PRETTY_MSG=""
+            DOCS_MSG=""
           fi
-          echo "render=$RENDER_MSG" >> $GITHUB_OUTPUT
-          echo "pretty=$PRETTY_MSG" >> $GITHUB_OUTPUT
+
+          echo "render=$RENDER_MSG"       >> $GITHUB_OUTPUT
+          echo "pretty=$PRETTY_MSG"       >> $GITHUB_OUTPUT
+          echo "docs=$DOCS_MSG"           >> $GITHUB_OUTPUT
+
 
       - name: Comment Preview URLs
         uses: marocchino/sticky-pull-request-comment@v2
@@ -103,3 +114,4 @@ jobs:
           message: |
             ${{ steps.compose.outputs.render }}
             ${{ steps.compose.outputs.pretty }}
+            ${{ steps.compose.outputs.docs }}
