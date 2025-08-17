@@ -1,0 +1,55 @@
+name: Preview Cleanup
+
+on:
+  pull_request:
+    types: [closed]   # fires on both merged and closed-without-merge
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Show context
+        run: |
+          echo "PR_NUMBER=$PR_NUMBER"
+          echo "merged=${{ github.event.pull_request.merged }}"
+
+      # If you want to only clean up when NOT merged, uncomment the next step.
+      # - name: Skip if merged (keep preview alive after merge)
+      #   if: ${{ github.event.pull_request.merged }}
+      #   run: echo "Merged PR; skipping preview cleanup."
+
+      - name: Delete mapping in Cloudflare Worker
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}   # already added in your repo secrets
+        run: |
+          if [[ -z "${WEBHOOK_SECRET:-}" ]]; then
+            echo "WEBHOOK_SECRET not set; skipping cleanup."
+            exit 0
+          fi
+          curl -sS -X POST "https://render-pr-alias.joemerrillis.workers.dev/hook" \
+            -H "x-hook-secret: ${WEBHOOK_SECRET}" \
+            -H "content-type: application/json" \
+            --data @- <<JSON
+          {
+            "action": "delete",
+            "pr": $PR_NUMBER
+          }
+          JSON
+
+      # Optional: update the sticky PR comment to show it's been cleaned
+      - name: Comment cleanup note
+        if: ${{ !cancelled() }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-link
+          message: |
+            🧹 Preview cleaned for PR #${{ env.PR_NUMBER }}.
+            (Pretty URL disabled; Render link may continue to serve if kept alive.)
