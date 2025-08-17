@@ -86,12 +86,32 @@ jobs:
 
           {
             echo "cmd=${CMD}"
-            printf 'text<<EOF\n%s\nEOF\n' "${MSG}"
+            printf 'text<<EOF
+%s
+EOF
+' "${MSG}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         # If you don't keep a package-lock.json at the repo root, npm ci will fail; we fall back to npm install.
         run: npm ci || npm install
+
+      # === NEW: Hybrid search context pre-step (index → serve → fetch) ===
+      - name: Build code index (with embeddings if key present)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          npx ts-node tools/build-index.ts
+
+      - name: Start search server (background)
+        run: |
+          node tools/search-server.ts & echo $! > search.pid
+
+      - name: Fetch harvested context for this request
+        env:
+          REQUEST_TEXT: ${{ steps.parse.outputs.text }}
+        run: |
+          node tools/fetch-context.mjs
 
       - name: Run agent
         env:
