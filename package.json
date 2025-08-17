@@ -5,7 +5,9 @@
   "private": true,
   "main": "index.js",
   "type": "module",
-  "engines": { "node": "20.x" },
+  "engines": {
+    "node": "20.x"
+  },
   "workspaces": [
     "apps/*",
     "tools"
@@ -61,7 +63,7 @@
     "yaml": "^2.4.5"
   },
   "devDependencies": {
-    "sqlite": "^5.2.4",
+    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2",
