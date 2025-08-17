@@ -26,6 +26,9 @@ jobs:
           whoami && id
           ls -ld /__w /__w/_temp || true
 
+      - name: Debug PRETTY_DOMAIN
+        run: echo "PRETTY_DOMAIN=${PRETTY_DOMAIN:-<empty>}"
+        
       - uses: actions/checkout@v4
 
       # SAFER: only chown the repo workspace
