@@ -1,0 +1,24 @@
+name: Build Embedding Index (main)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        run: corepack enable
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Build code index (with embeddings)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: pnpm ts-node tools/build-index.ts
+      - name: Upload index (optional debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-index-sqlite
+          path: code-index.sqlite
