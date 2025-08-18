@@ -101,7 +101,7 @@ EOF
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          npx ts-node tools/build-index.ts
+          npx ts-node --esm tools/build-index.ts
 
       - name: Start search server (background)
         run: |
