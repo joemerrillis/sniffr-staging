@@ -2,7 +2,9 @@ name: agent
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created]
   workflow_dispatch:
     inputs:
       title:
@@ -24,19 +26,27 @@ env:
 
 jobs:
   agent:
+    # Only run when:
+    # - manually dispatched, OR
+    # - an Issue is opened/edited/reopened (body contains '/agent'), OR
+    # - a comment starting with '/agent ' is posted on an Issue/PR
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' &&
+        (contains(github.event.issue.body, '/agent ') || contains(github.event.issue.body, '/Agent '))) ||
+      (github.event_name == 'issue_comment' &&
+        (startsWith(github.event.comment.body, '/agent ') || startsWith(github.event.comment.body, '/Agent ')))
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     steps:
-      - name: starting
-        run: echo "starting"
-
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 20.x
 
       # Gather TITLE/BODY into outputs and compute CMD/text safely (no shell expansion)
       - name: Parse event/title/body into request text
@@ -50,22 +60,26 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Use issue title/body when event is "issues"; otherwise use workflow_dispatch inputs.
-          if [[ "${GITHUB_EVENT_NAME}" == "issues" ]]; then
+          # Use issue title/body when event is "issues" or "issue_comment"; otherwise use workflow_dispatch inputs.
+          if [[ "${GITHUB_EVENT_NAME}" == "issues" || "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
             TITLE="${ISSUE_TITLE:-}"
             BODY="${ISSUE_BODY:-}"
+            # For comments, use the comment text as the BODY instead
+            if [[ "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
+              BODY="${{ github.event.comment.body }}"
+            fi
           else
             TITLE="${INPUT_TITLE:-}"
             BODY="${INPUT_BODY:-}"
           fi
 
-          # If BODY is still empty (rare), provide a safe single-quoted heredoc fallback.
+          # Fallback BODY (rare)
           if [[ -z "${BODY}" ]]; then
             read -r -d '' BODY <<'EOF'
           /agent plan
 
           # Feature
-          Example body to avoid shell expansion of backticks like `walker_recommendations`.
+          Example body to avoid shell expansion.
           EOF
           fi
 
@@ -76,7 +90,7 @@ jobs:
           fi
           if [[ -z "${CMD}" ]]; then CMD="plan"; fi
 
-          # The message we pass to the agent is the body without the "/agent <cmd>" prefix
+          # Message for the agent = body without the "/agent <cmd>" prefix
           AFTER="$(printf '%s' "${BODY}" | sed -E 's#^/[Aa]gent[[:space:]]+[A-Za-z]+[[:space:]]*##')"
           if [[ -z "${AFTER}" ]]; then
             MSG="${TITLE} — ${BODY}"
@@ -93,25 +107,21 @@ EOF
           } >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
-        # If you don't keep a package-lock.json at the repo root, npm ci will fail; we fall back to npm install.
         run: npm ci || npm install
 
-      # === NEW: Hybrid search context pre-step (index → serve → fetch) ===
+      # === Hybrid search context pre-step (index → serve → fetch) ===
       - name: Build code index (with embeddings if key present)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          npx ts-node --esm tools/build-index.ts
+        run: npx ts-node --esm tools/build-index.ts
 
       - name: Start search server (background)
-        run: |
-          node tools/search-server.ts & echo $! > search.pid
+        run: npx ts-node --esm tools/search-server.ts & echo $! > search.pid
 
       - name: Fetch harvested context for this request
         env:
           REQUEST_TEXT: ${{ steps.parse.outputs.text }}
-        run: |
-          node tools/fetch-context.mjs
+        run: node tools/fetch-context.mjs
 
       - name: Run agent
         env:
@@ -124,12 +134,4 @@ EOF
           set -euo pipefail
           echo "MODE=$MODE"
           echo "Text length: $(printf '%s' "$REQUEST_TEXT" | wc -c)"
-          # ✅ Correct path to your file:
           node .github/agent/agent.mjs
-
-      - name: Post-run note
-        run: |
-          echo "Plan file (if generated): .github/agent/.plan.md"
-          if [[ -f "$GITHUB_OUTPUT" ]]; then
-            echo "GITHUB_OUTPUT exists."
-          fi
