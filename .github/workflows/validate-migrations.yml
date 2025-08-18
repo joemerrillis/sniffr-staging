@@ -11,6 +11,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:15
@@ -18,34 +19,49 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
           POSTGRES_DB: app
-        ports: ["5432:5432"]
+        ports:
+          - "5432:5432"
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
+
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Postgres client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: List migration files in this PR
         id: files
+        shell: bash
         run: |
+          set -euo pipefail
           base="${{ github.event.pull_request.base.ref }}"
-          git fetch origin "$base":"origin/$base"
-          CHANGED=$(git diff --name-only "origin/$base"...HEAD | grep '^supabase/migrations/.*\.sql$' || true)
-          printf 'changed<<EOF\n%s\nEOF\n' "$CHANGED" >> $GITHUB_OUTPUT
+          git fetch --no-tags --depth=1 origin "$base:$base"
+          CHANGED=$(git diff --name-only "$base"...HEAD | grep '^supabase/migrations/.*\.sql$' || true)
+          {
+            echo 'changed<<EOF'
+            printf '%s\n' "$CHANGED"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Fail on dangerous statements without label
-        if: steps.files.outputs.changed != ''
+        if: ${{ steps.files.outputs.changed != '' }}
+        shell: bash
         run: |
-          DANG=$(echo "${{ steps.files.outputs.changed }}" | xargs -r cat | grep -Ei 'DROP\s+(TABLE|COLUMN)|ALTER\s+TABLE.+DROP' || true)
-          echo "${{ toJson(github.event.pull_request.labels.*.name) }}" | grep -q 'breaking-change' && ALLOW=1 || ALLOW=0
+          set -euo pipefail
+          DANG=$(echo "${{ steps.files.outputs.changed }}" | xargs -r cat | grep -Ei 'DROP[[:space:]]+(TABLE|COLUMN)|ALTER[[:space:]]+TABLE.+DROP' || true)
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          echo "$LABELS" | grep -q '"breaking-change"' && ALLOW=1 || ALLOW=0
           if [ -n "$DANG" ] && [ "$ALLOW" -ne 1 ]; then
             echo "❌ Detected DROP statements; add label 'breaking-change' to allow." >&2
             exit 1
           fi
 
       - name: Wait for Postgres
+        shell: bash
         run: |
           for i in {1..30}; do
             pg_isready -h 127.0.0.1 -p 5432 -U postgres && break
@@ -53,13 +69,14 @@ jobs:
           done
 
       - name: Apply migrations into scratch DB
-        if: steps.files.outputs.changed != ''
+        if: ${{ steps.files.outputs.changed != '' }}
         env:
           PGPASSWORD: postgres
+        shell: bash
         run: |
           set -euo pipefail
           uri="postgresql://postgres:postgres@127.0.0.1:5432/app"
-          files=$(echo "${{ steps.files.outputs.changed }}" | tr ' ' '\n' | sort)
+          files=$(printf '%s\n' "${{ steps.files.outputs.changed }}" | tr ' ' '\n' | sort)
           for f in $files; do
             echo "Applying $f"
             psql "$uri" -v ON_ERROR_STOP=1 -f "$f"
@@ -72,16 +89,23 @@ jobs:
         with:
           script: |
             const files = `${{ steps.files.outputs.changed }}`.trim() || "(none)";
-            const body = `**Migration validation**
-Files:
-\`\`\`
-${files}
-\`\`\`
-`;
-            await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            const body = [
+              "**Migration validation**",
+              "",
+              "Files:",
+              "```",
+              files,
+              "```"
+            ].join("\n");
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
 
       - name: Upload schema snapshot
-        if: steps.files.outputs.changed != ''
+        if: ${{ steps.files.outputs.changed != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: schema-snapshots
