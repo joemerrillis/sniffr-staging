@@ -107,13 +107,12 @@ async function dataPlane(request, env) {
   const kvKey = `pr:${prNum}`;
   const raw = await env.PR_PREVIEWS.get(kvKey);
   if (!raw) return new Response('No mapping', { status: 404 });
+  const rec = JSON.parse(raw); // { api, web }
 
-  const rec = JSON.parse(raw); // { api, web, apiPrefixes? }
-  const prefixes = Array.isArray(rec.apiPrefixes) && rec.apiPrefixes.length
-    ? rec.apiPrefixes
-    : ['/api', '/rapi-doc'];
-
-  const toApi = prefixes.some(prefix => url.pathname.startsWith(prefix));
+  // Route both /api/* and /rapi-doc/* to API
+  const toApi =
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/rapi-doc');
 
   const upstreamBase = toApi ? rec.api : rec.web;
   const upstream = new URL(upstreamBase);
@@ -123,15 +122,14 @@ async function dataPlane(request, env) {
   const headers = new Headers(request.headers);
   headers.set('host', upstream.host);
 
-  const resp = await fetch(upstream.toString(), {
+  return fetch(upstream.toString(), {
     method: request.method,
     headers,
     body: request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.arrayBuffer(),
     redirect: 'follow'
   });
-
-  return resp;
 }
+
 
 function json(obj, init = {}) {
   return new Response(JSON.stringify(obj), {
