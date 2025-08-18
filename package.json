@@ -17,8 +17,8 @@
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "check-deps": "npx depcheck --skip-missing=false",
-    "build:index": "ts-node tools/build-index.ts",
-    "serve:search": "node tools/search-server.ts",
+    "build:index": "tsx tools/build-index.ts",
+    "serve:search": "tsx tools/search-server.ts",
     "ctx:fetch": "node tools/fetch-context.mjs",
     "preview:worker:dev": "wrangler dev worker/preview-router.mjs"
   },
