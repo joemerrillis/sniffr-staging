@@ -115,7 +115,10 @@ jobs:
         run: npx tsx tools/build-index.ts
 
       - name: Start search server (background)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}   # <— add this
         run: npx tsx tools/search-server.ts & echo $! > search.pid
+
 
       - name: Fetch harvested context for this request
         env:
