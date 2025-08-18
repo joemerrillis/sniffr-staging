@@ -100,10 +100,9 @@ jobs:
 
           {
             echo "cmd=${CMD}"
-            printf 'text<<EOF
-%s
-EOF
-' "${MSG}"
+            echo 'text<<EOF'
+            printf '%s\n' "${MSG}"
+            echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
