@@ -113,10 +113,10 @@ EOF
       - name: Build code index (with embeddings if key present)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npx ts-node --esm tools/build-index.ts
+        run: npx tsx tools/build-index.ts
 
       - name: Start search server (background)
-        run: npx ts-node --esm tools/search-server.ts & echo $! > search.pid
+        run: npx tsx tools/search-server.ts & echo $! > search.pid
 
       - name: Fetch harvested context for this request
         env:
