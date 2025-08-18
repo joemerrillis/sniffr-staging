@@ -25,7 +25,7 @@ jobs:
       - name: Build code index (with embeddings)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npx ts-node --esm tools/build-index.ts
+        run: npx tsx tools/build-index.ts
 
       - name: Show chunk + vector row counts
         run: |
