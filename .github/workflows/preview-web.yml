@@ -25,25 +25,18 @@
 - name: Upsert pretty URL (available origins only)
   env:
     PR_NUM: ${{ github.event.pull_request.number }}
-    WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}
+    WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}   # e.g. https://render-pr-alias.joemerrillis.workers.dev
     WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
-    API_PREFIXES: '["/api","/rapi-doc","/docs"]'
   run: |
-    web=$(cat web_url.txt 2>/dev/null || true)
-    api=$(cat api_url.txt 2>/dev/null || true)
-    if [ -z "$web" ] && [ -z "$api" ]; then
-      echo "No Render preview URLs found"; exit 1; fi
-    payload=$(jq -n \
-      --arg pr  "${PR_NUM}" \
-      --arg api "$api" \
-      --arg web "$web" \
-      --argjson prefixes "${API_PREFIXES}" '
-      {action:"upsert", pr: ($pr|tonumber)}
-      + ( ($api|length)>0 ? {api:$api} : {} )
-      + ( ($web|length)>0 ? {web:$web} : {} )
-      + { apiPrefixes: $prefixes }')
-    echo "::group::Upsert payload"; echo "$payload"; echo "::endgroup::"
+    # build payload — for single-origin while API is booting:
+    payload=$(jq -n --argjson pr $PR_NUM --arg url "$RENDER_URL" \
+      '{action:"upsert", pr:$pr, url:$url}')
+    # or, if you have both web+api URLs available, send {api, web, apiPrefixes} instead
+
     curl -fsSL -X POST "$WORKER_WEBHOOK" \
+      -H "x-webhook-secret: $WORKER_SECRET" \
+      -H 'content-type: application/json' \
+      --data "$payload"
       -H "x-webhook-secret: $WORKER_SECRET" \
       -H 'content-type: application/json' \
       --data "$payload"
