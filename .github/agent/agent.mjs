@@ -1,228 +1,149 @@
-import { Octokit } from "@octokit/rest";
-import OpenAI from "openai";
-import { writeFileSync, mkdirSync, readFileSync, existsSync } from "fs";
-import { execSync } from "child_process";
-import path from "path";
+#!/usr/bin/env node
+/**
+ * Sniffr Agent Runner (PLAN / APPLY)
+ *
+ * This is a thin, pluggable wrapper around an LLM.
+ * - Reads prompt from STDIN (or --prompt-file)
+ * - --mode=plan  → returns Markdown PLAN
+ * - --mode=apply → returns strict JSON { summary, commitMessage, files:[{path,contents}] }
+ *
+ * If OPENAI is available (OPENAI_API_KEY + 'openai' npm pkg), it will call the API.
+ * Otherwise it will emit conservative stubs (so CI doesn't explode locally).
+ */
 
-const MODE = (process.env.MODE || "plan").toLowerCase();   // "plan" | "revise" | "apply"
-const REQUEST_TEXT = process.env.REQUEST_TEXT || "";
+import fs from 'node:fs';
+import path from 'node:path';
 
-// GitHub context
-const [owner, repo] = process.env.GITHUB_REPOSITORY.split("/");
-const baseBranch = process.env.GITHUB_BASE_REF || "main";
-const gh = new Octokit({ auth: process.env.GH_TOKEN });
-
-// OpenAI
-const ai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const MODEL = process.env.AGENT_MODEL || "gpt-5";
-
-
-// Utility: set output for later steps
-function setOutput(key, val) {
-  const out = process.env.GITHUB_OUTPUT;
-  if (out) writeFileSync(out, `${key}=${val}\n`, { flag: "a" });
-}
-
-// === Context loading (lightweight, curated) ===
-function safeRead(p, max = 12000) {
-  try {
-    const s = readFileSync(p, "utf8");
-    return s.length > max ? s.slice(0, max) + "\n\n... [truncated]" : s;
-  } catch { return ""; }
-}
-
-function gatherContext() {
-  const ctx = [];
-  const add = (label, rel) => {
-    const full = path.join(process.cwd(), rel);
-    if (existsSync(full)) {
-      const txt = safeRead(full);
-      if (txt) ctx.push(`--- ${label} (${rel}) ---\n${txt}`);
+function exists(p) { try { fs.accessSync(p); return true; } catch { return false; } }
+function read(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
+function parseArgs(argv) {
+  const args = { mode: 'plan' };
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    const [k, v] = a.includes('=') ? a.split('=') : [a, argv[i + 1]];
+    switch (k) {
+      case '--mode': args.mode = v; if (!a.includes('=')) i++; break;
+      case '--prompt-file': args.promptFile = v; if (!a.includes('=')) i++; break;
+      default: /* ignore */ break;
     }
-  };
-  add("CONTEXT", "docs/CONTEXT.md");
-  add("SCHEMA", "docs/SCHEMA.md");
-  add("ROUTING", "docs/ROUTING.md");
-  add("TESTING", "docs/TESTING.md");
-  add("package.json", "package.json");
-  add("Fastify entry", "index.js");
-  add("OpenAPI RapiDoc", "public/rapi-doc/rapidoc.html");
-  add("Swagger setup", "src/swagger.js");
-  return ctx.join("\n\n");
+  }
+  return args;
+}
+async function maybeOpenAI() {
+  const key = process.env.OPENAI_API_KEY || process.env.OPENAI_APIKEY || '';
+  if (!key) return null;
+  try {
+    const { OpenAI } = await import('openai');
+    const client = new OpenAI({ apiKey: key });
+    return client;
+  } catch {
+    return null;
+  }
 }
 
-// === System prompts ===
-const sysPlanner = `
-You are the PLANNER for the Sniffr repo.
-Read the project context and propose a concrete plan that matches house style.
+function readPrompt(promptFile) {
+  if (promptFile && exists(promptFile)) return read(promptFile);
+  // Read from stdin
+  const buf = fs.readFileSync(0, 'utf8');
+  return buf.toString();
+}
 
-RETURN STRICT MARKDOWN ONLY:
-# Plan
-- short bullets of tasks
+function defaultPlan(prompt) {
+  return `# Plan
+- Analyze Constitution & Schema; identify required changes.
+- Scaffold or modify plugin files as needed.
+- Ensure controllers return envelopes and services use injected supabase param.
+- Add/Update migrations and docs/SCHEMA.md if schema changes.
+- Add/Update smoke tests and worker tests.
 
 # Files
-- list each <path>: purpose
+- <computed by APPLY>
 
 # OpenAPI
-- paths you will add/change (YAML-like)
+- <paths to update or confirm>
 
-# Migrations (if any)
-- name using UTC: YYYYMMDDHHMMSS_name.sql and a matching _down.sql
-- describe the change
+# Migrations
+- <filenames if schema changed>
 
 # Smoke
-- endpoints to hit and expected status codes
-
-Never write or change files in PLAN mode.
+- /health -> 200
+- /docs/json -> 200
 `;
+}
 
-const sysExecutor = `
-You are the EXECUTOR for the Sniffr repo.
+function defaultApply(prompt) {
+  // Minimal no-op commit to keep pipelines flowing if no LLM configured
+  return {
+    summary: "No-op apply (fallback). Please configure OPENAI_API_KEY for real edits.",
+    commitMessage: "chore: noop apply (agent fallback)",
+    files: []
+  };
+}
 
-When asked to APPLY, output STRICT JSON:
+async function openaiPlan(client, prompt) {
+  const sys = `You are Sniffr's code agent. Respond ONLY with the PLAN markdown section as specified by the Constitution.`;
+  const res = await client.chat.completions.create({
+    model: process.env.SNIFFR_AGENT_MODEL || "gpt-4o-mini",
+    messages: [
+      { role: "system", content: sys },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.2,
+  });
+  return (res.choices?.[0]?.message?.content || '').trim();
+}
 
+async function openaiApply(client, prompt) {
+  const sys = `You are Sniffr's code agent. Respond ONLY with strict JSON in this shape:
 {
-  "summary": "one-line summary",
-  "commitMessage": "imperative commit message",
-  "files": [
-    {"path":"<relative path>", "contents":"<file contents>"}
-  ]
-}
-
-Rules:
-- Minimal, non-breaking changes by default.
-- If unsure of layout, create a minimal Fastify plugin at src/agent_sanity/routes.js registering GET /_agent/health returning {"ok":true}.
-- Add/extend OpenAPI so /docs/json includes new paths.
-- Add docs/AGENT_NOTES.md explaining what was added and how to test.
-- For migrations: always add a matching *_down.sql.
-`;
-
-const sysReviewer = `
-You are the REVIEWER. You will receive a unified git diff and short repo context.
-Find issues: missing imports, unregistered plugins, wrong OpenAPI, missing *_down.sql, bad timestamps, invalid JS.
-If fixes are needed, return STRICT JSON:
-
-{
-  "fixes": [
-    {"path":"<file>", "contents":"<full corrected file>"}
-  ],
-  "notes": "short list of what you corrected"
-}
-
-If nothing to fix, return: {"fixes":[],"notes":"looks good"}.
-`;
-
-// === Main modes ===
-async function runPlan() {
-  const ctx = gatherContext();
-  const messages = [
-    { role: "system", content: sysPlanner },
-    { role: "user", content: `## Project Context\n${ctx}\n\n## Request\n${REQUEST_TEXT}` },
-  ];
-  const res = await ai.chat.completions.create({
-    model: MODEL,
-    messages,
+  "summary": "...",
+  "commitMessage": "...",
+  "files": [{"path":"<relative path>","contents":"<string>"}]
+}`;
+  const res = await client.chat.completions.create({
+    model: process.env.SNIFFR_AGENT_MODEL || "gpt-4o-mini",
+    messages: [
+      { role: "system", content: sys },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.2,
+    response_format: { type: "json_object" }
   });
-  const plan = res.choices[0].message.content || "No plan generated.";
-  const planPath = ".github/agent/.plan.md";
-  mkdirSync(".github/agent", { recursive: true });
-  writeFileSync(planPath, plan, "utf8");
-  setOutput("plan_path", planPath);
+  return (res.choices?.[0]?.message?.content || '').trim();
 }
 
-async function runApply() {
-  // 1) Generate files
-  const ctx = gatherContext();
-  const messages = [
-    { role: "system", content: sysExecutor },
-    { role: "user", content: `## Project Context\n${ctx}\n\n## Implement\n${REQUEST_TEXT}` },
-  ];
-  const completion = await ai.chat.completions.create({
-    model: MODEL,
-    response_format: { type: "json_object" },
-    messages,
-  });
+async function main() {
+  const args = parseArgs(process.argv);
+  const prompt = readPrompt(args.promptFile);
 
-  const out = JSON.parse(completion.choices[0].message.content || "{}");
-  const summary = out.summary || "Agent proposal";
-  const commitMessage = out.commitMessage || "agent: apply proposal";
-  const files = Array.isArray(out.files) ? out.files : [];
+  const client = await maybeOpenAI();
 
-  // 2) Create branch, write files, commit, push (Draft PR)
-  const newBranch = `agent/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  execSync(`git config user.email "bot@sniffr.dev"`);
-  execSync(`git config user.name "sniffr-agent"`);
-  execSync(`git checkout -b ${newBranch}`, { stdio: "inherit" });
-
-  for (const f of files) {
-    const full = path.join(process.cwd(), f.path);
-    mkdirSync(path.dirname(full), { recursive: true });
-    writeFileSync(full, f.contents ?? "", "utf8");
-  }
-
-  execSync("git add -A", { stdio: "inherit" });
-  execSync(`git commit -m "${commitMessage}"`, { stdio: "inherit" });
-  execSync(`git push origin ${newBranch}`, { stdio: "inherit" });
-
-  const pr = await gh.pulls.create({
-    owner, repo,
-    title: commitMessage,
-    head: newBranch,
-    base: baseBranch,
-    body: `### Summary\n${summary}\n\n_Auto-generated._`,
-    draft: true
-  });
-
-  // 3) Reviewer pass (self‑review + possible patch commit)
-  try {
-    const diff = execSync(`git --no-pager diff origin/${baseBranch}...origin/${newBranch}`, { encoding: "utf8" });
-    const revMsgs = [
-      { role: "system", content: sysReviewer },
-      { role: "user", content: `## Minimal Context\n${ctx.slice(0, 8000)}\n\n## Diff\n${diff}` },
-    ];
-    const r = await ai.chat.completions.create({
-      model: MODEL,
-      response_format: { type: "json_object" },
-      messages: revMsgs,
-    });
-    const review = JSON.parse(r.choices[0].message.content || '{"fixes":[],"notes":""}');
-    if (Array.isArray(review.fixes) && review.fixes.length) {
-      // Checkout branch locally for patch commit
-      execSync(`git fetch origin ${newBranch}`);
-      execSync(`git checkout ${newBranch}`);
-      for (const fix of review.fixes) {
-        const full = path.join(process.cwd(), fix.path);
-        mkdirSync(path.dirname(full), { recursive: true });
-        writeFileSync(full, fix.contents ?? "", "utf8");
-      }
-      execSync("git add -A");
-      execSync(`git commit -m "agent: reviewer fixes"`);
-      execSync(`git push origin ${newBranch}`);
-      // Append reviewer notes to PR
-      if (review.notes) {
-        await gh.issues.createComment({ owner, repo, issue_number: pr.data.number, body: `🤖 Reviewer notes:\n\n${review.notes}` });
-      }
-    }
-  } catch (e) {
-    // Non-blocking; just comment error
-    await gh.issues.createComment({ owner, repo, issue_number: pr.data.number, body: `Reviewer pass error (non-blocking): \`${e.message}\`` });
-  }
-
-  // 4) Output PR URL
-  setOutput("pr_url", pr.data.html_url);
-}
-
-(async () => {
-  try {
-    if (MODE === "plan" || MODE === "revise") {
-      await runPlan();
-    } else if (MODE === "apply") {
-      await runApply();
+  if (args.mode === 'plan') {
+    if (client) {
+      const out = await openaiPlan(client, prompt);
+      process.stdout.write(out + '\n');
     } else {
-      await runPlan();
+      process.stdout.write(defaultPlan(prompt) + '\n');
     }
-  } catch (e) {
-    console.error(e);
-    process.exit(1);
+    return;
   }
-})();
+
+  if (args.mode === 'apply') {
+    if (client) {
+      const out = await openaiApply(client, prompt);
+      process.stdout.write(out + '\n');
+    } else {
+      process.stdout.write(JSON.stringify(defaultApply(prompt)) + '\n');
+    }
+    return;
+  }
+
+  // Unknown mode
+  console.error(`Unknown --mode ${args.mode}. Use --mode plan | apply`);
+  process.exit(2);
+}
+
+main().catch(err => {
+  console.error('agent fatal error:', err);
+  process.exit(1);
+});
