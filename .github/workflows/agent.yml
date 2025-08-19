@@ -113,6 +113,9 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npx tsx tools/build-index.ts
 
+      - name: Install ripgrep (optional)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Start search server (background)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -171,3 +174,10 @@ jobs:
           path: .github/agent/.plan.md
           include-hidden-files: true  
           if-no-files-found: warn
+      - name: Link to this run (comment)
+        if: always() && (github.event_name == 'issues' || github.event_name == 'issue_comment')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.run_id }}`;
+            await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body: `Artifact **agent-plan** is attached to this run.\n\n${url}` });
