@@ -1,0 +1,66 @@
+name: Search Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Search query"
+        required: true
+        default: "photo throttle"
+      mustContain:
+        description: "Expected substring in at least one hit's path"
+        required: true
+        default: "photo"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep jq
+          npm ci || npm install
+
+      - name: Build code index (embeddings if key present)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npx tsx tools/build-index.ts
+
+      - name: Start search server
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npx tsx tools/search-server.ts & echo $! > search.pid
+
+      - name: Wait for health
+        run: |
+          for i in {1..30}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:7777/health)
+            if [ "$code" = "200" ]; then echo OK; break; fi
+            sleep 1
+          done
+
+      - name: Run search
+        env:
+          Q: ${{ github.event.inputs.query }}
+        run: |
+          curl -fsSL "http://127.0.0.1:7777/search?q=${Q// /%20}" | tee out.json
+          echo "hits: $(jq '.hits | length' out.json)" || true
+          jq -r '.hits[0:5][] | .path + " #" + (.ord|tostring)' out.json || true
+
+      - name: Assert we found something plausible
+        env:
+          must: ${{ github.event.inputs.mustContain }}
+        run: |
+          n=$(jq '.hits | length' out.json)
+          if [ "$n" -lt 1 ]; then echo "❌ no hits"; exit 1; fi
+          if ! jq -r '.hits[].path' out.json | grep -i -q "$must"; then
+            echo "❌ no path contained '$must'"; exit 1; fi
+          echo "✅ search smoke passed"
