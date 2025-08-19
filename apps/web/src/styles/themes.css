@@ -1,0 +1,32 @@
+:root {
+  --brand-primary: #1a73e8;
+  --brand-primary-text: #ffffff;
+  --brand-accent: #9333ea;
+
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #6b7280;
+
+  --font-family: Inter, system-ui, Arial, sans-serif;
+  --scale-sm: .875;
+  --scale-md: 1;
+  --scale-lg: 1.25;
+  --scale-xl: 1.6;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 20px;
+}
+
+/* handy utilities if you prefer */
+:root {
+  --card-bg: var(--bg);
+  --card-fg: var(--fg);
+  --btn-bg: var(--brand-primary);
+  --btn-fg: var(--brand-primary-text);
+  --link: var(--brand-accent);
+}
