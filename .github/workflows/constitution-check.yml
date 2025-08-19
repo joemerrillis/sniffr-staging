@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  actions: write
 
 
 jobs:
@@ -41,6 +42,14 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
 
+      - name: Upload machine-readable violations
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: constitution-violations
+          path: .github/.constitution/violations.json
+
+
       - name: Report (PR comment)
         if: always()
         uses: marocchino/sticky-pull-request-comment@v2
@@ -49,7 +58,8 @@ jobs:
           message: |
             ### Constitution Check
             Status: ${{ job.status }}
-            
+
+
             ${{ steps.check.outputs.report || 'No additional report.' }}
 
 
