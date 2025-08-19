@@ -1,0 +1,82 @@
+name: Constitution Auto-Fix
+
+
+on:
+  workflow_run:
+    workflows: ["Constitution Check"]
+    types: [completed]
+
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+
+jobs:
+  autofix:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download PR refs
+        uses: dawidd6/action-download-artifact@v6
+        with:
+        workflow: Constitution Check
+        run_id: ${{ github.event.workflow_run.id }}
+        name: constitution-violations
+        path: ./.github/.constitution
+
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+
+      - name: Install deps
+        run: |
+          if [ -f package.json ]; then npm ci; fi
+
+
+      - name: Run auto-fix loop
+        id: fix
+        run: node scripts/agent-autofix.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          MAX_ITERS: 3
+
+
+      - name: Push changes (if any)
+        if: steps.fix.outputs.did_change == 'true'
+        run: |
+          git config user.email "bot@users.noreply.github.com"
+          git config user.name "sniffr-bot"
+          git checkout ${{ github.event.workflow_run.head_branch }}
+          git add -A
+          git commit -m "chore: auto-fix constitution violations"
+          git push
+
+
+      - name: Re-run constitution check (lightweight)
+        run: node scripts/constitution-check.mjs || true
+
+
+      - name: Post result comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: constitution-autofix
+          message: |
+            ### Constitution Auto-Fix
+            Iterations: ${{ steps.fix.outputs.iterations || '0' }} / ${{ env.MAX_ITERS }}
+            Changes: ${{ steps.fix.outputs.did_change || 'false' }}
+            Status: ${{ job.status }}
