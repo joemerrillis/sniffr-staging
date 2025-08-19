@@ -1,0 +1,58 @@
+name: Constitution Check
+
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
+
+
+permissions:
+  contents: read
+  pull-requests: write
+
+
+jobs:
+  constitution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+
+      - name: Install deps (if package.json exists)
+        run: |
+          if [ -f package.json ]; then npm ci; else echo "No package.json"; fi
+
+
+      - name: Run Constitution Checks
+        id: check
+        run: node scripts/constitution-check.mjs
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+
+      - name: Report (PR comment)
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: constitution
+          message: |
+            ### Constitution Check
+            Status: ${{ job.status }}
+            
+            ${{ steps.check.outputs.report || 'No additional report.' }}
+
+
+      - name: Fail if violations
+        if: failure()
+        run: exit 1
