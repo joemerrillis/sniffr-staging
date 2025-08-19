@@ -1,49 +1,171 @@
-# Sniffr Agent Constitution
+Sniffr Plugin Constitution
 
-**Purpose**: Ensure every AI‑generated change follows house rules, matches the database schema, and ships behind green smoke checks.
+This document defines the rules, formats, and checklists required for building, testing, and shipping plugins in Sniffr. It ensures consistency across contributors and automation.
 
-## Canonical References (read first)
-- `docs/CONTEXT.md` – plugin architecture, envelope pattern, routing and tagging
-- `docs/SCHEMA.md` – live data model and foreign keys (source of truth)
-- `docs/TESTING.md` – how we smoke/QA previews
-- `sniffr_plugin_gotchas.md` – common failure modes (schema drift, FK errors, envelope mistakes)
+Required Output Formats (for agents)
+PLAN Mode (Markdown)
+Plan
 
-## Golden Rules
-1. **Schema is King**  
-   Never invent columns. Every table/field/type must exist in `docs/SCHEMA.md`. If the schema changes, generate a matching migration and update OpenAPI schemas and examples in the same PR.
+High-level bullet points of tasks
 
-2. **Envelope Pattern (Mandatory)**  
-   All route handlers return envelopes: `{ thing: ... }` or `{ things: [...] }`. Never return naked arrays/objects.
+Files
 
-3. **Plugin Structure**  
-   New features are Fastify plugins: `src/<plugin>/` with:
-   - `index.js` (register schemas + routes with `fastify-plugin`)
-   - `routes.js` (HTTP layer only; tags for Swagger)
-   - `controllers/*.js` (validation, envelopes)
-   - `services/*.js` (data access only)
-   - `schemas/<plugin>Schemas.js` (export **one** object with named JSON Schemas)
+List of filenames and their purpose
 
-4. **Service Injection**  
-   Services receive `supabase` from `request.server.supabase`. Do **not** import a global client in services.
+OpenAPI
 
-5. **Logging for Debuggability**  
-   On all create/update/delete: log the input payload and the DB response shape (at debug level).
+YAML-like paths to be appended to the global OpenAPI spec
 
-6. **Swagger / OpenAPI**  
-   Group by plugin tags. Request/response schemas must match the DB and the envelope pattern. Examples must reflect reality.
+Migrations
 
-7. **Migrations**  
-   Use timestamped filenames: `YYYYMMDDHHMMSS_<name>.sql` with a matching `_down.sql`. Keep migrations and schema docs in sync.
+Filenames and descriptions of database migrations
 
-8. **Foreign Keys**  
-   Double‑check FK directions against `docs/SCHEMA.md`. Example: `walker_id → employees.id`, not `users.id`.
+Smoke
 
-9. **Naming**  
-   Tables/columns: snake_case; PK: `id uuid primary key default gen_random_uuid()` unless a join table.
+Endpoints and expected statuses
 
-10. **Small, Safe Diffs**  
-   Prefer minimal changes. If unsure, add `/ _agent/health`‑style sanity endpoints under `src/agent_sanity/`.
+APPLY/EXECUTE Mode (Strict JSON)
+{
+"summary": "one-line summary",
+"commitMessage": "imperative commit message",
+"files": [
+{ "path": "<relative path>", "contents": "<file contents>" }
+]
+}
+Controller Checklist
 
-## Required Output Formats (for agents)
+Validate input (AJV via route schema) and call service
 
-### PLAN Mode (Markdown)
+Wrap results in envelopes ({ x: ... })
+
+Use reply.code(201) for creates; 200 for reads/updates; 204 for deletes with empty body
+
+Log at debug level for payload and response
+
+Service Checklist
+
+Receive { supabase } injected from Fastify
+
+No global imports of Supabase
+
+Build queries with explicit column lists
+
+Handle not-found as 404 via controller
+
+PR Checklist (CI Enforces)
+
+All migrations are idempotent
+
+All new routes are in OpenAPI
+
+All schemas validate with AJV
+
+All services use injected Supabase
+
+All controllers use proper HTTP status codes
+
+Tests and smoke checks are updated
+
+Scripts
+1) scripts/scaffold-plugin.mjs
+
+Creates a new Fastify plugin from the schema doc, generating JSON Schemas, routes, controllers, services, and migrations.
+
+node scripts/scaffold-plugin.mjs <pluginName> <tableName> [--entity PascalCase]
+# Example:
+node scripts/scaffold-plugin.mjs dog_events dog_events --entity DogEvent
+2) scripts/scaffold-plugin.mjs Example Implementation
+// scripts/scaffold-plugin.mjs
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
+function toPascal(s) {
+  return s
+    .replace(/[\-\_]+/g, ' ')
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('');
+}
+
+
+function singularGuess(s) {
+  return s.endsWith('s') ? s.slice(0, -1) : s;
+}
+
+
+function mapType(t) {
+  const lc = t.toLowerCase();
+  if (lc.includes('uuid')) return { type: 'string', format: 'uuid' };
+  if (lc.includes('timestamp')) return { type: 'string', format: 'date-time' };
+  if (lc.includes('date')) return { type: 'string', format: 'date' };
+  if (lc.includes('time')) return { type: 'string', format: 'time' };
+  if (lc.includes('text')) return { type: 'string' };
+  return { type: 'string' };
+}
+Testing
+3) Smoke Tests – .github/workflows/smoke-reusable.yml
+
+Reusable workflow for validating endpoints return expected statuses.
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run smoke tests
+        uses: ./github/workflows/smoke-reusable.yml
+        with:
+          base_url: ${{ steps.preview.outputs.api_url }}
+          matrix_json: |
+            [
+              { "path": "/health", "expect": 200 },
+              { "path": "/docs/json", "expect": 200 },
+              { "path": "/walks", "expect": 200 }
+            ]
+4) Miniflare Tests – workers/render/test/render-router.test.mjs
+
+Boots the worker and verifies control-plane endpoints respond.
+
+Dev deps in root package.json:
+
+{
+  "devDependencies": {
+    "miniflare": "^3.20240512.0",
+    "vitest": "^1.6.0"
+  },
+  "scripts": {
+    "test:workers": "vitest run workers/render/test/*.test.mjs"
+  }
+}
+
+Test file:
+
+// workers/render/test/render-router.test.mjs
+import { describe, it, expect } from 'vitest';
+import { Miniflare } from 'miniflare';
+import fs from 'fs';
+
+
+const mf = new Miniflare({
+  scriptPath: 'workers/render/index.mjs'
+});
+
+
+describe('Render Router', () => {
+  it('responds to health', async () => {
+    const res = await mf.dispatchFetch('http://localhost/health');
+    expect(res.status).toBe(200);
+  });
+});
+Enforcement
+
+All plugins must include migrations, OpenAPI updates, and smoke tests.
+
+CI will block PRs that don’t conform to this constitution.
+
+Contributors should run npm run test:workers and npm run lint before PR.
