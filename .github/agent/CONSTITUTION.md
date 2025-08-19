@@ -1,171 +1,195 @@
-Sniffr Plugin Constitution
+# Sniffr Constitution (Machine-Oriented Spec)
 
-This document defines the rules, formats, and checklists required for building, testing, and shipping plugins in Sniffr. It ensures consistency across contributors and automation.
+This document defines the **authoritative ruleset** for generating, reviewing, and enforcing code contributions within the Sniffr project. It is optimized for **AI agents** and **automation workflows** to reference directly.
 
-Required Output Formats (for agents)
-PLAN Mode (Markdown)
-Plan
+---
 
-High-level bullet points of tasks
+## 1. PURPOSE
 
-Files
+* Enforce **consistency** across plugins, services, and frontend.
+* Guarantee that every change ships with **tests, docs, and migrations**.
+* Provide a **machine-parsable contract** for AI-driven development.
 
-List of filenames and their purpose
+---
 
-OpenAPI
+## 2. AGENT OUTPUT FORMATS
 
-YAML-like paths to be appended to the global OpenAPI spec
+### 2.1 PLAN Output
 
-Migrations
+* Summarize intended changes.
+* Must include:
 
-Filenames and descriptions of database migrations
+  * Files to be created/modified.
+  * Endpoints to be exposed.
+  * Migrations required.
+  * Tests required.
+* Format: Markdown list with file paths.
 
-Smoke
+### 2.2 APPLY / EXECUTE Output
 
-Endpoints and expected statuses
+* Provide final code.
+* Each file must be wrapped in fenced code blocks (`lang ... `).
+* No commentary outside of the plan unless marked as `NOTE:`.
 
-APPLY/EXECUTE Mode (Strict JSON)
-{
-"summary": "one-line summary",
-"commitMessage": "imperative commit message",
-"files": [
-{ "path": "<relative path>", "contents": "<file contents>" }
-]
-}
-Controller Checklist
+---
 
-Validate input (AJV via route schema) and call service
+## 3. CONTROLLERS & SERVICES
 
-Wrap results in envelopes ({ x: ... })
+### 3.1 Controller Rules
 
-Use reply.code(201) for creates; 200 for reads/updates; 204 for deletes with empty body
+* Controllers handle **HTTP layer only**.
+* Must:
 
-Log at debug level for payload and response
+  * Validate request.
+  * Call corresponding service.
+  * Return structured JSON.
+* Must not:
 
-Service Checklist
+  * Contain business logic.
 
-Receive { supabase } injected from Fastify
+### 3.2 Service Rules
 
-No global imports of Supabase
+* Services contain **business logic only**.
+* Must:
 
-Build queries with explicit column lists
+  * Be pure functions where possible.
+  * Interact with models, DB, or external APIs.
+* Must not:
 
-Handle not-found as 404 via controller
+  * Parse HTTP requests.
 
-PR Checklist (CI Enforces)
+---
 
-All migrations are idempotent
+## 4. TESTING REQUIREMENTS
 
-All new routes are in OpenAPI
+### 4.1 Smoke Tests
 
-All schemas validate with AJV
+* Required for every plugin.
+* Must:
 
-All services use injected Supabase
+  * Cover all public endpoints.
+  * Assert 200 response on happy path.
+  * Fail gracefully if DB or service unavailable.
+* Format: Jest + Supertest.
 
-All controllers use proper HTTP status codes
+### 4.2 Miniflare Tests
 
-Tests and smoke checks are updated
+* Required for Cloudflare Worker code.
+* Must:
 
-Scripts
-1) scripts/scaffold-plugin.mjs
+  * Run under `miniflare` runtime.
+  * Assert routes behave identically to production worker.
 
-Creates a new Fastify plugin from the schema doc, generating JSON Schemas, routes, controllers, services, and migrations.
+---
 
-node scripts/scaffold-plugin.mjs <pluginName> <tableName> [--entity PascalCase]
-# Example:
-node scripts/scaffold-plugin.mjs dog_events dog_events --entity DogEvent
-2) scripts/scaffold-plugin.mjs Example Implementation
-// scripts/scaffold-plugin.mjs
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+## 5. MIGRATIONS & SCHEMAS
 
+### 5.1 Database Migrations
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+* Every new table/column requires a migration.
+* Migration files must:
 
+  * Be idempotent.
+  * Follow naming: `YYYYMMDDHHMM_description.sql`.
+  * Be validated in CI (`validate-migrations.yml`).
 
-function toPascal(s) {
-  return s
-    .replace(/[\-\_]+/g, ' ')
-    .split(' ')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join('');
-}
+### 5.2 OpenAPI Schemas
 
+* All new endpoints must:
 
-function singularGuess(s) {
-  return s.endsWith('s') ? s.slice(0, -1) : s;
-}
+  * Update `schema.md`.
+  * Include request + response shapes.
+  * Be referenced in controller JSDoc.
 
+---
 
-function mapType(t) {
-  const lc = t.toLowerCase();
-  if (lc.includes('uuid')) return { type: 'string', format: 'uuid' };
-  if (lc.includes('timestamp')) return { type: 'string', format: 'date-time' };
-  if (lc.includes('date')) return { type: 'string', format: 'date' };
-  if (lc.includes('time')) return { type: 'string', format: 'time' };
-  if (lc.includes('text')) return { type: 'string' };
-  return { type: 'string' };
-}
-Testing
-3) Smoke Tests – .github/workflows/smoke-reusable.yml
+## 6. SCAFFOLDING
 
-Reusable workflow for validating endpoints return expected statuses.
+### 6.1 Tooling
 
-jobs:
-  smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run smoke tests
-        uses: ./github/workflows/smoke-reusable.yml
-        with:
-          base_url: ${{ steps.preview.outputs.api_url }}
-          matrix_json: |
-            [
-              { "path": "/health", "expect": 200 },
-              { "path": "/docs/json", "expect": 200 },
-              { "path": "/walks", "expect": 200 }
-            ]
-4) Miniflare Tests – workers/render/test/render-router.test.mjs
+* Use `scaffold-plugin.mjs` to generate new plugin structure.
+* Generated files must include:
 
-Boots the worker and verifies control-plane endpoints respond.
+  * `index.ts` (registers routes).
+  * `routes.ts` (Fastify routes).
+  * `schemas.ts` (Zod or JSON schema).
+  * `plugin-smoke.test.ts`.
 
-Dev deps in root package.json:
+### 6.2 Example Command
 
-{
-  "devDependencies": {
-    "miniflare": "^3.20240512.0",
-    "vitest": "^1.6.0"
-  },
-  "scripts": {
-    "test:workers": "vitest run workers/render/test/*.test.mjs"
-  }
-}
+```bash
+node scripts/scaffold-plugin.mjs boardingReports
+```
 
-Test file:
+---
 
-// workers/render/test/render-router.test.mjs
-import { describe, it, expect } from 'vitest';
-import { Miniflare } from 'miniflare';
-import fs from 'fs';
+## 7. ENFORCEMENT RULES
 
+### 7.1 Pull Request Rules
 
-const mf = new Miniflare({
-  scriptPath: 'workers/render/index.mjs'
-});
+* CI will reject PRs that:
 
+  * Lack migrations when schema changes.
+  * Lack OpenAPI updates for new endpoints.
+  * Lack smoke test coverage.
+* PR titles must match: `Feature: <name>` or `Fix: <name>`.
 
-describe('Render Router', () => {
-  it('responds to health', async () => {
-    const res = await mf.dispatchFetch('http://localhost/health');
-    expect(res.status).toBe(200);
-  });
-});
-Enforcement
+### 7.2 Commit Rules
 
-All plugins must include migrations, OpenAPI updates, and smoke tests.
+* Use Conventional Commits:
 
-CI will block PRs that don’t conform to this constitution.
+  * `feat: add boardingReports plugin`
+  * `fix: correct walker availability bug`
 
-Contributors should run npm run test:workers and npm run lint before PR.
+### 7.3 Branch Rules
+
+* `main` is protected.
+* All changes must land via PR.
+* Preview deployments required for frontend + backend.
+
+---
+
+## 8. FRONTEND RULES
+
+### 8.1 Next.js
+
+* Use **App Router** (`app/` directory).
+* Each route must:
+
+  * Have a `page.tsx`.
+  * Be styled with Tailwind.
+
+### 8.2 API Routes
+
+* Defined in `app/api/*/route.ts`.
+* Must:
+
+  * Call backend worker endpoints.
+  * Handle auth via middleware.
+
+---
+
+## 9. CHECKLIST (AI ENFORCEMENT)
+
+When generating a new feature, AI agents must:
+
+* [ ] Create migration if DB schema changes.
+* [ ] Update `schema.md`.
+* [ ] Scaffold plugin via `scaffold-plugin.mjs`.
+* [ ] Add smoke test.
+* [ ] Add miniflare test (if worker code).
+* [ ] Add OpenAPI docs.
+* [ ] Ensure controller/service separation.
+* [ ] Verify PR title & commit message format.
+
+---
+
+## 10. REFERENCES
+
+* `schema.md` → canonical OpenAPI spec.
+* `sniffr_plugin_gotchas.md` → pitfalls and lessons learned.
+* `CONTEXT.md` → project-wide design notes.
+
+---
+
+**This spec is binding. All PRs must comply.**
