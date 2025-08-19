@@ -1,0 +1,22 @@
+name: Validate Front-end Theme
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-theme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install deps
+        run: npm ci || npm i
+
+      - name: Validate tokens against schema + contrast
+        run: node .github/agent/theme-constitution-check.mjs
