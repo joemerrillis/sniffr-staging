@@ -26,10 +26,10 @@ env:
 
 jobs:
   agent:
-    # Only run when:
+    # Run when:
     # - manually dispatched, OR
-    # - an Issue is opened/edited/reopened (body contains '/agent'), OR
-    # - a comment starting with '/agent ' is posted on an Issue/PR
+    # - an Issue body contains '/agent ' (opened/edited/reopened), OR
+    # - a new comment starting with '/agent ' appears
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' &&
@@ -48,7 +48,7 @@ jobs:
         with:
           node-version: 20.x
 
-      # Gather TITLE/BODY into outputs and compute CMD/text safely (no shell expansion)
+      # Parse title/body → MODE and REQUEST_TEXT
       - name: Parse event/title/body into request text
         id: parse
         shell: bash
@@ -60,20 +60,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Use issue title/body when event is "issues" or "issue_comment"; otherwise use workflow_dispatch inputs.
+          # Decide where to read text from
           if [[ "${GITHUB_EVENT_NAME}" == "issues" || "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
             TITLE="${ISSUE_TITLE:-}"
             BODY="${ISSUE_BODY:-}"
-            # For comments, use the comment text as the BODY instead
             if [[ "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
-              BODY="${{ github.event.comment.body }}"
+              BODY='${{ github.event.comment.body }}'
             fi
           else
             TITLE="${INPUT_TITLE:-}"
             BODY="${INPUT_BODY:-}"
           fi
 
-          # Fallback BODY (rare)
+          # Fallback body
           if [[ -z "${BODY}" ]]; then
             read -r -d '' BODY <<'EOF'
           /agent plan
@@ -83,14 +82,14 @@ jobs:
           EOF
           fi
 
-          # Extract "/agent <cmd>" at the top, default to "plan"
+          # Extract "/agent <cmd>" (default plan)
           CMD=""
           if [[ "${BODY}" =~ ^/[Aa]gent[[:space:]]+([A-Za-z]+) ]]; then
             CMD="${BASH_REMATCH[1],,}"
           fi
-          if [[ -z "${CMD}" ]]; then CMD="plan"; fi
+          [[ -z "$CMD" ]] && CMD="plan"
 
-          # Message for the agent = body without the "/agent <cmd>" prefix
+          # Strip the prefix from message passed to the agent
           AFTER="$(printf '%s' "${BODY}" | sed -E 's#^/[Aa]gent[[:space:]]+[A-Za-z]+[[:space:]]*##')"
           if [[ -z "${AFTER}" ]]; then
             MSG="${TITLE} — ${BODY}"
@@ -108,22 +107,26 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      # === Hybrid search context pre-step (index → serve → fetch) ===
-      - name: Build code index (with embeddings if key present)
+      # === Hybrid search context: build → serve → fetch ===
+      - name: Build code index (embeddings if key present)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npx tsx tools/build-index.ts
 
       - name: Start search server (background)
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}   # <— add this
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npx tsx tools/search-server.ts & echo $! > search.pid
-
 
       - name: Fetch harvested context for this request
         env:
           REQUEST_TEXT: ${{ steps.parse.outputs.text }}
         run: node tools/fetch-context.mjs
+
+      - name: Show harvested context size
+        run: |
+          sudo apt-get update >/dev/null && sudo apt-get install -y jq >/dev/null
+          echo "hits: $(jq '.hits | length' .github/agent/.context.json)"
 
       - name: Run agent
         env:
@@ -137,3 +140,33 @@ jobs:
           echo "MODE=$MODE"
           echo "Text length: $(printf '%s' "$REQUEST_TEXT" | wc -c)"
           node .github/agent/agent.mjs
+
+      - name: Comment plan preview
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const p = '.github/agent/.plan.md';
+            if (!fs.existsSync(p)) { core.info('No plan file at ' + p); return; }
+            const md = fs.readFileSync(p, 'utf8');
+            const short = md.replace(/\s+/g, ' ').trim().slice(0, 151);
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: [
+                '**Agent plan (preview)**',
+                '',
+                short + (md.length > 151 ? '…' : ''),
+                '',
+                '_Full plan attached as artifact `agent-plan`._'
+              ].join('\n')
+            });
+
+      - name: Upload full plan as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-plan
+          path: .github/agent/.plan.md
+          if-no-files-found: ignore
