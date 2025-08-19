@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "design_tokens": {
+    "required": ["--brand-50","--brand-100","--brand-200","--brand-300","--brand-400","--brand-500","--brand-600","--brand-700","--brand-800","--brand-900","--bg","--fg","--muted","--muted-fg","--card","--card-fg","--ring","--radius","--space-1","--space-2","--space-3","--space-4","--space-5","--space-6","--space-7","--space-8"],
+    "typography": ["--font-sans","--text-sm","--text-base","--text-lg","--text-xl","--text-2xl"],
+    "rules": [
+      "Never hardcode hex/rgb; use tokens only",
+      "Spacing uses --space-*; typography uses --text-*"
+    ]
+  },
+  "ui_primitives": {
+    "import_base": "@/components/ui",
+    "components": [
+      {"name":"Button","props":{"variant":["solid","soft","outline","ghost"],"size":["sm","md","lg"]}},
+      {"name":"Input"},
+      {"name":"Card"},
+      {"name":"Sheet"},
+      {"name":"Dialog"},
+      {"name":"DataTable"},
+      {"name":"PageHeader"}
+    ]
+  },
+  "layout": {
+    "container_class": "container",
+    "grid_gap_class": "gap-var",
+    "rules": [
+      "Pages live under app/(tenants)/[tenant]/*",
+      "Wrap in TenantThemeProvider at layout level",
+      "Provide loading.tsx and error.tsx"
+    ]
+  },
+  "interaction": {
+    "use_sheet_for": ["secondary details","previews"],
+    "use_modal_for": ["destructive confirmations","multi-step wizards"],
+    "inline_edit": ["simple text fields","toggles"]
+  },
+  "accessibility": {
+    "focus_visible": true,
+    "aria_labels_required_for": ["icon-only buttons"],
+    "contrast": "WCAG AA"
+  },
+  "telemetry": {
+    "events": ["ui.click","form.submit","api.error"],
+    "context_fields": ["tenant","route","component"]
+  },
+  "agent_outputs": {
+    "plan_sections": ["Plan","Pages","API","Theme Contracts"],
+    "apply_format": {"summary":"string","commitMessage":"string","files":[{"path":"string","contents":"string"}]}
+  }
+}
