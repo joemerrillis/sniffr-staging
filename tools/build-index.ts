@@ -1,87 +1,113 @@
-// tools/build-index.ts
-// Build a local code index into SQLite: chunks + optional embeddings via OpenAI
-// - Runs in CI for PRs and on main
-// - If OPENAI_API_KEY is present, stores embeddings (float32) to enable semantic search
-
+// tools/build-index.ts (tree-sitter enabled)
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { openDb, ensureSchema, upsertChunkBatch } from './sqlite';
+import { openDb } from './sqlite';
+import { chunkSource, Chunk } from './chunker';
 
 const ROOT = process.env.GITHUB_WORKSPACE || process.cwd();
-const OUT = path.join(ROOT, 'code-index.sqlite');
-const INCLUDE = [
-  'src', 'apps', 'worker', 'tools', 'package.json', 'README.md', 'docs'
-];
-const EXTS = new Set(['.js','.mjs','.ts','.tsx','.json','.md','.yaml','.yml']);
+const DB = path.join(ROOT, 'code-index.sqlite');
 
-async function* walk(dir: string): AsyncGenerator<string> {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name.startsWith('.git')) continue;
-      yield* walk(p);
-    } else {
-      const ext = path.extname(entry.name).toLowerCase();
-      if (EXTS.has(ext)) yield p;
-    }
+const INCLUDED = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+const EXCLUDE_DIRS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'coverage']);
+
+function listFiles(dir: string, out: string[] = []) {
+  const ents = fs.readdirSync(dir, { withFileTypes: true });
+  for (const e of ents) {
+    if (EXCLUDE_DIRS.has(e.name)) continue;
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) listFiles(p, out);
+    else if (INCLUDED.includes(path.extname(e.name))) out.push(p);
   }
+  return out;
 }
 
-function chunk(text: string, size = 512, overlap = 64) {
-  const tokens = text.split(/\s+/);
-  const chunks: string[] = [];
-  for (let i=0;i<tokens.length;i+= (size - overlap)) {
-    chunks.push(tokens.slice(i, i+size).join(' '));
-  }
-  return chunks;
-}
-
-async function embedBatch(chunks: string[]): Promise<Float32Array[]> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return [] as any;
-  const body = { model: 'text-embedding-3-small', input: chunks };
+async function embedBatch(texts: string[]): Promise<Float32Array[] | null> {
+  const key = process.env.OPENAI_API_KEY; if (!key) return null;
   const res = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify(body)
+    method: 'POST',
+    headers: { 'authorization': `Bearer ${key}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'text-embedding-3-small', input: texts })
   });
-  if (!res.ok) throw new Error('Embedding error');
-  const json: any = await res.json();
-  return json.data.map((d: any) => new Float32Array(d.embedding));
+  if (!res.ok) throw new Error(`embed failed: ${res.status}`);
+  const j: any = await res.json();
+  return j.data.map((d: any) => new Float32Array(d.embedding));
 }
 
 async function main() {
-  const db = await openDb(OUT);
-  await ensureSchema(db);
+  const files = listFiles(ROOT);
+  console.log(`Indexing ${files.length} files…`);
 
-  const files: string[] = [];
-  for (const inc of INCLUDE) {
-    const p = path.join(ROOT, inc);
-    if (fs.existsSync(p)) {
-      if (fs.statSync(p).isDirectory()) {
-        for await (const f of walk(p)) files.push(f);
-      } else files.push(p);
-    }
-  }
+  const db = await openDb(DB);
+  await db.exec(`
+    PRAGMA journal_mode=WAL;
+    DROP TABLE IF EXISTS chunk_vec;
+    DROP TABLE IF EXISTS chunks;
+    CREATE TABLE chunks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      path TEXT NOT NULL,
+      ord INTEGER NOT NULL,
+      text TEXT NOT NULL
+    );
+    CREATE TABLE chunk_vec (
+      id INTEGER PRIMARY KEY,
+      vec BLOB NOT NULL
+    );
+  `);
 
+  // Build chunks
+  let total = 0;
   for (const f of files) {
-    const rel = path.relative(ROOT, f);
-    const text = fs.readFileSync(f, 'utf8');
-    const parts = chunk(text);
-    let vecs: Float32Array[] = [];
-    if (process.env.OPENAI_API_KEY) {
-      const BATCH = 64;
-      for (let i=0;i<parts.length;i+=BATCH) {
-        const slice = parts.slice(i, i+BATCH);
-        const embeds = await embedBatch(slice);
-        vecs.push(...embeds);
+    const src = fs.readFileSync(f, 'utf8');
+    const chunks: Chunk[] = await chunkSource(path.relative(ROOT, f), src);
+    if (chunks.length === 0) continue;
+    const stmt = await db.prepare('INSERT INTO chunks(path, ord, text) VALUES (?,?,?)');
+    try {
+      await db.exec('BEGIN');
+      for (const c of chunks) {
+        await stmt.run(c.path, c.ord, c.text);
+        total++;
       }
+      await db.exec('COMMIT');
+    } catch (e) {
+      await db.exec('ROLLBACK'); throw e;
+    } finally {
+      await stmt.finalize();
     }
-    await upsertChunkBatch(db, rel, parts, vecs.length === parts.length ? vecs : undefined);
+  }
+  console.log(`wrote ${total} chunks`);
+
+  // Embeddings (optional)
+  if (process.env.OPENAI_API_KEY) {
+    console.log('creating vectors…');
+    const rows = await db.all('SELECT id, text FROM chunks');
+    const BATCH = 64;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const slice = rows.slice(i, i + BATCH);
+      const vecs = await embedBatch(slice.map((r: any) => r.text));
+      if (!vecs) break;
+      const stmt = await db.prepare('INSERT INTO chunk_vec(id, vec) VALUES (?, ?)');
+      try {
+        await db.exec('BEGIN');
+        slice.forEach(async (r: any, k: number) => {
+          const v = vecs[k];
+          const buf = Buffer.from(v.buffer, v.byteOffset, v.byteLength);
+          await stmt.run(r.id, buf);
+        });
+        await db.exec('COMMIT');
+      } catch (e) {
+        await db.exec('ROLLBACK'); throw e;
+      } finally {
+        await stmt.finalize();
+      }
+      process.stdout.write('.');
+    }
+    process.stdout.write('
+');
+  } else {
+    console.log('OPENAI_API_KEY not set; skipping embeddings');
   }
 
-  await db.close();
-  console.log(`Indexed ${files.length} files → ${OUT}`);
+  console.log('done');
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => { console.error(e); process.exit(1); });
