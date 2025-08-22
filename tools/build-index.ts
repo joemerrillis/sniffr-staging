@@ -24,7 +24,7 @@ async function embedBatch(texts: string[]): Promise<Float32Array[] | null> {
   const key = process.env.OPENAI_API_KEY; if (!key) return null;
   const res = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
-    headers: { 'authorization': `Bearer ${key}`, 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
     body: JSON.stringify({ model: 'text-embedding-3-small', input: texts })
   });
   if (!res.ok) throw new Error(`embed failed: ${res.status}`);
@@ -101,8 +101,7 @@ async function main() {
       }
       process.stdout.write('.');
     }
-    process.stdout.write('
-');
+    process.stdout.write('\n');
   } else {
     console.log('OPENAI_API_KEY not set; skipping embeddings');
   }
