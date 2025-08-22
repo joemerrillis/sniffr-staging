@@ -1,4 +1,3 @@
-// tools/build-index.ts (tree-sitter enabled)
 import fs from 'node:fs';
 import path from 'node:path';
 import { openDb } from './sqlite';
@@ -88,11 +87,12 @@ async function main() {
       const stmt = await db.prepare('INSERT INTO chunk_vec(id, vec) VALUES (?, ?)');
       try {
         await db.exec('BEGIN');
-        slice.forEach(async (r: any, k: number) => {
+        for (let k = 0; k < slice.length; k++) {
+          const r = slice[k];
           const v = vecs[k];
           const buf = Buffer.from(v.buffer, v.byteOffset, v.byteLength);
           await stmt.run(r.id, buf);
-        });
+        }
         await db.exec('COMMIT');
       } catch (e) {
         await db.exec('ROLLBACK'); throw e;
