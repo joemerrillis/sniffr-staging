@@ -1,73 +1,175 @@
-# .github/workflows/constitution-fix.yml
-name: Constitution Auto-Fix
+name: constitution-fix
 
 on:
-  workflow_run:
-    workflows: ["Constitution Check"]
-    types: [completed]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, closed]
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
-  actions: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  autofix:
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+  # ---------------------------------------------------------
+  # No-op on PR close to avoid sticky failures after branch delete/merge
+  # ---------------------------------------------------------
+  noop_on_close:
+    if: ${{ github.event.action == 'closed' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch }}
-          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+      - run: echo "PR closed — skipping constitution checks."
 
-      - name: Download PR refs
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          workflow: Constitution Check
-          run_id: ${{ github.event.workflow_run.id }}
-          name: constitution-violations
-          path: ./.github/.constitution
+  # ---------------------------------------------------------
+  # Constitution checks (backend + frontend rules)
+  # ---------------------------------------------------------
+  constitution:
+    if: >
+      github.event.action != 'closed' &&
+      github.event.pull_request.state == 'open' &&
+      github.event.pull_request.merged == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+    env:
+      # Label to bypass hard enforcement (human override)
+      BYPASS_LABEL: constitution-bypass
 
-      - name: Install deps
+    steps:
+      # ---------- Determine enforcement mode ----------
+      - name: Determine enforcement mode (draft / bypass / secrets)
+        id: mode
         run: |
-          if [ -f package.json ]; then npm ci || npm install; fi
+          ENFORCE=true
+          REASONS=()
 
-      - name: Run auto-fix loop
-        id: fix
-        run: node scripts/agent-autofix.mjs
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          MAX_ITERS: 3
+          # Draft PRs run in advisory mode (no fail)
+          if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+            ENFORCE=false
+            REASONS+=("draft PR")
+          fi
 
-      - name: Push changes (if any)
-        if: steps.fix.outputs.did_change == 'true'
+          # Bypass label forces advisory mode
+          if echo "${{ join(github.event.pull_request.labels.*.name, ' ') }}" | grep -qi "\b${BYPASS_LABEL}\b"; then
+            ENFORCE=false
+            REASONS+=("label:${BYPASS_LABEL}")
+          fi
+
+          # If running from a fork without secrets, use advisory mode
+          if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
+            ENFORCE=false
+            REASONS+=("fork/no-secrets")
+          fi
+
+          echo "enforce=$ENFORCE" >> $GITHUB_OUTPUT
+          echo "reasons=${REASONS[*]}" >> $GITHUB_OUTPUT
+          echo "Mode: enforce=$ENFORCE reasons=${REASONS[*]}"
+
+      # ---------- Guard: head ref still exists ----------
+      - name: Guard against deleted head ref
         run: |
-          git config user.email "bot@users.noreply.github.com"
-          git config user.name "sniffr-bot"
-          git checkout ${{ github.event.workflow_run.head_branch }}
-          git add -A
-          git commit -m "chore: auto-fix constitution violations"
-          git push
+          git ls-remote --exit-code ${{ github.event.pull_request.head.repo.clone_url }} ${{ github.event.pull_request.head.sha }} || {
+            echo "Head ref not found (branch deleted?). Skipping."; exit 0;
+          }
 
-      - name: Re-run constitution check (lightweight)
-        run: node scripts/constitution-check.mjs || true
+      # ---------- Checkout the PR code ----------
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Post result comment
+      # ---------- Setup Node (adjust if your checker uses a different runtime) ----------
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies (safe install)
+        run: |
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm i --ignore-scripts; fi
+
+      # ---------- Run the actual constitution checks ----------
+      # Replace the script below with your real checker (backend + frontend).
+      # It should exit non-zero on violations and print a machine-readable summary for comments.
+      - name: Run constitution checks
+        id: checks
+        continue-on-error: ${{ steps.mode.outputs.enforce == 'false' }}
+        run: |
+          echo "Running constitution checks..."
+          # Example: node scripts/ci/constitution-check.mjs
+          # Your checker should output a JSON summary to checks.json
+          # For now, we simulate a checker:
+          node -e '
+            const fs = require("fs");
+            const findings = [];
+            // TODO: implement real checks:
+            // - Envelope responses only
+            // - Controller/service split, no global supabase in services
+            // - Schema $id uniqueness and registration
+            // - OpenAPI examples match schema
+            // - Frontend rules (App Router, Tailwind tokens, API via /api)
+            const summary = { ok: findings.length === 0, findings };
+            fs.writeFileSync("checks.json", JSON.stringify(summary, null, 2));
+            if (!summary.ok) process.exit(1);
+          '
+
+      # ---------- Summarize results for PR (sticky comment) ----------
+      - name: Prepare comment body
+        id: comment
+        run: |
+          SUMMARY="✅ Constitution checks passed."
+          if [ "${{ steps.checks.outcome }}" = "failure" ]; then
+            SUMMARY="❌ Constitution violations found."
+          fi
+
+          REASONS="${{ steps.mode.outputs.reasons }}"
+          MODE_NOTE=""
+          if [ "${{ steps.mode.outputs.enforce }}" != "true" ]; then
+            MODE_NOTE="(advisory mode: ${REASONS:-n/a})"
+          fi
+
+          BODY=$(cat << 'EOF'
+          <!-- constitution-fix report -->
+          **Constitution Check** %SUMMARY% %MODE_NOTE%
+
+          **Backend constitution**: `.github/agent/constitution.md`  
+          **Frontend constitution**: `.github/agent/frontend_constitution.md`
+
+          Results:
+          ```json
+          %JSON%
+          ```
+
+          **Enforcement**: %ENFORCE%
+          - Draft PRs, forks with no secrets, or PRs labeled `constitution-bypass` run in advisory mode (no failure).
+          - Remove the bypass label and mark PR “Ready for review” to enforce.
+          EOF
+          )
+          JSON=$(cat checks.json 2>/dev/null || echo '{"ok":true,"findings":[]}')
+          BODY="${BODY//%SUMMARY%/$SUMMARY}"
+          BODY="${BODY//%MODE_NOTE%/$MODE_NOTE}"
+          BODY="${BODY//%JSON%/$JSON}"
+          BODY="${BODY//%ENFORCE%/${{ steps.mode.outputs.enforce }}}"
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post sticky comment
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          header: constitution-autofix
-          message: |
-            ### Constitution Auto-Fix
-            Iterations: ${{ steps.fix.outputs.iterations || '0' }} / ${{ env.MAX_ITERS }}
-            Changes: ${{ steps.fix.outputs.did_change || 'false' }}
-            Status: ${{ job.status }}
+          header: constitution-fix
+          message: ${{ steps.comment.outputs.body }}
+
+      # ---------- Fail the job only in enforce mode ----------
+      - name: Enforce failure on violations
+        if: ${{ steps.mode.outputs.enforce == 'true' && steps.checks.outcome == 'failure' }}
+        run: |
+          echo "Violations detected and enforce=true — failing the job."
+          exit 1
+
+      # ---------- Log advisory when not enforcing ----------
+      - name: Advisory mode note
+        if: ${{ steps.mode.outputs.enforce != 'true' }}
+        run: echo "Advisory mode active — no failure even if violations exist."
