@@ -1,0 +1,15 @@
+name: Manual CI (main)
+on: { workflow_dispatch: {}, push: { branches: [main] } }
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - name: Install deps
+        run: if [ -f package.json ]; then npm ci || npm install; else echo "No package.json"; fi
+      - name: TypeScript check (if present)
+        run: if [ -f tsconfig.json ]; then npx tsc --noEmit; else echo "No tsconfig.json"; fi
+      - name: Build index (if script exists)
+        run: if jq -e '.scripts["build:index"]' package.json >/dev/null 2>&1; then npm run -s build:index; else echo "No build:index script"; fi
