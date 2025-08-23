@@ -29,7 +29,7 @@ jobs:
 
       - name: Install deps (if package.json exists)
         run: |
-          if [ -f package.json ]; then npm ci; else echo "No package.json"; fi
+          if [ -f package.json ]; then npm ci || npm install; else echo "No package.json"; fi
 
 
       - name: Run Constitution Checks
