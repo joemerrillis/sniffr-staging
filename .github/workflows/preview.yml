@@ -75,14 +75,14 @@ jobs:
             echo "WEBHOOK_SECRET not set; skipping."
             exit 0
           fi
-          curl -sS -X POST "https://render-pr-alias.joemerrillis.workers.dev/hook" \
+          curl -sS -X POST "https://render-pr-alias.joemerrillis.workers.dev/_control" \
             -H "x-hook-secret: ${WEBHOOK_SECRET}" \
             -H "content-type: application/json" \
             --data @- <<JSON
           {
             "action": "upsert",
             "pr": ${{ env.PR_NUMBER }},
-            "url": "${{ env.RENDER_URL }}"
+            "web": "${{ env.RENDER_URL }}"
           }
           JSON
 
