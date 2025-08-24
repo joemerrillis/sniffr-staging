@@ -2,7 +2,12 @@ name: Preview (Web)
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to upsert (manual run)"
+        required: true
 
 permissions:
   contents: read
@@ -10,7 +15,7 @@ permissions:
 
 # Ensure only the latest run per PR is active
 concurrency:
-  group: preview-web-${{ github.event.pull_request.number }}
+  group: preview-web-${{ github.event.pull_request.number || github.event.inputs.pr || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,76 +28,73 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      # --- Discover WEB preview URL (with fast timeout) ---
-      - name: Get Render PR preview URL (web)
+      - name: Resolve PR number
+        run: |
+          PR="${{ github.event.pull_request.number }}"
+          if [ -z "$PR" ]; then PR="${{ github.event.inputs.pr }}"; fi
+          echo "PR=$PR" >> $GITHUB_ENV
+
+      # Deterministic URLs (always available)
+      - name: Set deterministic preview URLs
+        env:
+          WEB_PREFIX: ${{ secrets.RENDER_WEB_HOST_PREFIX }}   # e.g. sniffr-web-ui
+          API_PREFIX: ${{ secrets.RENDER_API_HOST_PREFIX }}   # e.g. sniffr-staging
+        run: |
+          : "${WEB_PREFIX:?Set secret RENDER_WEB_HOST_PREFIX}"
+          echo "WEB_URL=https://${WEB_PREFIX}-pr-${PR}.onrender.com" >> $GITHUB_ENV
+          echo "API_URL=https://${API_PREFIX}-pr-${PR}.onrender.com" >> $GITHUB_ENV
+          printf "%s" "$WEB_URL" > web_url.txt
+          printf "%s" "$API_URL" > api_url.txt
+
+      # Try Render API discovery to override (short timeout)
+      - name: Try Render API discovery (web)
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_WEB_SERVICE_ID }}
           BRANCH: ${{ github.head_ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ env.PR }}
           WAIT_SECS: 120
         run: |
-          node ./scripts/render-get-preview-url.mjs > web_url.txt || true
-          echo "WEB_RENDER_URL=$(cat web_url.txt 2>/dev/null || true)" >> $GITHUB_ENV
+          node ./scripts/render-get-preview-url.mjs > _web.txt || true
+          if [ -s _web.txt ]; then mv _web.txt web_url.txt; fi
 
-      # Deterministic fallback in case API lookup is slow/missing
-      - name: Fallback WEB preview URL (deterministic)
-        env:
-          PR_NUM: ${{ github.event.pull_request.number }}
-          WEB_PREFIX: ${{ secrets.RENDER_WEB_HOST_PREFIX }} # e.g. sniffr-web-ui
-        run: |
-          if [ ! -s web_url.txt ] && [ -n "$WEB_PREFIX" ]; then
-            echo "https://${WEB_PREFIX}-pr-${PR_NUM}.onrender.com" > web_url.txt
-          fi
-
-      # --- Discover API preview URL (optional) ---
-      - name: Get Render PR preview URL (api)
+      - name: Try Render API discovery (api)
         if: ${{ secrets.RENDER_API_SERVICE_ID != '' }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_API_SERVICE_ID }}
           BRANCH: ${{ github.head_ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ env.PR }}
           WAIT_SECS: 120
         run: |
-          node ./scripts/render-get-preview-url.mjs > api_url.txt || true
-          echo "API_RENDER_URL=$(cat api_url.txt 2>/dev/null || true)" >> $GITHUB_ENV
-
-      - name: Fallback API preview URL (deterministic)
-        if: ${{ secrets.RENDER_API_HOST_PREFIX != '' }}
-        env:
-          PR_NUM: ${{ github.event.pull_request.number }}
-          API_PREFIX: ${{ secrets.RENDER_API_HOST_PREFIX }} # e.g. sniffr-staging
-        run: |
-          if [ ! -s api_url.txt ] && [ -n "$API_PREFIX" ]; then
-            echo "https://${API_PREFIX}-pr-${PR_NUM}.onrender.com" > api_url.txt
-          fi
+          node ./scripts/render-get-preview-url.mjs > _api.txt || true
+          if [ -s _api.txt ]; then mv _api.txt api_url.txt; fi
 
       - name: Show resolved preview URLs
         run: |
-          echo "WEB_RENDER_URL=$(cat web_url.txt 2>/dev/null || echo '')"
-          echo "API_RENDER_URL=$(cat api_url.txt 2>/dev/null || echo '')"
+          echo "WEB=$(cat web_url.txt 2>/dev/null || echo '')"
+          echo "API=$(cat api_url.txt 2>/dev/null || echo '')"
 
       - name: Upsert pretty URL (available origins only)
         env:
-          PR_NUM: ${{ github.event.pull_request.number }}
           WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}   # e.g. https://render-pr-alias.<user>.workers.dev
           WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
-          API_PREFIXES: '"[\"/api\",\"/rapi-doc\",\"/docs\"]"'
         run: |
+          set -e
           web=$(cat web_url.txt 2>/dev/null || true)
           api=$(cat api_url.txt 2>/dev/null || true)
           if [ -z "$web" ] && [ -z "$api" ]; then
             echo "No Render preview URLs found"; exit 1; fi
+          prefixes='["/api","/rapi-doc","/docs"]'
           payload=$(jq -n \
-            --arg pr  "${PR_NUM}" \
+            --arg pr "$PR" \
             --arg api "$api" \
             --arg web "$web" \
-            --argjson prefixes ${API_PREFIXES} '
-            {action:"upsert", pr: ($pr|tonumber)}
-            + ( ($api|length)>0 ? {api:$api} : {} )
-            + ( ($web|length)>0 ? {web:$web} : {} )
-            + { apiPrefixes: $prefixes }')
+            --argjson prefixes "$prefixes" \
+            '{action:"upsert", pr: ($pr|tonumber)}
+              + ( ($api|length)>0 ? {api:$api} : {} )
+              + ( ($web|length)>0 ? {web:$web} : {} )
+              + { apiPrefixes: $prefixes }')
           echo "::group::Upsert payload"; echo "$payload"; echo "::endgroup::"
           curl -v -w "
 status=%{http_code}
@@ -103,11 +105,10 @@ status=%{http_code}
 
       - name: Verify KV mapping for this PR
         env:
-          PR_NUM: ${{ github.event.pull_request.number }}
           WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}
         run: |
           set -e
-          resp=$(curl -fsSL "$WORKER_WEBHOOK/kv?pr=${PR_NUM}")
+          resp=$(curl -fsSL "$WORKER_WEBHOOK/kv?pr=${PR}")
           echo "$resp"
           pretty=$(echo "$resp" | jq -r '.value.prettyHost // empty')
           api=$(echo "$resp" | jq -r '.value.apiOrigin // empty')
@@ -120,13 +121,16 @@ status=%{http_code}
     if: github.event.action == 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve PR number
+        run: |
+          PR="${{ github.event.pull_request.number }}"
+          echo "PR=$PR" >> $GITHUB_ENV
       - name: Delete mapping on close
         env:
-          PR_NUM: ${{ github.event.pull_request.number }}
           WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}
           WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
         run: |
           curl -fsSL -X POST "$WORKER_WEBHOOK/_control" \
             -H "x-webhook-secret: $WORKER_SECRET" \
             -H 'content-type: application/json' \
-            --data "{\"action\":\"delete\",\"pr\":$PR_NUM}"
+            --data "{\"action\":\"delete\",\"pr\":$PR}"
