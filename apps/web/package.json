@@ -26,5 +26,6 @@
      "eslint-config-next": "15.4.6",
      "@eslint/eslintrc": "^3"
    },
-   "overrides": {}
+   "overrides": {"zod": "3.25.76"
+   }
  }
