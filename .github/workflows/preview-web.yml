@@ -62,7 +62,7 @@ jobs:
             + ( ($web|length)>0 ? {web:$web} : {} )
             + { apiPrefixes: $prefixes }')
           echo "::group::Upsert payload"; echo "$payload"; echo "::endgroup::"
-          curl -fsSL -X POST "$WORKER_WEBHOOK" \
+          curl -fsSL -X POST "$WORKER_WEBHOOK/_control" \
             -H "x-webhook-secret: $WORKER_SECRET" \
             -H 'content-type: application/json' \
             --data "$payload"
@@ -77,7 +77,7 @@ jobs:
           WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}
           WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
         run: |
-          curl -fsSL -X POST "$WORKER_WEBHOOK" \
+          curl -fsSL -X POST "$WORKER_WEBHOOK/_control" \
             -H "x-webhook-secret: $WORKER_SECRET" \
             -H 'content-type: application/json' \
             --data "{\"action\":\"delete\",\"pr\":$PR_NUM}"
