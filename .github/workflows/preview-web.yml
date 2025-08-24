@@ -16,42 +16,69 @@ concurrency:
 jobs:
   upsert:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
+      # --- Discover WEB preview URL (with fast timeout) ---
       - name: Get Render PR preview URL (web)
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_WEB_SERVICE_ID }}
           BRANCH: ${{ github.head_ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          WAIT_SECS: 600
+          WAIT_SECS: 120
         run: |
-          node ./scripts/render-get-preview-url.mjs > web_url.txt
-          echo "WEB_RENDER_URL=$(cat web_url.txt)" >> $GITHUB_ENV
-        continue-on-error: true
+          node ./scripts/render-get-preview-url.mjs > web_url.txt || true
+          echo "WEB_RENDER_URL=$(cat web_url.txt 2>/dev/null || true)" >> $GITHUB_ENV
 
+      # Deterministic fallback in case API lookup is slow/missing
+      - name: Fallback WEB preview URL (deterministic)
+        env:
+          PR_NUM: ${{ github.event.pull_request.number }}
+          WEB_PREFIX: ${{ secrets.RENDER_WEB_HOST_PREFIX }} # e.g. sniffr-web-ui
+        run: |
+          if [ ! -s web_url.txt ] && [ -n "$WEB_PREFIX" ]; then
+            echo "https://${WEB_PREFIX}-pr-${PR_NUM}.onrender.com" > web_url.txt
+          fi
+
+      # --- Discover API preview URL (optional) ---
       - name: Get Render PR preview URL (api)
+        if: ${{ secrets.RENDER_API_SERVICE_ID != '' }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_API_SERVICE_ID }}
           BRANCH: ${{ github.head_ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          WAIT_SECS: 600
+          WAIT_SECS: 120
         run: |
-          node ./scripts/render-get-preview-url.mjs > api_url.txt
-          echo "API_RENDER_URL=$(cat api_url.txt)" >> $GITHUB_ENV
-        continue-on-error: true
+          node ./scripts/render-get-preview-url.mjs > api_url.txt || true
+          echo "API_RENDER_URL=$(cat api_url.txt 2>/dev/null || true)" >> $GITHUB_ENV
+
+      - name: Fallback API preview URL (deterministic)
+        if: ${{ secrets.RENDER_API_HOST_PREFIX != '' }}
+        env:
+          PR_NUM: ${{ github.event.pull_request.number }}
+          API_PREFIX: ${{ secrets.RENDER_API_HOST_PREFIX }} # e.g. sniffr-staging
+        run: |
+          if [ ! -s api_url.txt ] && [ -n "$API_PREFIX" ]; then
+            echo "https://${API_PREFIX}-pr-${PR_NUM}.onrender.com" > api_url.txt
+          fi
+
+      - name: Show resolved preview URLs
+        run: |
+          echo "WEB_RENDER_URL=$(cat web_url.txt 2>/dev/null || echo '')"
+          echo "API_RENDER_URL=$(cat api_url.txt 2>/dev/null || echo '')"
 
       - name: Upsert pretty URL (available origins only)
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}   # e.g. https://render-pr-alias.<user>.workers.dev
           WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
-          API_PREFIXES: '["/api","/rapi-doc","/docs"]'
+          API_PREFIXES: '"[\"/api\",\"/rapi-doc\",\"/docs\"]"'
         run: |
           web=$(cat web_url.txt 2>/dev/null || true)
           api=$(cat api_url.txt 2>/dev/null || true)
@@ -61,13 +88,15 @@ jobs:
             --arg pr  "${PR_NUM}" \
             --arg api "$api" \
             --arg web "$web" \
-            --argjson prefixes "${API_PREFIXES}" '
+            --argjson prefixes ${API_PREFIXES} '
             {action:"upsert", pr: ($pr|tonumber)}
             + ( ($api|length)>0 ? {api:$api} : {} )
             + ( ($web|length)>0 ? {web:$web} : {} )
             + { apiPrefixes: $prefixes }')
           echo "::group::Upsert payload"; echo "$payload"; echo "::endgroup::"
-          curl -fsSL -X POST "$WORKER_WEBHOOK/_control" \
+          curl -v -w "
+status=%{http_code}
+" -fsSL -X POST "$WORKER_WEBHOOK/_control" \
             -H "x-webhook-secret: $WORKER_SECRET" \
             -H 'content-type: application/json' \
             --data "$payload"
