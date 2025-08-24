@@ -54,7 +54,7 @@ export default function DevSearchPage() {
         {hits.map((h, i) => (
           <div key={i} className="border rounded p-3">
             <div className="font-mono text-sm">
-              {h.path} <span className="opacity-60">#{{}h.ord}</span>
+              {h.path} <span className="opacity-60">#{h.ord}</span>
               {typeof h.score === "number" && (
                 <span className="ml-2">score {h.score.toFixed(3)}</span>
               )}
