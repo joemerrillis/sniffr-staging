@@ -77,8 +77,8 @@ jobs:
 
       - name: Upsert pretty URL (available origins only)
         env:
-          WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}   # e.g. https://render-pr-alias.<user>.workers.dev
-          WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
+          WORKER_WEBHOOK: ${{ secrets.PR_WORKER_URL }}   # e.g. https://render-pr-alias.<user>.workers.dev
+          WORKER_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           set -e
           web=$(cat web_url.txt 2>/dev/null || true)
@@ -105,7 +105,7 @@ jobs:
 
       - name: Verify KV mapping for this PR
         env:
-          WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}
+          WORKER_WEBHOOK: ${{ secrets.PR_WORKER_URL }}
         run: |
           set -e
           resp=$(curl -fsSL "$WORKER_WEBHOOK/kv?pr=${PR}")
@@ -127,8 +127,8 @@ jobs:
           echo "PR=$PR" >> $GITHUB_ENV
       - name: Delete mapping on close
         env:
-          WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}
-          WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
+          WORKER_WEBHOOK: ${{ secrets.PR_WORKER_URL }}
+          WORKER_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           curl -fsSL -X POST "$WORKER_WEBHOOK/_control" \
             -H "x-webhook-secret: $WORKER_SECRET" \
