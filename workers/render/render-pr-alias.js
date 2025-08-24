@@ -32,7 +32,7 @@ async function controlPlane(request, env) {
   }
 
   // simple HMAC-style shared-secret gate
-  const secret = request.headers.get('x-webhook-secret');
+  const secret = request.headers.get('x-webhook-secret') || request.headers.get('x-hook-secret');
   if (!secret || secret !== env.WEBHOOK_SECRET) {
     return new Response('Forbidden', { status: 403 });
   }
@@ -48,7 +48,7 @@ async function controlPlane(request, env) {
   const prNum = pr || prId;
   if (!prNum) return new Response('Missing pr', { status: 400 });
 
-  const kvKey = `pr:${prNum}`;
+  const kvKey = `pr-${prNum}`;
 
   if (action === 'delete') {
     await env.PR_PREVIEWS.delete(kvKey);
@@ -104,7 +104,7 @@ async function dataPlane(request, env) {
   const prNum = prFromHost(url.hostname);
   if (!prNum) return new Response('Not a PR host', { status: 404 });
 
-  const kvKey = `pr:${prNum}`;
+  const kvKey = `pr-${prNum}`;
   const raw = await env.PR_PREVIEWS.get(kvKey);
   if (!raw) return new Response('No mapping', { status: 404 });
 
