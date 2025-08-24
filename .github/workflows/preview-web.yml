@@ -8,6 +8,11 @@ permissions:
   contents: read
   pull-requests: write
 
+# Ensure only the latest run per PR is active
+concurrency:
+  group: preview-web-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   upsert:
     runs-on: ubuntu-latest
@@ -44,7 +49,7 @@ jobs:
       - name: Upsert pretty URL (available origins only)
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
-          WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}   # e.g. https://render-pr-alias.joemerrillis.workers.dev
+          WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}   # e.g. https://render-pr-alias.<user>.workers.dev
           WORKER_SECRET: ${{ secrets.PREVIEW_WORKER_SECRET }}
           API_PREFIXES: '["/api","/rapi-doc","/docs"]'
         run: |
@@ -66,6 +71,21 @@ jobs:
             -H "x-webhook-secret: $WORKER_SECRET" \
             -H 'content-type: application/json' \
             --data "$payload"
+
+      - name: Verify KV mapping for this PR
+        env:
+          PR_NUM: ${{ github.event.pull_request.number }}
+          WORKER_WEBHOOK: ${{ secrets.PREVIEW_WORKER_URL }}
+        run: |
+          set -e
+          resp=$(curl -fsSL "$WORKER_WEBHOOK/kv?pr=${PR_NUM}")
+          echo "$resp"
+          pretty=$(echo "$resp" | jq -r '.value.prettyHost // empty')
+          api=$(echo "$resp" | jq -r '.value.apiOrigin // empty')
+          web=$(echo "$resp" | jq -r '.value.webOrigin // empty')
+          if [ -z "$pretty" ]; then echo "❌ prettyHost missing in KV"; exit 1; fi
+          if [ -z "$api" ] && [ -z "$web" ]; then echo "❌ No apiOrigin or webOrigin in KV"; exit 1; fi
+          echo "✅ KV looks good: $pretty (api=$api, web=$web)"
 
   cleanup:
     if: github.event.action == 'closed' || github.event.pull_request.merged == true
