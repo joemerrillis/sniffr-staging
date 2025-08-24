@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Call Worker cleanup
         env:
-          WORKER_URL: ${{ secrets.PR_WORKER_URL }}        # e.g. https://render-pr-alias.your.workers.dev/
+          WORKER_URL: ${{ secrets.PREVIEW_WORKER_URL }}        # e.g. https://render-pr-alias.your.workers.dev/
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}  # same as used by Render webhook
           PR_NUMBER: ${{ github.event.number }}
         run: |
@@ -18,8 +18,8 @@ jobs:
             echo "Missing PR_WORKER_URL or WEBHOOK_SECRET secrets"; exit 1;
           fi
           echo "Deleting preview for PR $PR_NUMBER via worker..."
-          curl -s -X POST "$WORKER_URL" \
-            -H "x-hook-secret: $WEBHOOK_SECRET" \
+          curl -s -X POST "$WORKER_URL/_control" \
+            -H "x-webhook-secret: $WEBHOOK_SECRET" \
             -H "content-type: application/json" \
-            -d "{\"action\":\"delete\",\"prId\":$PR_NUMBER}" \
+            -d "{\"action\":\"delete\",\"pr\":$PR_NUMBER}" \
             | sed -e 's/^/worker: /'
