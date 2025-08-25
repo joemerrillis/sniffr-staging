@@ -97,16 +97,16 @@ jobs:
           api=$(cat api_url.txt 2>/dev/null || true)
           if [ -z "$web" ] && [ -z "$api" ]; then
             echo "No Render preview URLs found"; exit 1; fi
-          prefixes='["/api","/rapi-doc","/docs"]'
-          payload=$(jq -n \
-            --arg pr "$PR" \
-            --arg api "$api" \
-            --arg web "$web" \
-            --argjson prefixes "$prefixes" \
-            '{action:"upsert", pr: ($pr|tonumber)}
-              + ( ($api|length)>0 ? {api:$api} : {} )
-              + ( ($web|length)>0 ? {web:$web} : {} )
-              + { apiPrefixes: $prefixes }')
+            prefixes='["/api","/rapi-doc","/docs"]'
+            payload=$(jq -n \
+              --arg pr  "$PR" \
+              --arg api "$api" \
+              --arg web "$web" \
+              --argjson prefixes "$prefixes" '
+              {action:"upsert", pr: ($pr|tonumber)}
+                + (if ($api|length) > 0 then {api:$api} else {} end)
+                + (if ($web|length) > 0 then {web:$web} else {} end)
+                + { apiPrefixes: $prefixes }')
           echo "::group::Upsert payload"; echo "$payload"; echo "::endgroup::"
           curl -v -w "
           status=%{http_code}
