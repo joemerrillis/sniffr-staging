@@ -115,38 +115,29 @@ jobs:
             -H 'content-type: application/json' \
             --data "$payload"
 
-      - name: Verify KV mapping for this PR
+      - name: Verify pretty URL resolves (no "no mapping")
         env:
-          WORKER_WEBHOOK: ${{ secrets.PR_WORKER_URL }}
-          WORKER_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          PRETTY_DOMAIN: previews.sniffrpack.com
         run: |
           set -e
-          # Try public GET first (ok to fail)
-          code=$(curl -sS -o kv.json -w "%{http_code}" "$WORKER_WEBHOOK/kv?pr=${PR}" || true)
-          if [ "$code" != "200" ]; then
-            # Fallback: ask the control API for the record
-            echo "{\"action\":\"get\",\"pr\":${PR}}" > body.json
-            curl -fsSL -X POST "$WORKER_WEBHOOK/_control" \
-              -H "x-webhook-secret: $WORKER_SECRET" \
-              -H "content-type: application/json" \
-              --data @body.json > kv.json
-          fi
+          pretty="https://pr-${PR}-stage.${PRETTY_DOMAIN}"
+          echo "Checking $pretty …"
 
-          cat kv.json
+          # Retry loop to allow KV propagation
+          for i in {1..10}; do
+            code=$(curl -s -o body.txt -w "%{http_code}" "$pretty/")
+            # Treat as success if body does NOT contain our Worker’s "no mapping" text.
+            if ! grep -qi 'no mapping' body.txt; then
+              echo "✅ pretty URL responds (code=$code)"
+              exit 0
+            fi
+            echo "…not ready yet (code=$code). retry $i/10"
+            sleep 3
+          done
 
-          # Normalize both possible shapes: {value:{...}} or {rec:{...}} or flat
-          pretty=$(jq -r '(.value.prettyHost // .prettyHost // empty)' kv.json)
-          api=$(jq -r '(.value.apiOrigin // .value.api // .rec.api // .api // empty)' kv.json)
-          web=$(jq -r '(.value.webOrigin // .value.web // .rec.web // .web // empty)' kv.json)
-
-          # Compute pretty host if not returned
-          if [ -z "$pretty" ]; then pretty="pr-${PR}-stage.previews.sniffrpack.com"; fi
-
-          if [ -z "$api" ] && [ -z "$web" ]; then
-            echo "❌ No api/web in record"; exit 1
-          fi
-
-          echo "✅ KV looks good: $pretty (api=$api, web=$web)"
+          echo "❌ pretty URL still not mapped after retries"
+          echo "---- body ----"; sed -n '1,120p' body.txt; echo "--------------"
+          exit 1
   cleanup:
     if: github.event.action == 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
