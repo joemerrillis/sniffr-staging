@@ -36,20 +36,30 @@ jobs:
           if [ -z "$PR" ]; then PR="${{ github.event.inputs.pr }}"; fi
           echo "PR=$PR" >> $GITHUB_ENV
 
-      # Deterministic URLs (always available)
       - name: Set deterministic preview URLs
         env:
           WEB_PREFIX: ${{ secrets.RENDER_WEB_HOST_PREFIX }}   # e.g. sniffr-web-ui
           API_PREFIX: ${{ secrets.RENDER_API_HOST_PREFIX }}   # e.g. sniffr-staging
         run: |
           : "${WEB_PREFIX:?Set secret RENDER_WEB_HOST_PREFIX}"
-          echo "WEB_URL=https://${WEB_PREFIX}-pr-${PR}.onrender.com" >> $GITHUB_ENV
-          echo "API_URL=https://${API_PREFIX}-pr-${PR}.onrender.com" >> $GITHUB_ENV
-          printf "%s" "$WEB_URL" > web_url.txt
-          printf "%s" "$API_URL" > api_url.txt
+
+          # Compute locally, write files, then export for *later* steps.
+          WEB="https://${WEB_PREFIX}-pr-${PR}.onrender.com"
+          echo "$WEB" > web_url.txt
+          echo "WEB_URL=$WEB" >> $GITHUB_ENV
+
+          if [ -n "${API_PREFIX:-}" ]; then
+            API="https://${API_PREFIX}-pr-${PR}.onrender.com"
+            echo "$API" > api_url.txt
+            echo "API_URL=$API" >> $GITHUB_ENV
+          fi
+
+          echo "deterministic WEB=$WEB"
+          [ -n "${API:-}" ] && echo "deterministic API=$API" || true
 
       # Try Render API discovery to override (short timeout)
       - name: Try Render API discovery (web)
+        if: ${{ github.head_ref != '' }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_WEB_SERVICE_ID }}
@@ -61,7 +71,7 @@ jobs:
           if [ -s _web.txt ]; then mv _web.txt web_url.txt; fi
 
       - name: Try Render API discovery (api)
-        if: ${{ env.RENDER_API_SERVICE_ID != '' }}
+        if: ${{ github.head_ref != '' && env.RENDER_API_SERVICE_ID != '' }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ env.RENDER_API_SERVICE_ID }}
