@@ -135,8 +135,8 @@ jobs:
               + { apiPrefixes: $prefixes }')
           echo "::group::Upsert payload"; echo "$payload"; echo "::endgroup::"
           curl -v -w "
-status=%{http_code}
-" -fsSL -X POST "$WORKER_WEBHOOK/_control" \
+          status=%{http_code}
+          " -fsSL -X POST "$WORKER_WEBHOOK/_control" \
             -H "x-webhook-secret: $WORKER_SECRET" \
             -H 'content-type: application/json' \
             --data "$payload"
