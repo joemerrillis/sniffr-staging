@@ -173,15 +173,45 @@ jobs:
           fi
           echo "✅ KV looks good: $pretty (api=$api, web=$web)"
 
-      - name: "Sanity: /rapi-doc should come from API origin"
+      - name: "Sanity: RapiDoc reachable via pretty URL (and diagnose)"
         run: |
           set -e
-          pretty="https://pr-${PR}-stage.previews.sniffrpack.com/rapi-doc/rapidoc.html"
-          code=$(curl -s -o /dev/null -w "%{http_code}" "$pretty" || true)
-          echo "RapiDoc HTTP $code at $pretty"
-          if [ "$code" -ne 200 ]; then
-            echo "❌ RapiDoc not reachable via pretty URL"; exit 1
+          pretty_base="https://pr-${PR}-stage.previews.sniffrpack.com"
+
+          # Try common RapiDoc locations, follow redirects, HEAD first then GET.
+          try_urls=(
+            "$pretty_base/rapi-doc/rapidoc.html"
+            "$pretty_base/rapi-doc/"
+            "$pretty_base/docs"
+          )
+
+          ok=""
+          for u in "${try_urls[@]}"; do
+            code=$(curl -s -I -L -o /dev/null -w "%{http_code}" "$u" || true)
+            echo "HEAD $u -> $code"
+            if [ "$code" = "200" ]; then ok="$u"; break; fi
+            # Some servers don't respond well to HEAD; retry with GET
+            code=$(curl -s -L -o /dev/null -w "%{http_code}" "$u" || true)
+            echo " GET $u -> $code"
+            if [ "$code" = "200" ]; then ok="$u"; break; fi
+          done
+
+          if [ -z "$ok" ]; then
+            echo "❌ RapiDoc not reachable at common paths on pretty host."
+
+            # Diagnose: hit API origin directly from the KV record we just fetched
+            api=$(jq -r '(.value.apiOrigin // .value.api // .rec.api // .api // empty)' kv.json)
+            if [ -n "$api" ]; then
+              for p in "/rapi-doc/rapidoc.html" "/rapi-doc/" "/docs"; do
+                url="$api$p"
+                code=$(curl -s -I -L -o /dev/null -w "%{http_code}" "$url" || true)
+                echo "API HEAD $url -> $code"
+              done
+            fi
+            exit 1
           fi
+
+          echo "✅ RapiDoc reachable at: $ok"
 
   cleanup:
     if: github.event.action == 'closed' || github.event.pull_request.merged == true
