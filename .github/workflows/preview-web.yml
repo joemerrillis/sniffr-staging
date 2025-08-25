@@ -173,7 +173,7 @@ jobs:
           fi
           echo "✅ KV looks good: $pretty (api=$api, web=$web)"
 
-      - name: Sanity: /rapi-doc should come from API origin
+      - name: "Sanity: /rapi-doc should come from API origin"
         run: |
           set -e
           pretty="https://pr-${PR}-stage.previews.sniffrpack.com/rapi-doc/rapidoc.html"
