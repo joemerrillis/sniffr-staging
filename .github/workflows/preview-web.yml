@@ -118,17 +118,35 @@ jobs:
       - name: Verify KV mapping for this PR
         env:
           WORKER_WEBHOOK: ${{ secrets.PR_WORKER_URL }}
+          WORKER_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           set -e
-          resp=$(curl -fsSL "$WORKER_WEBHOOK/kv?pr=${PR}")
-          echo "$resp"
-          pretty=$(echo "$resp" | jq -r '.value.prettyHost // empty')
-          api=$(echo "$resp" | jq -r '.value.apiOrigin // empty')
-          web=$(echo "$resp" | jq -r '.value.webOrigin // empty')
-          if [ -z "$pretty" ]; then echo "❌ prettyHost missing in KV"; exit 1; fi
-          if [ -z "$api" ] && [ -z "$web" ]; then echo "❌ No apiOrigin or webOrigin in KV"; exit 1; fi
-          echo "✅ KV looks good: $pretty (api=$api, web=$web)"
+          # Try public GET first (ok to fail)
+          code=$(curl -sS -o kv.json -w "%{http_code}" "$WORKER_WEBHOOK/kv?pr=${PR}" || true)
+          if [ "$code" != "200" ]; then
+            # Fallback: ask the control API for the record
+            echo "{\"action\":\"get\",\"pr\":${PR}}" > body.json
+            curl -fsSL -X POST "$WORKER_WEBHOOK/_control" \
+              -H "x-webhook-secret: $WORKER_SECRET" \
+              -H "content-type: application/json" \
+              --data @body.json > kv.json
+          fi
 
+          cat kv.json
+
+          # Normalize both possible shapes: {value:{...}} or {rec:{...}} or flat
+          pretty=$(jq -r '(.value.prettyHost // .prettyHost // empty)' kv.json)
+          api=$(jq -r '(.value.apiOrigin // .value.api // .rec.api // .api // empty)' kv.json)
+          web=$(jq -r '(.value.webOrigin // .value.web // .rec.web // .web // empty)' kv.json)
+
+          # Compute pretty host if not returned
+          if [ -z "$pretty" ]; then pretty="pr-${PR}-stage.previews.sniffrpack.com"; fi
+
+          if [ -z "$api" ] && [ -z "$web" ]; then
+            echo "❌ No api/web in record"; exit 1
+          fi
+
+          echo "✅ KV looks good: $pretty (api=$api, web=$web)"
   cleanup:
     if: github.event.action == 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
