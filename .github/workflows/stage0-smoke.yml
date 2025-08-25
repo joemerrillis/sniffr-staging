@@ -1,0 +1,86 @@
+name: Stage 0 Smoke
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number (manual run)"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage0-smoke-${{ github.event.pull_request.number || github.event.inputs.pr || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve PR number
+        run: |
+          PR="${{ github.event.pull_request.number }}"
+          if [ -z "$PR" ]; then PR="${{ github.event.inputs.pr }}"; fi
+          echo "PR=$PR" >> $GITHUB_ENV
+
+      - name: Compute pretty URL
+        env:
+          PRETTY_DOMAIN: previews.sniffrpack.com
+        run: |
+          base="https://pr-${PR}-stage.${PRETTY_DOMAIN}"
+          echo "E2E_BASE_URL=$base" >> $GITHUB_ENV
+          echo "E2E_BASE_URL=$base"
+
+      - name: Wait for preview to be live
+        run: |
+          set -e
+          for i in {1..40}; do
+            code=$(curl -s -o body.txt -w "%{http_code}" "$E2E_BASE_URL/" || true)
+            if ! grep -qi 'no mapping' body.txt && [ "$code" -ge 200 ] && [ "$code" -lt 500 ]; then
+              echo "Ready ($code)"; break
+            fi
+            echo "…not ready yet ($code) try $i/40"; sleep 5
+          done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright (deps + browsers)
+        run: |
+          npm i -D @playwright/test
+          npx playwright install --with-deps
+
+      - name: Check test secrets
+        env:
+          EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+          PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+        run: |
+          if [ -z "$EMAIL" ] || [ -z "$PASSWORD" ]; then
+            echo "Missing E2E_USER_EMAIL or E2E_USER_PASSWORD secrets"; exit 1; fi
+          echo "E2E_USER_EMAIL=$EMAIL" >> $GITHUB_ENV
+          echo "E2E_USER_PASSWORD=$PASSWORD" >> $GITHUB_ENV
+
+      - name: Run smoke
+        env:
+          E2E_BASE_URL: ${{ env.E2E_BASE_URL }}
+          E2E_USER_EMAIL: ${{ env.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD: ${{ env.E2E_USER_PASSWORD }}
+          E2E_LOGIN_PATH: "/login"
+        run: |
+          npx playwright test --project=chromium --reporter=line
+
+      - name: Upload Playwright report (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
