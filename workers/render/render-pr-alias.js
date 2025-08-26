@@ -94,7 +94,7 @@ function normalizeRecord({ origin, url, api, web, apiPrefixes }) {
   // default to ['/api','/rapi-doc'] to satisfy your docs path routing request
   const prefixes = Array.isArray(apiPrefixes) && apiPrefixes.length
     ? apiPrefixes.filter(p => typeof p === 'string' && p.startsWith('/'))
-    : ['/api', '/rapi-doc'];
+    : ['/api', '/rapi-doc', '/docs'];
 
   return { api: a, web: w, apiPrefixes: prefixes };
 }
@@ -111,7 +111,7 @@ async function dataPlane(request, env) {
   const rec = JSON.parse(raw); // { api, web, apiPrefixes? }
   const prefixes = Array.isArray(rec.apiPrefixes) && rec.apiPrefixes.length
     ? rec.apiPrefixes
-    : ['/api', '/rapi-doc'];
+    : ['/api', '/rapi-doc', '/docs'];
 
   const toApi = prefixes.some(prefix => url.pathname.startsWith(prefix));
 
