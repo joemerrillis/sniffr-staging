@@ -12,36 +12,37 @@ import { fileURLToPath } from 'url';
 import { existsSync, readFileSync } from 'fs';
 
 // --- Feature Plugins ---
-import corePlugin from './src/core/index.js';
-import authPlugin from './src/auth/index.js';
-import usersPlugin from './src/users/index.js';
-import tenantsPlugin from './src/tenants/index.js';
-import stripeConnectPlugin from './src/stripe_connect/index.js';
-import householdsPlugin from './src/households/index.js';
-import domainsPlugin from './src/domains/index.js';
-import employeesPlugin from './src/employees/index.js';
-import dogsPlugin from './src/dogs/index.js';
-import tenantClientsPlugin from './src/tenantClients/index.js';
-import clientWalkersPlugin from './src/clientWalkers/index.js';
-import dogAssignmentsPlugin from './src/dogAssignments/index.js';
-import clientWalkWindowsPlugin from './src/clientWalkWindows/index.js';
-import clientWalkRequestsPlugin from './src/clientWalkRequests/index.js';
-import boardingsPlugin from './src/boardings/index.js';
-import daycareSessionsPlugin from './src/daycare_sessions/index.js';
-import pendingServicesPlugin from './src/pendingServices/index.js';
-import purchasesPlugin from './src/purchases/index.js';
-import pricingRulesPlugin from './src/pricingRules/index.js';
-import schedulingPlugin from './src/scheduling/index.js';
-import availabilityPlugin from './src/availability/index.js';
-import walksPlugin from './src/walks/index.js';
-import dogMemoriesPlugin from './src/dog_memories/index.js';
-import dogFriendsPlugin from './src/dogFriends/index.js';
-import visibilityPlugin from './src/dogVisibility/index.js';
-import chatPlugin from './src/chat/index.js';
-import walkReportsPlugin from './src/walk_reports/index.js';
-import dogEventsPlugin from './src/dog_events/index.js';
-import boardingReportsPlugin from './src/boarding_reports/index.js';
-import calendarSyncPlugin from './src/calendar_sync/index.js';
+// index.js — wrap all feature plugins under /api
+await fastify.register(async function apiScope(api) {
+  await api.register(usersPlugin, { prefix: '/users' });
+  await api.register(householdsPlugin, { prefix: '/households' });
+  await api.register(tenantsPlugin, { prefix: '/tenants' });
+  await api.register(stripeConnectPlugin, { prefix: '/stripe-connect' });
+  await api.register(domainsPlugin, { prefix: '/domains' });
+  await api.register(employeesPlugin, { prefix: '/employees' });
+  await api.register(dogsPlugin, { prefix: '/dogs' });
+  await api.register(tenantClientsPlugin, { prefix: '/tenant-clients' });
+  await api.register(clientWalkersPlugin, { prefix: '/client-walkers' });
+  await api.register(dogAssignmentsPlugin, { prefix: '/dog-assignments' });
+  await api.register(clientWalkWindowsPlugin, { prefix: '/client-windows' });
+  await api.register(clientWalkRequestsPlugin, { prefix: '/client-walk-requests' });
+  await api.register(boardingsPlugin, { prefix: '/boardings' });
+  await api.register(daycareSessionsPlugin, { prefix: '/daycare_sessions' });
+  await api.register(pendingServicesPlugin, { prefix: '/pending-services' });
+  await api.register(purchasesPlugin, { prefix: '/purchases' });
+  await api.register(pricingRulesPlugin, { prefix: '/pricing-rules' });
+  await api.register(schedulingPlugin, { prefix: '/scheduling' });
+  await api.register(availabilityPlugin, { prefix: '/availability' });
+  await api.register(walksPlugin, { prefix: '/walks' });
+  await api.register(dogMemoriesPlugin, { prefix: '/dog-memories' });
+  await api.register(dogFriendsPlugin, { prefix: '/dog-friends' });
+  await api.register(visibilityPlugin, { prefix: '/dogs/:id/visibility' });
+  await api.register(chatPlugin, { prefix: '/chats' });
+  await api.register(walkReportsPlugin, { prefix: '/walk-reports' });
+  await api.register(dogEventsPlugin, { prefix: '/dog-events' });
+  await api.register(boardingReportsPlugin, { prefix: '/boarding-reports' });
+  await api.register(calendarSyncPlugin, { prefix: '/calendar-sync' });
+}, { prefix: '/api' });
 
 dotenv.config();
 
