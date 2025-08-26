@@ -131,7 +131,7 @@ jobs:
           sudo apt-get update >/dev/null && sudo apt-get install -y jq >/dev/null
           echo "hits: $(jq '.hits | length' .github/agent/.context.json)"
 
-      - name: Run agent
+      - name: Run agent (and persist output)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
@@ -140,9 +140,21 @@ jobs:
           AGENT_MODEL:    ${{ env.AGENT_MODEL }}
         run: |
           set -euo pipefail
+          mkdir -p .github/agent
           echo "MODE=$MODE"
           echo "Text length: $(printf '%s' "$REQUEST_TEXT" | wc -c)"
-          node .github/agent/agent.mjs
+
+          if [[ "$MODE" = "plan" ]]; then
+            # Write the plan markdown so later steps can find it
+            printf '%s' "$REQUEST_TEXT" \
+              | node .github/agent/agent.mjs --mode=plan \
+              | tee .github/agent/.plan.md
+          else
+            # Capture APPLY JSON for a later commit step
+            printf '%s' "$REQUEST_TEXT" \
+              | node .github/agent/agent.mjs --mode=apply \
+              | tee .github/agent/.apply.json
+          fi
 
       - name: Comment plan preview
         if: always()
