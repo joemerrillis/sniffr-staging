@@ -24,6 +24,7 @@ export default fp(async function jwtPlugin(fastify, opts) {
   // 3) Global onRequest hook that *skips* public paths
   const publicPrefixes = [
     '/auth',
+    '/api/auth',
     '/docs',
     '/healthz',
     '/dog-memories/test-upload',
