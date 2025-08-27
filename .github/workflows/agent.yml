@@ -240,6 +240,11 @@ jobs:
             echo "Plan still failing after 3 attempts."
           fi
 
+      - name: Debug PLAN source
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
+        run: jq -r '.meta.source // "unknown"' .github/agent/PLAN.json
+
+
       - name: Comment lint results
         if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
         uses: actions/github-script@v7
