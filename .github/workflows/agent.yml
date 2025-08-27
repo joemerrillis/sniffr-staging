@@ -1,195 +1,188 @@
-name: agent
+name: Agent
 
 on:
   issues:
-    types: [opened, edited, reopened]
+    types: [opened, edited]
   issue_comment:
     types: [created]
-  workflow_dispatch:
-    inputs:
-      title:
-        description: "Issue title (optional when dispatching)"
-        required: false
-        default: ""
-      body:
-        description: "Issue body (optional when dispatching)"
-        required: false
-        default: ""
 
 permissions:
   contents: write
   pull-requests: write
-  issues: write
-
-env:
-  AGENT_MODEL: gpt-5
 
 jobs:
   agent:
-    # Run when:
-    # - manually dispatched, OR
-    # - an Issue body contains '/agent ' (opened/edited/reopened), OR
-    # - a new comment starting with '/agent ' appears
     if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' &&
-        (contains(github.event.issue.body, '/agent ') || contains(github.event.issue.body, '/Agent '))) ||
-      (github.event_name == 'issue_comment' &&
-        (startsWith(github.event.comment.body, '/agent ') || startsWith(github.event.comment.body, '/Agent ')))
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+      (github.event_name == 'issues' && startsWith(github.event.issue.body, '/agent ')) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/agent '))
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 20
 
-      # Parse title/body → MODE and REQUEST_TEXT
-      - name: Parse event/title/body into request text
+      - name: Parse command and prompt
         id: parse
         shell: bash
-        env:
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY:  ${{ github.event.issue.body }}
-          INPUT_TITLE: ${{ github.event.inputs.title }}
-          INPUT_BODY:  ${{ github.event.inputs.body }}
         run: |
           set -euo pipefail
-
-          # Decide where to read text from
-          if [[ "${GITHUB_EVENT_NAME}" == "issues" || "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
-            TITLE="${ISSUE_TITLE:-}"
-            BODY="${ISSUE_BODY:-}"
-            if [[ "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
-              BODY='${{ github.event.comment.body }}'
-            fi
+          mkdir -p .github/.agent
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
+            RAW="${{ github.event.issue.body }}"
           else
-            TITLE="${INPUT_TITLE:-}"
-            BODY="${INPUT_BODY:-}"
+            RAW="${{ github.event.comment.body }}"
           fi
 
-          # Fallback body
-          if [[ -z "${BODY}" ]]; then
-            read -r -d '' BODY <<'EOF'
-          /agent plan
-
-          # Feature
-          Example body to avoid shell expansion.
-          EOF
-          fi
-
-          # Extract "/agent <cmd>" (default plan)
-          CMD=""
-          if [[ "${BODY}" =~ ^/[Aa]gent[[:space:]]+([A-Za-z]+) ]]; then
-            CMD="${BASH_REMATCH[1],,}"
-          fi
-          [[ -z "$CMD" ]] && CMD="plan"
-
-          # Strip the prefix from message passed to the agent
-          AFTER="$(printf '%s' "${BODY}" | sed -E 's#^/[Aa]gent[[:space:]]+[A-Za-z]+[[:space:]]*##')"
-          if [[ -z "${AFTER}" ]]; then
-            MSG="${TITLE} — ${BODY}"
+          # Detect /agent plan|apply at start of text
+          if [[ "$RAW" =~ ^/agent[[:space:]]+plan ]]; then
+            CMD="plan"
+            REM="${RAW#*/agent plan}"
+          elif [[ "$RAW" =~ ^/agent[[:space:]]+apply ]]; then
+            CMD="apply"
+            REM="${RAW#*/agent apply}"
           else
-            MSG="${AFTER}"
+            echo "❌ No /agent plan|apply prefix found"; exit 1
           fi
 
-          {
-            echo "cmd=${CMD}"
-            echo 'text<<EOF'
-            printf '%s\n' "${MSG}"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
+          # Trim leading whitespace/newlines from remainder
+          TEXT="$(printf '%s' "$REM" | sed '1,1 s/^[[:space:]]*//')"
 
-      - name: Install dependencies
-        run: npm ci || npm install
+          echo "cmd=$CMD" >> "$GITHUB_OUTPUT"
+          printf '%s' "$TEXT" > .github/.agent/request.md
 
-      # === Hybrid search context: build → serve → fetch ===
-      - name: Build code index (embeddings if key present)
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npx tsx tools/build-index.ts
+          echo "Command: $CMD"
+          echo "Prompt bytes: $(wc -c < .github/.agent/request.md)"
 
-      - name: Install ripgrep (optional)
-        run: sudo apt-get update && sudo apt-get install -y ripgrep
-
-      - name: Start search server (background)
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npx tsx tools/search-server.ts & echo $! > search.pid
-
-      - name: Fetch harvested context for this request
-        env:
-          REQUEST_TEXT: ${{ steps.parse.outputs.text }}
-        run: node tools/fetch-context.mjs
-
-      - name: Show harvested context size
+      - name: Show harvested canon context sizes (optional)
+        shell: bash
         run: |
-          sudo apt-get update >/dev/null && sudo apt-get install -y jq >/dev/null
-          echo "hits: $(jq '.hits | length' .github/agent/.context.json)"
+          for f in "docs/CONTEXT.md" "CONTEXT.md" "docs/SCHEMA.md" "schema.md.txt" "sniffr_plugin_gotchas.md" "sniffr_plugin_gotchas.md.txt"; do
+            [[ -f "$f" ]] && echo "::notice title=Context::$(printf "%s (%s bytes)" "$f" "$(wc -c < "$f")")"
+          done
 
-      - name: Run agent (and persist output)
+      # ===== PLAN MODE =====
+      - name: Run agent PLAN
+        if: steps.parse.outputs.cmd == 'plan'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GH_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
-          MODE:           ${{ steps.parse.outputs.cmd }}
-          REQUEST_TEXT:   ${{ steps.parse.outputs.text }}
-          AGENT_MODEL:    ${{ env.AGENT_MODEL }}
         run: |
           set -euo pipefail
-          mkdir -p .github/agent
-          echo "MODE=$MODE"
-          echo "Text length: $(printf '%s' "$REQUEST_TEXT" | wc -c)"
+          node .github/agent/plan-and-commit.mjs --prompt-file .github/.agent/request.md --planOnly
+          test -f .github/.agent/plan.md || { echo "PLAN missing"; exit 1; }
+          # Short preview for comment
+          head -c 8000 .github/.agent/plan.md > .github/.agent/plan.preview.md || true
 
-          if [[ "$MODE" = "plan" ]]; then
-            # Write the plan markdown so later steps can find it
-            printf '%s' "$REQUEST_TEXT" \
-              | node .github/agent/agent.mjs --mode=plan \
-              | tee .github/agent/.plan.md
-          else
-            # Capture APPLY JSON for a later commit step
-            printf '%s' "$REQUEST_TEXT" \
-              | node .github/agent/agent.mjs --mode=apply \
-              | tee .github/agent/.apply.json
-          fi
-
-      - name: Comment plan preview
-        if: always()
+      - name: Comment plan preview on issue
+        if: steps.parse.outputs.cmd == 'plan'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const p = '.github/agent/.plan.md';
-            if (!fs.existsSync(p)) { core.info('No plan file at ' + p); return; }
-            const md = fs.readFileSync(p, 'utf8');
-            const short = md.replace(/\s+/g, ' ').trim().slice(0, 151);
+            const body = fs.readFileSync('.github/.agent/plan.preview.md','utf8');
+            const head = body.replace(/\s+/g,' ').slice(0, 300);
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: context.issue.number,
               body: [
-                '**Agent plan (preview)**',
+                '**Agent PLAN (preview)**',
                 '',
-                short + (md.length > 151 ? '…' : ''),
+                head + (body.length > 300 ? '…' : ''),
                 '',
-                '_Full plan attached as artifact `agent-plan`._'
+                '_Full plan attached as artifact:_ **agent-plan.md**'
               ].join('\n')
             });
 
-      - name: Upload full plan as artifact
-        if: always()
+      - name: Upload plan artifact
+        if: steps.parse.outputs.cmd == 'plan'
         uses: actions/upload-artifact@v4
         with:
-          name: agent-plan
-          path: .github/agent/.plan.md
-          include-hidden-files: true  
-          if-no-files-found: warn
-      - name: Link to this run (comment)
-        if: always() && (github.event_name == 'issues' || github.event_name == 'issue_comment')
+          name: agent-plan.md
+          path: .github/.agent/plan.md
+          if-no-files-found: error
+
+      # ===== APPLY MODE =====
+      - name: Run agent APPLY (write files only)
+        if: steps.parse.outputs.cmd == 'apply'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          node .github/agent/plan-and-commit.mjs --prompt-file .github/.agent/request.md --applyOnly
+          # Grab the latest apply json for metadata
+          LATEST=$(ls -t .github/.agent/apply-*.json | head -n1)
+          echo "latest_apply=$LATEST" >> "$GITHUB_OUTPUT"
+        id: applyrun
+
+      - name: Extract apply metadata
+        if: steps.parse.outputs.cmd == 'apply'
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          LATEST="${{ steps.applyrun.outputs.latest_apply }}"
+          test -f "$LATEST" || { echo "No APPLY JSON found"; exit 1; }
+          COMMIT_MSG="$(jq -r '.commitMessage // "chore: agent apply"' "$LATEST")"
+          SUMMARY="$(jq -r '.summary // ""' "$LATEST")"
+          echo "commit_msg<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create branch, commit, and push
+        if: steps.parse.outputs.cmd == 'apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BR="agent/apply-${{ github.run_id }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BR"
+
+          # Only commit if there are changes
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No changes produced by agent APPLY; exiting early."
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "${{ steps.meta.outputs.commit_msg }}"
+          git push --set-upstream origin "$BR"
+
+      - name: Open Pull Request
+        if: steps.parse.outputs.cmd == 'apply'
         uses: actions/github-script@v7
         with:
           script: |
-            const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.run_id }}`;
-            await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body: `Artifact **agent-plan** is attached to this run.\n\n${url}` });
+            const title = core.getInput('title') || process.env.PR_TITLE || `${{ toJson(steps.meta.outputs.commit_msg) }}`;
+            const body  = `${{ toJson(steps.meta.outputs.summary) }}\n\n_Auto-generated by **agent** from issue #${{ github.event.issue.number }}._`;
+            try {
+              const { data: pr } = await github.rest.pulls.create({
+                ...context.repo,
+                title,
+                body,
+                head: 'agent/apply-${{ github.run_id }}',
+                base: 'main'
+              });
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body: `Opened PR #${pr.number}: ${pr.title}`
+              });
+            } catch (e) {
+              core.setFailed(`Failed to open PR: ${e.message}`);
+            }
+
+      - name: Upload APPLY JSON (artifact)
+        if: steps.parse.outputs.cmd == 'apply'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-apply.json
+          path: ${{ steps.applyrun.outputs.latest_apply }}
+          if-no-files-found: error
