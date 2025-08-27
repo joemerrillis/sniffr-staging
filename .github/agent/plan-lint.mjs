@@ -194,6 +194,21 @@ function lintFrontendPlanLevel(plan) {
     WARN.push('FE: plan.meta.outputFormat not declared. Expected "PLAN (Markdown) + APPLY (Strict JSON)".');
   }
 
+function lintWeakPlan(plan) {
+  const pm = String(plan.planMarkdown || '');
+  const looksBoiler = /Analyze Constitution & Schema; identify required changes\./.test(pm);
+  if (!Array.isArray(plan.changes) || plan.changes.length < 4) {
+    ERR.push('PLAN is too weak: "changes[]" must list >= 4 concrete files for this card.');
+  }
+  if (looksBoiler) {
+    ERR.push('PLAN Markdown looks like boilerplate; provide concrete steps and file list.');
+  }
+}
+lintFrontendPlanLevel(plan);
+lintBackendPlanLevel(plan);
+lintWeakPlan(plan); // <— add this call
+
+  
   // If the plan adds a login page, ensure it includes basic contracts
   for (const ch of plan.changes) {
     const f = ch.path;
