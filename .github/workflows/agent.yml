@@ -192,9 +192,81 @@ jobs:
       # Plan Lint (quality gate)
       # ---------------------------
       - name: Plan Lint (quality gate)
+        id: lint1
         if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
         run: |
-          node .github/agent/plan-lint.mjs .github/agent/PLAN.json
+          set -euo pipefail
+          # capture both stdout and stderr so we can show the user exactly what failed
+          node .github/agent/plan-lint.mjs .github/agent/PLAN.json 2>&1 | tee .github/agent/.lint.txt
+        continue-on-error: true
+
+      - name: Auto-refine plan from lint feedback (1 attempt)
+        id: refine
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan' && steps.lint1.outcome == 'failure'
+        shell: bash
+        env:
+          REQUEST_TEXT: ${{ steps.parse.outputs.text }}
+        run: |
+          set -euo pipefail
+          # Build a refinement prompt that includes lint failures + the original request text
+          {
+            echo "/agent plan"
+            echo
+            echo "## Please revise the plan to satisfy the linter. Only produce a valid PLAN with PLAN.json as per contract."
+            echo
+            echo "### Lint failures"
+            echo '```'
+            sed -E 's/\x1b\[[0-9;]*m//g' .github/agent/.lint.txt
+            echo '```'
+            echo
+            echo "### Original request"
+            echo '```'
+            printf '%s\n' "$REQUEST_TEXT"
+            echo '```'
+          } > .github/agent/REFINED_REQUEST.md
+
+          # Re-run plan using the refined prompt; agent.mjs will write .plan.md and PLAN.json
+          cat .github/agent/REFINED_REQUEST.md \
+            | node .github/agent/agent.mjs --mode=plan \
+            | tee .github/agent/.plan.md
+
+      - name: Plan Lint (after refine)
+        id: lint2
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan' && steps.lint1.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          node .github/agent/plan-lint.mjs .github/agent/PLAN.json 2>&1 | tee .github/agent/.lint2.txt
+        continue-on-error: true
+
+      - name: Comment lint results
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            function read(p){ try { return fs.readFileSync(p,'utf8'); } catch { return ''; } }
+            const l1 = read('.github/agent/.lint.txt');
+            const l2 = read('.github/agent/.lint2.txt');
+            const refined = Boolean(l2.trim());
+            const body = [
+              '### Plan Lint Results',
+              '',
+              refined ? '**Initial lint:**' : '**Lint:**',
+              '```',
+              (l1 || '(no output)'),
+              '```',
+              refined ? '**After auto-refine:**' : '',
+              refined ? '```' : '',
+              refined ? (l2 || '(no output)') : '',
+              refined ? '```' : '',
+              '_The agent will not open a PR until the plan passes the linter._'
+            ].filter(Boolean).join('\n');
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
 
       - name: Comment plan preview
         if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
