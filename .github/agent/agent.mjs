@@ -184,7 +184,7 @@ async function main() {
     if (client) {
       // NEW: get strict JSON with both planMarkdown + changes[]
       const planObj = await openaiPlanJSON(client, prompt);
-
+      planObj.meta = { ...(planObj.meta||{}), source: client ? 'openai' : 'fallback' };
       // Write PLAN.json for the linter
       fs.writeFileSync(PLAN_JSON, JSON.stringify(planObj, null, 2), 'utf8');
 
