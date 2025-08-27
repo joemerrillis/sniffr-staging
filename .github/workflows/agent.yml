@@ -26,16 +26,6 @@ env:
 
 jobs:
   agent:
-    # Run when:
-    # - manually dispatched, OR
-    # - an Issue body contains '/agent ' (opened/edited/reopened), OR
-    # - a new comment starting with '/agent ' appears
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' &&
-        (contains(github.event.issue.body, '/agent ') || contains(github.event.issue.body, '/Agent '))) ||
-      (github.event_name == 'issue_comment' &&
-        (startsWith(github.event.comment.body, '/agent ') || startsWith(github.event.comment.body, '/Agent ')))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -48,9 +38,49 @@ jobs:
         with:
           node-version: 20.x
 
-      # Parse title/body → MODE and REQUEST_TEXT
+      # ------------------------------------------------------------------
+      # Gate: decide if we should run, and extract cmd (plan/apply)
+      # Accepts "/agent" followed by space OR newline (defaults to plan)
+      # ------------------------------------------------------------------
+      - name: Gate (should we run?)
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
+            BODY='${{ github.event.comment.body }}'
+          elif [[ "${GITHUB_EVENT_NAME}" == "issues" ]]; then
+            BODY='${{ github.event.issue.body }}'
+          else
+            # workflow_dispatch path uses inputs below; still allow /agent via body if present
+            BODY="${{ github.event.inputs.body }}"
+          fi
+          printf 'body: %q\n' "$BODY"
+
+          CLEAN="$(printf '%s' "$BODY" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+/ /g')"
+
+          if echo "$CLEAN" | grep -Ei '^/(agent)\b' >/dev/null; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            CMD="$(printf '%s' "$CLEAN" | awk '{print $2}')"
+            [[ -z "$CMD" ]] && CMD="plan"
+            echo "cmd=$CMD" >> "$GITHUB_OUTPUT"
+          else
+            # Allow workflow_dispatch even without /agent
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+              echo "cmd=plan" >> "$GITHUB_OUTPUT"
+            else
+              echo "ok=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      # ------------------------------------------------------------------
+      # Your original parser that builds REQUEST_TEXT (kept intact)
+      # ------------------------------------------------------------------
       - name: Parse event/title/body into request text
         id: parse
+        if: steps.gate.outputs.ok == 'true'
         shell: bash
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
@@ -60,7 +90,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Decide where to read text from
           if [[ "${GITHUB_EVENT_NAME}" == "issues" || "${GITHUB_EVENT_NAME}" == "issue_comment" ]]; then
             TITLE="${ISSUE_TITLE:-}"
             BODY="${ISSUE_BODY:-}"
@@ -72,7 +101,6 @@ jobs:
             BODY="${INPUT_BODY:-}"
           fi
 
-          # Fallback body
           if [[ -z "${BODY}" ]]; then
             read -r -d '' BODY <<'EOF'
           /agent plan
@@ -82,14 +110,12 @@ jobs:
           EOF
           fi
 
-          # Extract "/agent <cmd>" (default plan)
           CMD=""
           if [[ "${BODY}" =~ ^/[Aa]gent[[:space:]]+([A-Za-z]+) ]]; then
             CMD="${BASH_REMATCH[1],,}"
           fi
-          [[ -z "$CMD" ]] && CMD="plan"
+          [[ -z "$CMD" ]] && CMD="${{ steps.gate.outputs.cmd }}"
 
-          # Strip the prefix from message passed to the agent
           AFTER="$(printf '%s' "${BODY}" | sed -E 's#^/[Aa]gent[[:space:]]+[A-Za-z]+[[:space:]]*##')"
           if [[ -z "${AFTER}" ]]; then
             MSG="${TITLE} — ${BODY}"
@@ -105,62 +131,73 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
+        if: steps.gate.outputs.ok == 'true'
         run: npm ci || npm install
 
       # === Hybrid search context: build → serve → fetch ===
       - name: Build code index (embeddings if key present)
+        if: steps.gate.outputs.ok == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npx tsx tools/build-index.ts
 
       - name: Install ripgrep (optional)
+        if: steps.gate.outputs.ok == 'true'
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Start search server (background)
+        if: steps.gate.outputs.ok == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npx tsx tools/search-server.ts & echo $! > search.pid
 
       - name: Fetch harvested context for this request
+        if: steps.gate.outputs.ok == 'true'
         env:
           REQUEST_TEXT: ${{ steps.parse.outputs.text }}
         run: node tools/fetch-context.mjs
 
       - name: Show harvested context size
+        if: steps.gate.outputs.ok == 'true'
         run: |
           sudo apt-get update >/dev/null && sudo apt-get install -y jq >/dev/null
           echo "hits: $(jq '.hits | length' .github/agent/.context.json)"
 
       - name: Run agent (and persist output)
+        if: steps.gate.outputs.ok == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
           MODE:           ${{ steps.parse.outputs.cmd }}
           REQUEST_TEXT:   ${{ steps.parse.outputs.text }}
           AGENT_MODEL:    ${{ env.AGENT_MODEL }}
+        shell: bash
         run: |
           set -euo pipefail
           mkdir -p .github/agent
           echo "MODE=$MODE"
           echo "Text length: $(printf '%s' "$REQUEST_TEXT" | wc -c)"
 
-        if [[ "$MODE" = "plan" ]]; then
-          printf '%s' "$REQUEST_TEXT" \
-            | node .github/agent/agent.mjs --mode=plan \
-            | tee .github/agent/.plan.md
-        else
-          printf '%s' "$REQUEST_TEXT" \
-            | node .github/agent/agent.mjs --mode=apply \
-            | tee .github/agent/.apply.json
-        fi
-        
+          if [[ "$MODE" = "plan" ]]; then
+            printf '%s' "$REQUEST_TEXT" \
+              | node .github/agent/agent.mjs --mode=plan \
+              | tee .github/agent/.plan.md
+          else
+            printf '%s' "$REQUEST_TEXT" \
+              | node .github/agent/agent.mjs --mode=apply \
+              | tee .github/agent/.apply.json
+          fi
+
+      # ---------------------------
+      # Plan Lint (quality gate)
+      # ---------------------------
       - name: Plan Lint (quality gate)
-        if: steps.parse.outputs.cmd == 'plan'
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
         run: |
           node .github/agent/plan-lint.mjs .github/agent/PLAN.json
-        
+
       - name: Comment plan preview
-        if: steps.parse.outputs.cmd == 'plan'
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
         uses: actions/github-script@v7
         with:
           script: |
@@ -176,16 +213,16 @@ jobs:
             });
 
       - name: Upload full plan as artifact
-        if: steps.parse.outputs.cmd == 'plan'
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'plan'
         uses: actions/upload-artifact@v4
         with:
           name: agent-plan
           path: .github/agent/.plan.md
           include-hidden-files: true
           if-no-files-found: warn
-          
+
       - name: Link to this run (comment)
-        if: always() && (github.event_name == 'issues' || github.event_name == 'issue_comment')
+        if: steps.gate.outputs.ok == 'true' && (github.event_name == 'issues' || github.event_name == 'issue_comment')
         uses: actions/github-script@v7
         with:
           script: |
@@ -193,14 +230,15 @@ jobs:
             await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body: `Artifact **agent-plan** is attached to this run.\n\n${url}` });
 
       - name: Materialize files from APPLY JSON
-        if: steps.parse.outputs.cmd == 'apply'
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'apply'
+        shell: bash
         run: |
           set -euo pipefail
           node -e "const fs=require('fs'),p=require('path');const j=JSON.parse(fs.readFileSync('.github/agent/.apply.json','utf8'));if(!j.files||!j.files.length){process.exit(0)};for(const f of j.files){fs.mkdirSync(p.dirname(f.path),{recursive:true});fs.writeFileSync(f.path,f.contents,'utf8');}fs.writeFileSync('.github/agent/.commitmsg', (j.commitMessage||'chore: agent apply')+'\n');fs.writeFileSync('.github/agent/.summary', j.summary||'');"
 
       - name: Read APPLY metadata
         id: applymeta
-        if: steps.parse.outputs.cmd == 'apply'
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'apply'
         run: |
           echo "commit<<EOF" >> $GITHUB_OUTPUT
           jq -r '.commitMessage // "chore: agent apply"' .github/agent/.apply.json >> $GITHUB_OUTPUT
@@ -210,7 +248,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request (agent apply)
-        if: steps.parse.outputs.cmd == 'apply'
+        if: steps.gate.outputs.ok == 'true' && steps.parse.outputs.cmd == 'apply'
         uses: peter-evans/create-pull-request@v6
         with:
           branch: agent/apply-${{ github.run_id }}
