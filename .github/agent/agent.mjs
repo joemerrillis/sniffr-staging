@@ -2,20 +2,24 @@
 /**
  * Sniffr Agent Runner (PLAN / APPLY)
  *
- * This is a thin, pluggable wrapper around an LLM.
- * - Reads prompt from STDIN (or --prompt-file)
- * - --mode=plan  → returns Markdown PLAN
- * - --mode=apply → returns strict JSON { summary, commitMessage, files:[{path,contents}] }
- *
- * If OPENAI is available (OPENAI_API_KEY + 'openai' npm pkg), it will call the API.
- * Otherwise it will emit conservative stubs (so CI doesn't explode locally).
+ * - --mode=plan  → writes:
+ *     - .github/agent/.plan.md  (human preview)
+ *     - .github/agent/PLAN.json (machine-readable for plan-lint)
+ *   and prints the markdown to stdout (so your workflow keeps tee -> .plan.md)
+ * - --mode=apply → prints strict JSON { summary, commitMessage, files:[...] }
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 
+const OUT_DIR = '.github/agent';
+const PLAN_MD = path.join(OUT_DIR, '.plan.md');
+const PLAN_JSON = path.join(OUT_DIR, 'PLAN.json');
+
 function exists(p) { try { fs.accessSync(p); return true; } catch { return false; } }
 function read(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
+function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
+
 function parseArgs(argv) {
   const args = { mode: 'plan' };
   for (let i = 2; i < argv.length; i++) {
@@ -29,6 +33,7 @@ function parseArgs(argv) {
   }
   return args;
 }
+
 async function maybeOpenAI() {
   const key = process.env.OPENAI_API_KEY || process.env.OPENAI_APIKEY || '';
   if (!key) return null;
@@ -43,12 +48,13 @@ async function maybeOpenAI() {
 
 function readPrompt(promptFile) {
   if (promptFile && exists(promptFile)) return read(promptFile);
-  // Read from stdin
-  const buf = fs.readFileSync(0, 'utf8');
+  const buf = fs.readFileSync(0, 'utf8'); // stdin
   return buf.toString();
 }
 
-function defaultPlan(prompt) {
+/* ---------------------- DEFAULT FALLBACKS (unchanged semantics) ---------------------- */
+
+function defaultPlanMarkdown(prompt) {
   return `# Plan
 - Analyze Constitution & Schema; identify required changes.
 - Scaffold or modify plugin files as needed.
@@ -71,8 +77,18 @@ function defaultPlan(prompt) {
 `;
 }
 
+function defaultPlanJSON(prompt, planMarkdown) {
+  return {
+    meta: {
+      outputFormat: "PLAN(markdown) + APPLY(strict JSON)",
+      cookieStrategy: "server-set" // safe default to satisfy FE constitution until specified
+    },
+    changes: [], // planner can fill these; linter will still run path-only checks if present
+    planMarkdown
+  };
+}
+
 function defaultApply(prompt) {
-  // Minimal no-op commit to keep pipelines flowing if no LLM configured
   return {
     summary: "No-op apply (fallback). Please configure OPENAI_API_KEY for real edits.",
     commitMessage: "chore: noop apply (agent fallback)",
@@ -80,8 +96,37 @@ function defaultApply(prompt) {
   };
 }
 
-async function openaiPlan(client, prompt) {
-  const sys = `You are Sniffr's code agent. Respond ONLY with the PLAN markdown section as specified by the Constitution.`;
+/* ---------------------- OPENAI CALLS ---------------------- */
+
+/** CHANGED: Plan returns strict JSON (with embedded planMarkdown). */
+async function openaiPlanJSON(client, prompt) {
+  const sys = `
+You are Sniffr's code agent.
+
+Return ONLY strict JSON in this shape (no markdown fences):
+{
+  "meta": {
+    "outputFormat": "PLAN(markdown) + APPLY(strict JSON)",
+    "cookieStrategy": "server-set" | "other?"
+  },
+  "changes": [
+    {
+      "path": "relative/path/from/repo/root",
+      "type": "add|modify|delete",
+      "meta": {
+        "purpose": "frontend-login|backend-route|... (optional)",
+        "responseEnvelopeKey": "auth|user|walk|..."  // required for backend routes/controllers
+      }
+      // "contents": "optional preview; not required at PLAN time"
+    }
+  ],
+  "planMarkdown": "# Plan\\n- ... (human-readable plan preview)"
+}
+- "changes" should include intended files with correct paths (e.g., apps/web/src/app/(tenants)/[tenant]/login/page.tsx).
+- For backend routes/controllers, include a responseEnvelopeKey in "meta".
+- DO NOT include code blocks or backticks. DO NOT return anything except the JSON object.
+`.trim();
+
   const res = await client.chat.completions.create({
     model: process.env.SNIFFR_AGENT_MODEL || "gpt-4o-mini",
     messages: [
@@ -89,8 +134,22 @@ async function openaiPlan(client, prompt) {
       { role: "user", content: prompt }
     ],
     temperature: 0.2,
+    response_format: { type: "json_object" }
   });
-  return (res.choices?.[0]?.message?.content || '').trim();
+
+  const raw = (res.choices?.[0]?.message?.content || '').trim();
+  let obj;
+  try {
+    obj = JSON.parse(raw);
+  } catch (e) {
+    // As a safety net, if the model returned md: rewrap into JSON
+    obj = defaultPlanJSON(prompt, raw || defaultPlanMarkdown(prompt));
+  }
+  // Ensure minimal fields
+  if (!obj.planMarkdown) obj.planMarkdown = defaultPlanMarkdown(prompt);
+  if (!obj.meta) obj.meta = { outputFormat: "PLAN(markdown) + APPLY(strict JSON)" };
+  if (!Array.isArray(obj.changes)) obj.changes = [];
+  return obj;
 }
 
 async function openaiApply(client, prompt) {
@@ -112,18 +171,35 @@ async function openaiApply(client, prompt) {
   return (res.choices?.[0]?.message?.content || '').trim();
 }
 
+/* ---------------------- MAIN ---------------------- */
+
 async function main() {
   const args = parseArgs(process.argv);
   const prompt = readPrompt(args.promptFile);
+  ensureDir(OUT_DIR);
 
   const client = await maybeOpenAI();
 
   if (args.mode === 'plan') {
     if (client) {
-      const out = await openaiPlan(client, prompt);
-      process.stdout.write(out + '\n');
+      // NEW: get strict JSON with both planMarkdown + changes[]
+      const planObj = await openaiPlanJSON(client, prompt);
+
+      // Write PLAN.json for the linter
+      fs.writeFileSync(PLAN_JSON, JSON.stringify(planObj, null, 2), 'utf8');
+
+      // Also write .plan.md for your existing preview/comment workflow
+      fs.writeFileSync(PLAN_MD, String(planObj.planMarkdown || ''), 'utf8');
+
+      // Keep stdout = markdown so your current workflow `tee .plan.md` still works
+      process.stdout.write(String(planObj.planMarkdown || '') + '\n');
     } else {
-      process.stdout.write(defaultPlan(prompt) + '\n');
+      // Fallback: generate markdown + minimal JSON
+      const md = defaultPlanMarkdown(prompt);
+      const json = defaultPlanJSON(prompt, md);
+      fs.writeFileSync(PLAN_JSON, JSON.stringify(json, null, 2), 'utf8');
+      fs.writeFileSync(PLAN_MD, md, 'utf8');
+      process.stdout.write(md + '\n');
     }
     return;
   }
@@ -138,7 +214,6 @@ async function main() {
     return;
   }
 
-  // Unknown mode
   console.error(`Unknown --mode ${args.mode}. Use --mode plan | apply`);
   process.exit(2);
 }
