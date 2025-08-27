@@ -153,7 +153,12 @@ jobs:
             | node .github/agent/agent.mjs --mode=apply \
             | tee .github/agent/.apply.json
         fi
-
+        
+      - name: Plan Lint (quality gate)
+        if: steps.parse.outputs.cmd == 'plan'
+        run: |
+          node .github/agent/plan-lint.mjs .github/agent/PLAN.json
+        
       - name: Comment plan preview
         if: steps.parse.outputs.cmd == 'plan'
         uses: actions/github-script@v7
@@ -177,15 +182,6 @@ jobs:
           name: agent-plan
           path: .github/agent/.plan.md
           include-hidden-files: true
-          if-no-files-found: warn
-
-      - name: Upload full plan as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-plan
-          path: .github/agent/.plan.md
-          include-hidden-files: true  
           if-no-files-found: warn
           
       - name: Link to this run (comment)
