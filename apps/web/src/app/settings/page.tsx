@@ -1,9 +1,67 @@
+'use client';
+
+import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SettingsPage() {
+  const { user, updateProfile, changePassword } = useAuth();
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+  });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setProfileData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdatingProfile(true);
+    try {
+      await updateProfile(profileData);
+      alert('Profile updated successfully!');
+    } catch {
+      alert('Failed to update profile');
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('New passwords do not match');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      alert('Password changed successfully!');
+    } catch {
+      alert('Failed to change password');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -46,33 +104,68 @@ export default function SettingsPage() {
                 <CardTitle>Profile Information</CardTitle>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      label="First Name"
-                      defaultValue="John"
-                      placeholder="Enter first name"
-                    />
-                    <Input
-                      label="Last Name"
-                      defaultValue="Doe"
-                      placeholder="Enter last name"
-                    />
-                  </div>
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <Input
+                    label="Full Name"
+                    name="name"
+                    value={profileData.name}
+                    onChange={handleProfileChange}
+                    placeholder="Enter your full name"
+                  />
                   <Input
                     label="Email"
+                    name="email"
                     type="email"
-                    defaultValue="john@example.com"
+                    value={profileData.email}
+                    onChange={handleProfileChange}
                     placeholder="Enter email address"
                   />
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-gray-500">
+                      Role: <span className="capitalize font-medium">{user?.role}</span>
+                    </div>
+                    <Button type="submit" loading={isUpdatingProfile}>
+                      Save Changes
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Change Password</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleChangePassword} className="space-y-4">
                   <Input
-                    label="Phone"
-                    type="tel"
-                    defaultValue="+1 (555) 123-4567"
-                    placeholder="Enter phone number"
+                    label="Current Password"
+                    name="currentPassword"
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={handlePasswordChange}
+                    placeholder="Enter current password"
+                  />
+                  <Input
+                    label="New Password"
+                    name="newPassword"
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={handlePasswordChange}
+                    placeholder="Enter new password"
+                  />
+                  <Input
+                    label="Confirm New Password"
+                    name="confirmPassword"
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={handlePasswordChange}
+                    placeholder="Confirm new password"
                   />
                   <div className="flex justify-end">
-                    <Button>Save Changes</Button>
+                    <Button type="submit" loading={isChangingPassword}>
+                      Change Password
+                    </Button>
                   </div>
                 </form>
               </CardContent>

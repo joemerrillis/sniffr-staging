@@ -1,39 +1,58 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { apiClient, type Dog, type Household } from '@/lib/api';
 
 interface DogFormProps {
-  dog?: {
-    id?: string;
-    name: string;
-    breed: string;
-    age: number;
-    weight: number;
-    owner: string;
-    notes?: string;
-  };
-  onSubmit: (data: any) => Promise<void>;
+  dog?: Dog;
+  onSubmit: (data: Omit<Dog, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   onCancel?: () => void;
 }
 
 export function DogForm({ dog, onSubmit, onCancel }: DogFormProps) {
+  const [households, setHouseholds] = useState<Household[]>([]);
   const [formData, setFormData] = useState({
     name: dog?.name || '',
     breed: dog?.breed || '',
     age: dog?.age?.toString() || '',
     weight: dog?.weight?.toString() || '',
-    owner: dog?.owner || '',
+    color: dog?.color || '',
+    gender: dog?.gender || 'male',
+    fixed: dog?.fixed || false,
+    medications: dog?.medications?.join(', ') || '',
+    allergies: dog?.allergies?.join(', ') || '',
     notes: dog?.notes || '',
+    household_id: dog?.household_id || '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  useEffect(() => {
+    const fetchHouseholds = async () => {
+      try {
+        const response = await apiClient.getHouseholds();
+        if (response.data) {
+          setHouseholds(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching households:', error);
+      }
+    };
+    fetchHouseholds();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    let processedValue: any = value;
+    
+    if (type === 'checkbox') {
+      processedValue = (e.target as HTMLInputElement).checked;
+    }
+    
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
     
     // Clear error when user starts typing
     if (errors[name]) {
@@ -48,20 +67,16 @@ export function DogForm({ dog, onSubmit, onCancel }: DogFormProps) {
       newErrors.name = 'Dog name is required';
     }
 
-    if (!formData.breed.trim()) {
-      newErrors.breed = 'Breed is required';
+    if (!formData.household_id) {
+      newErrors.household_id = 'Please select a household';
     }
 
-    if (!formData.age || isNaN(Number(formData.age)) || Number(formData.age) <= 0) {
+    if (formData.age && (isNaN(Number(formData.age)) || Number(formData.age) <= 0)) {
       newErrors.age = 'Please enter a valid age';
     }
 
-    if (!formData.weight || isNaN(Number(formData.weight)) || Number(formData.weight) <= 0) {
+    if (formData.weight && (isNaN(Number(formData.weight)) || Number(formData.weight) <= 0)) {
       newErrors.weight = 'Please enter a valid weight';
-    }
-
-    if (!formData.owner.trim()) {
-      newErrors.owner = 'Owner name is required';
     }
 
     setErrors(newErrors);
@@ -79,9 +94,17 @@ export function DogForm({ dog, onSubmit, onCancel }: DogFormProps) {
 
     try {
       await onSubmit({
-        ...formData,
-        age: Number(formData.age),
-        weight: Number(formData.weight),
+        name: formData.name,
+        breed: formData.breed || undefined,
+        age: formData.age ? Number(formData.age) : undefined,
+        weight: formData.weight ? Number(formData.weight) : undefined,
+        color: formData.color || undefined,
+        gender: formData.gender as 'male' | 'female',
+        fixed: formData.fixed,
+        medications: formData.medications ? formData.medications.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+        allergies: formData.allergies ? formData.allergies.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+        notes: formData.notes || undefined,
+        household_id: formData.household_id,
       });
     } catch (error) {
       console.error('Form submission error:', error);
@@ -99,7 +122,7 @@ export function DogForm({ dog, onSubmit, onCancel }: DogFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Dog Name"
+              label="Dog Name*"
               name="name"
               value={formData.name}
               onChange={handleChange}
@@ -107,13 +130,43 @@ export function DogForm({ dog, onSubmit, onCancel }: DogFormProps) {
               placeholder="Enter dog's name"
             />
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Household*
+              </label>
+              <select
+                name="household_id"
+                value={formData.household_id}
+                onChange={handleChange}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="">Select a household</option>
+                {households.map((household) => (
+                  <option key={household.id} value={household.id}>
+                    {household.name}
+                  </option>
+                ))}
+              </select>
+              {errors.household_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.household_id}</p>
+              )}
+            </div>
+
             <Input
               label="Breed"
               name="breed"
               value={formData.breed}
               onChange={handleChange}
               error={errors.breed}
-              placeholder="Enter breed"
+              placeholder="Enter breed (optional)"
+            />
+
+            <Input
+              label="Color"
+              name="color"
+              value={formData.color}
+              onChange={handleChange}
+              placeholder="Enter color (optional)"
             />
 
             <Input
@@ -123,7 +176,7 @@ export function DogForm({ dog, onSubmit, onCancel }: DogFormProps) {
               value={formData.age}
               onChange={handleChange}
               error={errors.age}
-              placeholder="Enter age"
+              placeholder="Enter age (optional)"
             />
 
             <Input
@@ -133,17 +186,53 @@ export function DogForm({ dog, onSubmit, onCancel }: DogFormProps) {
               value={formData.weight}
               onChange={handleChange}
               error={errors.weight}
-              placeholder="Enter weight"
+              placeholder="Enter weight (optional)"
             />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gender
+              </label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="fixed"
+                name="fixed"
+                checked={formData.fixed}
+                onChange={handleChange}
+                className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+              />
+              <label htmlFor="fixed" className="text-sm font-medium text-gray-700">
+                Spayed/Neutered
+              </label>
+            </div>
           </div>
 
           <Input
-            label="Owner Name"
-            name="owner"
-            value={formData.owner}
+            label="Medications"
+            name="medications"
+            value={formData.medications}
             onChange={handleChange}
-            error={errors.owner}
-            placeholder="Enter owner's name"
+            placeholder="Enter medications separated by commas (optional)"
+          />
+
+          <Input
+            label="Allergies"
+            name="allergies"
+            value={formData.allergies}
+            onChange={handleChange}
+            placeholder="Enter allergies separated by commas (optional)"
           />
 
           <div>

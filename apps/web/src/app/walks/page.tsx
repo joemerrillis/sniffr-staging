@@ -1,5 +1,5 @@
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { PlusIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
 
@@ -39,14 +39,17 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'completed':
       return 'bg-green-100 text-green-800';
-    case 'in-progress':
+    case 'in_progress':
       return 'bg-blue-100 text-blue-800';
     case 'scheduled':
       return 'bg-orange-100 text-orange-800';
+    case 'cancelled':
+      return 'bg-red-100 text-red-800';
     default:
       return 'bg-gray-100 text-gray-800';
   }
 };
+
 
 export default function WalksPage() {
   return (

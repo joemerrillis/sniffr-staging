@@ -51,7 +51,7 @@ function setCssVars(tokens: ThemeTokens) {
 }
 
 export function TenantThemeProvider({ initial, children }: { initial: ThemeTokens; children: React.ReactNode }) {
-  const [tokens, setTokens] = useState<ThemeTokens>(initial);
+  const [tokens] = useState<ThemeTokens>(initial);
   const memo = useMemo(() => tokens, [tokens]);
 
   useEffect(() => {
