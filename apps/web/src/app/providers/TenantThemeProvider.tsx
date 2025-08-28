@@ -11,29 +11,43 @@ export const useThemeTokens = () => {
 };
 
 function setCssVars(tokens: ThemeTokens) {
+  if (!tokens || typeof document === 'undefined') return;
+  
   const r = document.documentElement.style;
   // brand
-  r.setProperty('--brand-primary', tokens.brand.primary);
-  r.setProperty('--brand-primary-text', tokens.brand.primaryText);
-  r.setProperty('--brand-accent', tokens.brand.accent);
+  if (tokens.brand) {
+    r.setProperty('--brand-primary', tokens.brand.primary || '#1a73e8');
+    r.setProperty('--brand-primary-text', tokens.brand.primaryText || '#ffffff');
+    r.setProperty('--brand-accent', tokens.brand.accent || '#9333ea');
+  }
   // surface
-  r.setProperty('--bg', tokens.surface.bg);
-  r.setProperty('--fg', tokens.surface.fg);
-  r.setProperty('--muted', tokens.surface.muted);
+  if (tokens.surface) {
+    r.setProperty('--bg', tokens.surface.bg || '#ffffff');
+    r.setProperty('--fg', tokens.surface.fg || '#111111');
+    r.setProperty('--muted', tokens.surface.muted || '#6b7280');
+  }
   // type
-  r.setProperty('--font-family', tokens.typography.fontFamily);
-  r.setProperty('--scale-sm', String(tokens.typography.scale.sm));
-  r.setProperty('--scale-md', String(tokens.typography.scale.md));
-  r.setProperty('--scale-lg', String(tokens.typography.scale.lg));
-  r.setProperty('--scale-xl', String(tokens.typography.scale.xl));
+  if (tokens.typography) {
+    r.setProperty('--font-family', tokens.typography.fontFamily || 'Inter, system-ui, Arial, sans-serif');
+    if (tokens.typography.scale) {
+      r.setProperty('--scale-sm', String(tokens.typography.scale.sm || 0.875));
+      r.setProperty('--scale-md', String(tokens.typography.scale.md || 1));
+      r.setProperty('--scale-lg', String(tokens.typography.scale.lg || 1.25));
+      r.setProperty('--scale-xl', String(tokens.typography.scale.xl || 1.6));
+    }
+  }
   // radius
-  r.setProperty('--radius-sm', tokens.radius.sm + 'px');
-  r.setProperty('--radius-md', tokens.radius.md + 'px');
-  r.setProperty('--radius-lg', tokens.radius.lg + 'px');
+  if (tokens.radius) {
+    r.setProperty('--radius-sm', (tokens.radius.sm || 6) + 'px');
+    r.setProperty('--radius-md', (tokens.radius.md || 12) + 'px');
+    r.setProperty('--radius-lg', (tokens.radius.lg || 20) + 'px');
+  }
   // spacing
-  r.setProperty('--space-sm', tokens.spacing.sm + 'px');
-  r.setProperty('--space-md', tokens.spacing.md + 'px');
-  r.setProperty('--space-lg', tokens.spacing.lg + 'px');
+  if (tokens.spacing) {
+    r.setProperty('--space-sm', (tokens.spacing.sm || 8) + 'px');
+    r.setProperty('--space-md', (tokens.spacing.md || 12) + 'px');
+    r.setProperty('--space-lg', (tokens.spacing.lg || 20) + 'px');
+  }
 }
 
 export function TenantThemeProvider({ initial, children }: { initial: ThemeTokens; children: React.ReactNode }) {

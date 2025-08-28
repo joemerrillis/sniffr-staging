@@ -2,6 +2,7 @@ import './globals.css';
 import { TenantThemeProvider } from './providers/TenantThemeProvider';
 import { AppProvider } from '@/components/providers/AppProvider';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { DEFAULT_TOKENS } from '@/lib/tenant';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ErrorBoundary>
           <AppProvider>
-            <TenantThemeProvider>
+            <TenantThemeProvider initial={DEFAULT_TOKENS}>
               {children}
             </TenantThemeProvider>
           </AppProvider>
