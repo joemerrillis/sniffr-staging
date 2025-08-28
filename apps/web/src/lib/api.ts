@@ -143,7 +143,14 @@ class ApiClient {
         throw new Error(data.error?.message || data.message || `HTTP ${response.status}`);
       }
 
-      return data;
+      // Handle both envelope and direct response formats
+      // If the response has a 'data' property, it's already enveloped
+      if ('data' in data) {
+        return data; // Already in envelope format: { data: T, error?, meta? }
+      } else {
+        // Backend returned data directly, wrap it in envelope format
+        return { data }; // Convert to envelope format
+      }
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
