@@ -2,7 +2,6 @@
 
 import {
   listDogs,
-  listDogsForTenant,
   getDog,
   createDog,
   updateDog,
@@ -11,24 +10,12 @@ import {
   createDogOwner
 } from '../services/dogsService.js';
 
-import { getTenantId } from '../../chat/utils/chatUtils.js';
-
 /**
  * GET /dogs
  */
 export async function list(request, reply) {
-  const tenantId = getTenantId(request);
-  
-  let dogs;
-  if (tenantId) {
-    // Use tenant-filtered results if tenant context is available
-    dogs = await listDogsForTenant(request.server, tenantId);
-  } else {
-    // Fallback to all dogs (for backwards compatibility or non-tenant contexts)
-    dogs = await listDogs(request.server);
-  }
-  
-  reply.send({ data: dogs });
+  const dogs = await listDogs(request.server);
+  reply.send({ dogs });
 }
 
 /**
@@ -40,7 +27,7 @@ export async function retrieve(request, reply) {
   if (!dog) {
     return reply.code(404).send({ error: 'Dog not found' });
   }
-  reply.send({ data: dog });
+  reply.send({ dog });
 }
 
 /**
@@ -56,7 +43,7 @@ export async function create(request, reply) {
   // 2. Create dog-owner relationship (role must be provided)
   await createDogOwner(request.server, { dog_id: dog.id, user_id, role: 'owner' });
 
-  reply.code(201).send({ data: dog });
+  reply.code(201).send({ dog });
 }
 
 /**
@@ -69,7 +56,7 @@ export async function modify(request, reply) {
   if (!dog) {
     return reply.code(404).send({ error: 'Dog not found' });
   }
-  reply.send({ data: dog });
+  reply.send({ dog });
 }
 
 /**
@@ -97,6 +84,6 @@ export async function photoUploadUrl(request, reply) {
  */
 export async function exportOwnerMedia(request, reply) {
   const { ownerId } = request.params;
-  // TODO: fetch & package owner’s media, then stream or send back
+  // TODO: fetch & package owner's media, then stream or send back
   reply.send({ media: [] });
 }

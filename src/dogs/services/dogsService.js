@@ -4,58 +4,7 @@ const TABLE = 'dogs';
 const PHOTO_BUCKET = process.env.DOG_PHOTO_BUCKET || 'dog_photos';
 
 /**
- * List all dogs accessible within a tenant context
- * Dogs are accessible if their owners are clients of the tenant
- */
-export async function listDogsForTenant(server, tenantId) {
-  // First, get all client user IDs for this tenant
-  const { data: tenantClients, error: clientError } = await server.supabase
-    .from('tenant_clients')
-    .select('client_id')
-    .eq('tenant_id', tenantId)
-    .eq('accepted', true);
-    
-  if (clientError) throw clientError;
-  
-  if (!tenantClients || tenantClients.length === 0) {
-    return []; // No clients for this tenant
-  }
-  
-  const clientIds = tenantClients.map(tc => tc.client_id);
-  
-  // Then, get all dogs owned by these clients
-  const { data: dogs, error: dogsError } = await server.supabase
-    .from(TABLE)
-    .select(`
-      id,
-      name,
-      breed,
-      age,
-      weight,
-      color,
-      gender,
-      fixed,
-      medications,
-      allergies,
-      notes,
-      household_id,
-      created_at,
-      updated_at,
-      dog_owners!inner (user_id)
-    `)
-    .in('dog_owners.user_id', clientIds);
-    
-  if (dogsError) throw dogsError;
-  
-  // Clean the data to remove the joined relationship data
-  return dogs.map(dog => {
-    const { dog_owners, ...cleanDog } = dog;
-    return cleanDog;
-  });
-}
-
-/**
- * List all dogs (legacy - for backwards compatibility)
+ * List all dogs
  */
 export async function listDogs(server) {
   const { data, error } = await server.supabase
@@ -112,8 +61,8 @@ export async function updateDog(server, id, payload) {
   const { data, error } = await server.supabase
     .from(TABLE)
     .update(payload)
-    .eq('id', id)
     .select('*')
+    .eq('id', id)
     .single();
   if (error) throw error;
   return data;

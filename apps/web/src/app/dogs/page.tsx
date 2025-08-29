@@ -28,8 +28,8 @@ export default function DogsPage() {
     try {
       const response = await apiClient.getDogs();
       if (response.data) {
-        // Handle both array and object response formats
-        const dogsData = Array.isArray(response.data) ? response.data : response.data.dogs;
+        // Backend returns { dogs: [...] }, API client wraps it as { data: { dogs: [...] } }
+        const dogsData = response.data.dogs || response.data;
         if (Array.isArray(dogsData)) {
           setDogs(dogsData);
           setError(null);
@@ -51,8 +51,14 @@ export default function DogsPage() {
     try {
       const response = await apiClient.createDog(dogData);
       if (response.data) {
-        await fetchDogs(); // Refresh the list
-        setIsAddModalOpen(false);
+        // Backend returns { dog: {...} }, API client wraps it as { data: { dog: {...} } }
+        const dogResult = response.data.dog || response.data;
+        if (dogResult) {
+          await fetchDogs(); // Refresh the list
+          setIsAddModalOpen(false);
+        } else {
+          throw new Error('Failed to create dog');
+        }
       } else {
         throw new Error(response.error?.message || 'Failed to create dog');
       }
@@ -68,9 +74,15 @@ export default function DogsPage() {
     try {
       const response = await apiClient.updateDog(selectedDog.id, dogData);
       if (response.data) {
-        await fetchDogs(); // Refresh the list
-        setIsEditModalOpen(false);
-        setSelectedDog(null);
+        // Backend returns { dog: {...} }, API client wraps it as { data: { dog: {...} } }
+        const dogResult = response.data.dog || response.data;
+        if (dogResult) {
+          await fetchDogs(); // Refresh the list
+          setIsEditModalOpen(false);
+          setSelectedDog(null);
+        } else {
+          throw new Error('Failed to update dog');
+        }
       } else {
         throw new Error(response.error?.message || 'Failed to update dog');
       }
