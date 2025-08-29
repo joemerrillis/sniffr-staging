@@ -10,12 +10,18 @@ import {
   createDogOwner
 } from '../services/dogsService.js';
 
+import { getTenantId } from '../../chat/utils/chatUtils.js';
+
 /**
  * GET /dogs
  */
 export async function list(request, reply) {
-  const dogs = await listDogs(request.server);
-  reply.send({ dogs });
+  const tenantId = getTenantId(request);
+  if (!tenantId) {
+    return reply.code(400).send({ error: 'Tenant ID is required' });
+  }
+  const dogs = await listDogs(request.server, tenantId);
+  reply.send({ data: dogs });
 }
 
 /**
@@ -27,7 +33,7 @@ export async function retrieve(request, reply) {
   if (!dog) {
     return reply.code(404).send({ error: 'Dog not found' });
   }
-  reply.send({ dog });
+  reply.send({ data: dog });
 }
 
 /**
@@ -43,7 +49,7 @@ export async function create(request, reply) {
   // 2. Create dog-owner relationship (role must be provided)
   await createDogOwner(request.server, { dog_id: dog.id, user_id, role: 'owner' });
 
-  reply.code(201).send({ dog });
+  reply.code(201).send({ data: dog });
 }
 
 /**
@@ -56,7 +62,7 @@ export async function modify(request, reply) {
   if (!dog) {
     return reply.code(404).send({ error: 'Dog not found' });
   }
-  reply.send({ dog });
+  reply.send({ data: dog });
 }
 
 /**

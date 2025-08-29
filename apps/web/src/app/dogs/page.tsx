@@ -28,8 +28,14 @@ export default function DogsPage() {
     try {
       const response = await apiClient.getDogs();
       if (response.data) {
-        setDogs(response.data);
-        setError(null);
+        // Handle both array and object response formats
+        const dogsData = Array.isArray(response.data) ? response.data : response.data.dogs;
+        if (Array.isArray(dogsData)) {
+          setDogs(dogsData);
+          setError(null);
+        } else {
+          setError('Invalid response format - expected array of dogs');
+        }
       } else {
         setError(response.error?.message || 'Failed to fetch dogs');
       }

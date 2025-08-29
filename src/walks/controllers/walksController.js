@@ -9,8 +9,14 @@ import {
   cloneWeekWalks as cloneService
 } from '../services/walksService.js';
 
+import { getTenantId } from '../../chat/utils/chatUtils.js';
+
 export async function listWalks(request, reply) {
-  const data = await listService(request.server);
+  const tenantId = getTenantId(request);
+  if (!tenantId) {
+    return reply.code(400).send({ error: 'Tenant ID is required' });
+  }
+  const data = await listService(request.server, tenantId);
   reply.send(data);
 }
 

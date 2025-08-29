@@ -6,10 +6,11 @@ const PHOTO_BUCKET = process.env.DOG_PHOTO_BUCKET || 'dog_photos';
 /**
  * List all dogs
  */
-export async function listDogs(server) {
+export async function listDogs(server, tenantId) {
   const { data, error } = await server.supabase
     .from(TABLE)
-    .select('*');
+    .select('*')
+    .eq('tenant_id', tenantId);
   if (error) throw error;
   return data;
 }

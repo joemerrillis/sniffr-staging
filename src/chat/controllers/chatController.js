@@ -10,6 +10,14 @@ export async function listChats(request, reply) {
     const supabase = getSupabase(request);
     const user_id = getUserId(request);
     const tenant_id = getTenantId(request);
+    
+    if (!user_id) {
+      return reply.code(400).send({ error: 'User ID is required' });
+    }
+    if (!tenant_id) {
+      return reply.code(400).send({ error: 'Tenant ID is required' });
+    }
+    
     const chats = await getChatsForUser(supabase, user_id, tenant_id);
     return reply.send({ data: chats });
   } catch (err) {

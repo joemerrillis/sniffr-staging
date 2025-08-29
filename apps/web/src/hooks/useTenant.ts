@@ -27,7 +27,9 @@ export function useTenant() {
     const fetchTenant = async () => {
       try {
         // Get tenant info from hostname or headers
-        const response = await fetch('/api/tenant/current');
+        // TODO: For now using a placeholder tenant ID, should be dynamic based on subdomain/context
+        const tenantId = 'current'; // This should be determined from subdomain or auth context
+        const response = await fetch(`/api/tenants/${tenantId}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch tenant information');
