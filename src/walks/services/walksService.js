@@ -4,11 +4,10 @@ const TABLE = 'walks';
 const DOGS_TABLE = 'dogs';
 const USERS_TABLE = 'users';
 
-export async function listWalks(server, tenantId) {
+export async function listWalks(server) {
   const { data, error } = await server.supabase
     .from(TABLE)
-    .select('*')
-    .eq('tenant_id', tenantId);
+    .select('*');
   if (error) throw error;
   return data;
 }

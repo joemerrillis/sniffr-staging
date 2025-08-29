@@ -2,6 +2,7 @@
 
 import {
   listDogs,
+  listDogsForTenant,
   getDog,
   createDog,
   updateDog,
@@ -17,10 +18,16 @@ import { getTenantId } from '../../chat/utils/chatUtils.js';
  */
 export async function list(request, reply) {
   const tenantId = getTenantId(request);
-  if (!tenantId) {
-    return reply.code(400).send({ error: 'Tenant ID is required' });
+  
+  let dogs;
+  if (tenantId) {
+    // Use tenant-filtered results if tenant context is available
+    dogs = await listDogsForTenant(request.server, tenantId);
+  } else {
+    // Fallback to all dogs (for backwards compatibility or non-tenant contexts)
+    dogs = await listDogs(request.server);
   }
-  const dogs = await listDogs(request.server, tenantId);
+  
   reply.send({ data: dogs });
 }
 
