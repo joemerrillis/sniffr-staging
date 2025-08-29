@@ -84,6 +84,6 @@ export async function photoUploadUrl(request, reply) {
  */
 export async function exportOwnerMedia(request, reply) {
   const { ownerId } = request.params;
-  // TODO: fetch & package owner’s media, then stream or send back
+  // TODO: fetch & package owner's media, then stream or send back
   reply.send({ media: [] });
 }
